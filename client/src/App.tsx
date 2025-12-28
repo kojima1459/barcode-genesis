@@ -4,11 +4,11 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import Auth from "@/pages/Auth";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch } from "wouter";
+import { Route, Switch, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
-import { SoundProvider } from "@/contexts/SoundContext";
+import { SoundProvider, useSound } from "@/contexts/SoundContext";
 import Battle from "@/pages/Battle";
 import Collection from "@/pages/Collection";
 import Leaderboard from "@/pages/Leaderboard";
@@ -23,32 +23,54 @@ import Privacy from "@/pages/legal/Privacy";
 import Terms from "@/pages/legal/Terms";
 import SpecifiedCommercial from "@/pages/legal/SpecifiedCommercial";
 import BottomNav from "@/components/BottomNav";
+import { useEffect } from "react";
+import { AnimatePresence } from "framer-motion";
+import PageTransition from "@/components/PageTransition";
+
+function GlobalSoundManager() {
+  const { playSE } = useSound();
+
+  useEffect(() => {
+    const handleClick = () => {
+      playSE("se_click");
+    };
+    window.addEventListener("click", handleClick);
+    return () => window.removeEventListener("click", handleClick);
+  }, [playSE]);
+
+  return null;
+}
 
 function Router() {
+  const [location] = useLocation();
+
   return (
     <>
-      <Switch>
-        <Route path="/lp" component={LandingPage} />
-        <Route path="/privacy" component={Privacy} />
-        <Route path="/terms" component={Terms} />
-        <Route path="/law" component={SpecifiedCommercial} />
-        <Route path="/auth" component={Auth} />
-        <Route path="/" component={Home} />
-        <Route path="/battle" component={Battle} />
-        <Route path="/collection" component={Collection} />
-        <Route path="/shop" component={Shop} />
-        <Route path="/robots/:robotId">
-          {(params) => <RobotDetail robotId={params.robotId} />}
-        </Route>
-        <Route path="/leaderboard" component={Leaderboard} />
-        <Route path="/achievements" component={Achievements} />
-        <Route path="/premium" component={Premium} />
-        <Route path="/profile" component={Profile} />
-        <Route path="/404" component={NotFound} />
-        {/* Final fallback route */}
-        <Route component={NotFound} />
-        <Route component={NotFound} />
-      </Switch>
+      <AnimatePresence mode="wait">
+        <PageTransition key={location}>
+          <Switch location={location}>
+            <Route path="/lp" component={LandingPage} />
+            <Route path="/privacy" component={Privacy} />
+            <Route path="/terms" component={Terms} />
+            <Route path="/law" component={SpecifiedCommercial} />
+            <Route path="/auth" component={Auth} />
+            <Route path="/" component={Home} />
+            <Route path="/battle" component={Battle} />
+            <Route path="/collection" component={Collection} />
+            <Route path="/shop" component={Shop} />
+            <Route path="/robots/:robotId">
+              {(params) => <RobotDetail robotId={params.robotId} />}
+            </Route>
+            <Route path="/leaderboard" component={Leaderboard} />
+            <Route path="/achievements" component={Achievements} />
+            <Route path="/premium" component={Premium} />
+            <Route path="/profile" component={Profile} />
+            <Route path="/404" component={NotFound} />
+            {/* Final fallback route */}
+            <Route component={NotFound} />
+          </Switch>
+        </PageTransition>
+      </AnimatePresence>
       <BottomNav />
     </>
   );
@@ -64,6 +86,7 @@ function App() {
     <ErrorBoundary>
       <LanguageProvider>
         <SoundProvider>
+          <GlobalSoundManager />
           <ThemeProvider defaultTheme="dark">
             <AuthProvider>
               <TooltipProvider>

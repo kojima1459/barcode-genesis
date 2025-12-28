@@ -8,6 +8,7 @@ import { collection, collectionGroup, getDocs, query, orderBy, limit, where, onS
 import { httpsCallable } from "firebase/functions";
 import { ArrowLeft, Loader2, Sword, Trophy, Search, Star } from "lucide-react";
 import RobotSVG from "@/components/RobotSVG";
+import { ElementalBurst, SkillCutIn } from "@/components/BattleEffects";
 import { Link } from "wouter";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
@@ -281,47 +282,81 @@ export default function Battle() {
   };
 
   // ログ再生アニメーション
-  const playBattleLogs = (logs: BattleLog[]) => {
+  const playBattleLogs = (result: BattleResult) => {
     let index = 0;
     const interval = setInterval(() => {
-      setCurrentLogIndex(index);
-
-      // SE再生 & エフェクト
-      const log = logs[index];
-      if (log) {
-        if (log.damage > 0) {
-          playSE('se_attack');
-          // Defender takes damage, so shake defender
-          setShaking(log.defenderId);
-          setTimeout(() => setShaking(null), 500);
-
-          // Add visual popup
-          // Randomize position slightly
-          const offset = Math.random() * 40 - 20;
-          setDamagePopups(prev => [
-            ...prev,
-            {
-              id: Math.random().toString(),
-              value: log.damage,
-              isCritical: log.isCritical,
-              x: offset, // Relative logic handled in render
-              y: -50 // Initial float
-            }
-          ]);
-
-          // Cleanup popup after 1s
-          setTimeout(() => {
-            setDamagePopups(prev => prev.slice(1));
-          }, 1000);
+      // Check interval end
+      if (index >= result.logs.length) {
+        clearInterval(interval);
+        const finalWinnerId = result.winnerId;
+        if (finalWinnerId === selectedRobotId) {
+          playSE('se_win');
+          if (result.rewards?.newSkill || result.rewards?.upgradedSkill) {
+            setTimeout(() => playSE('se_levelup'), 1500);
+          }
+        } else {
+          playSE('se_lose');
         }
+        setIsBattling(false);
+        return;
+      }
+
+      setCurrentLogIndex(index);
+      const log = result.logs[index];
+
+      // VFX Logic
+      if (log.damage > 0) {
+        playSE('se_attack');
+        setShaking(log.defenderId);
+        setTimeout(() => setShaking(null), 500);
+
+        // Visuals
+        const isPlayerDefender = log.defenderId === selectedRobotId;
+        const attacker = log.attackerId === selectedRobotId ? robots.find(r => r.id === selectedRobotId) : enemyRobots.find(r => r.id === enemyRobotId);
+
+        if (attacker) {
+          const w = window.innerWidth;
+          const h = window.innerHeight;
+          const isMobile = w < 768;
+          const targetX = isMobile ? w * 0.5 : (isPlayerDefender ? w * 0.3 : w * 0.7);
+          const targetY = isMobile ? (isPlayerDefender ? h * 0.7 : h * 0.3) : h * 0.5;
+
+          setActiveEffect({
+            element: attacker.elementName || "Neutral",
+            x: targetX,
+            y: targetY
+          });
+          setTimeout(() => setActiveEffect(null), 500);
+        }
+
+        setDamagePopups(prev => [
+          ...prev,
+          {
+            id: index + "-" + Math.random(),
+            value: log.damage,
+            isCritical: log.isCritical,
+            x: Math.random() * 40 - 20,
+            y: -50
+          }
+        ]);
+        setTimeout(() => {
+          setDamagePopups(prev => prev.slice(1));
+        }, 1000);
+      }
+
+      // Cut-In Logic
+      if (log.skillName) {
+        clearInterval(interval);
+        setActiveCutIn({ skillName: log.skillName, robotId: log.attackerId });
+        setTimeout(() => {
+          setActiveCutIn(null);
+          startResumeLoop(index + 1, result);
+        }, 1500);
+        return;
       }
 
       index++;
-      if (index >= logs.length) {
-        clearInterval(interval);
-        setIsBattling(false);
-      }
-    }, 1200); // 少しゆっくりにして演出を見せる
+    }, 1200);
   };
 
   const myRobot = robots.find(r => r.id === selectedRobotId);
@@ -704,6 +739,21 @@ export default function Battle() {
             </AnimatePresence>
           </div>
         )}
+        {/* Effects Layer */}
+        {activeEffect && (
+          <ElementalBurst element={activeEffect.element} x={activeEffect.x} y={activeEffect.y} />
+        )}
+
+        <AnimatePresence>
+          {activeCutIn && (
+            <SkillCutIn
+              skillName={activeCutIn.skillName}
+              robot={activeCutIn.robotId === myRobot.id ? myRobot : enemyRobot}
+              onComplete={() => { }} // Controlled by parent timeout, empty callback fine
+            />
+          )}
+        </AnimatePresence>
+
       </main>
     </div>
   );

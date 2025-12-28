@@ -46,7 +46,7 @@ const Hero = () => {
                     </p>
 
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                        <Link href="/login">
+                        <Link href="/auth">
                             <Button size="lg" className="h-14 px-8 text-lg rounded-full bg-white text-black hover:bg-slate-200 transition-all hover:scale-105 shadow-[0_0_20px_rgba(255,255,255,0.3)]">
                                 Start Game <ArrowRight className="ml-2 w-5 h-5" />
                             </Button>
@@ -164,7 +164,7 @@ const World = () => {
                         <br /><br />
                         As a "Scanner", your mission is to explore the world, decode the hidden data, and command your legion in the struggle for digital supremacy.
                     </p>
-                    <Link href="/login">
+                    <Link href="/auth">
                         <Button className="rounded-full px-8 bg-purple-600 hover:bg-purple-700 text-white border-none">
                             Enter Genesis Layer
                         </Button>

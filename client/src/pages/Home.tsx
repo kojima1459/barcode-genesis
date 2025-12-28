@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/AuthContext";
 import { db, functions } from "@/lib/firebase";
 import { callGenerateRobot } from "@/lib/functions";
 import { httpsCallable } from "firebase/functions";
 import { collection, doc, getDoc, getDocs } from "firebase/firestore";
-import { Loader2, LogOut, Scan, ShoppingCart, Sword, Trophy } from "lucide-react";
+import { Loader2, LogOut, Scan, ShoppingCart, Sword, Trophy, Zap, ScanBarcode, Swords } from "lucide-react";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import RobotSVG from "@/components/RobotSVG";
 import { toast } from "sonner";
@@ -18,6 +19,8 @@ import TutorialModal from "@/components/TutorialModal";
 import SoundSettings from "@/components/SoundSettings";
 import { useSound } from "@/contexts/SoundContext";
 import { RobotData } from "@/types/shared";
+import AdBanner from "@/components/AdBanner";
+
 
 
 interface Mission {
@@ -49,6 +52,9 @@ export default function Home() {
   const [following, setFollowing] = useState<string[]>([]);
   const [followError, setFollowError] = useState<string | null>(null);
   const [isFollowing, setIsFollowing] = useState(false);
+
+  const [robots, setRobots] = useState<RobotData[]>([]);
+  const [robotsLoading, setRobotsLoading] = useState(true);
 
   useEffect(() => {
     // playBGM('bgm_menu'); // ユーザー要望により起動時の英語アナウンス（BGMに含まれる）を停止
@@ -96,9 +102,27 @@ export default function Home() {
       }
     };
 
+    const loadRobots = async () => {
+      setRobotsLoading(true);
+      try {
+        const q = collection(db, "users", user.uid, "robots");
+        const snapshot = await getDocs(q);
+        // Simple mapping, might want sorting
+        const robotList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as RobotData));
+        // Sort by level desc or createdAt desc if available
+        // robotList.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)); 
+        setRobots(robotList);
+      } catch (e) {
+        console.error("Failed to load robots:", e);
+      } finally {
+        setRobotsLoading(false);
+      }
+    };
+
     loadData();
     loadMissions();
     loadFollowing();
+    loadRobots();
   }, [user]);
 
   const handleScan = async (barcode: string) => {
@@ -121,7 +145,7 @@ export default function Home() {
       const code = error?.code;
       const message = error?.message || 'Unknown error';
 
-      let userMessage = `エラー: ${message}`;
+      let userMessage = "Error: " + message;
       if (code === 'internal') {
         userMessage = 'サーバーエラーが発生しました。時間を置いて再度お試しください。(internal)';
       } else if (code === 'invalid-argument') {
@@ -204,6 +228,38 @@ export default function Home() {
     }
   };
 
+  // Assuming 'loading' is a state variable that indicates overall page loading
+  // For example, you might have: const [loading, setLoading] = useState(true);
+  // and set it to false after all initial data (user, missions, following) is loaded.
+  // For this change, we'll assume 'loading' is defined elsewhere or needs to be added.
+  const loading = missionsLoading || robotsLoading; // Placeholder, replace with actual loading state
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-dark-bg p-4 flex flex-col pb-24 relative overflow-hidden text-foreground">
+        <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-20 pointer-events-none" />
+        <main className="flex-1 w-full max-w-4xl mx-auto space-y-8 relative z-10">
+          <div className="flex justify-between items-center py-4">
+            <Skeleton className="h-16 w-40" />
+            <Skeleton className="h-10 w-24" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Skeleton className="h-32 w-full" />
+            <Skeleton className="h-32 w-full" />
+          </div>
+          <div className="space-y-4">
+            <Skeleton className="h-8 w-32" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {[1, 2, 3, 4].map(i => (
+                <Skeleton key={i} className="h-24 w-full" />
+              ))}
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-dark-bg p-4 flex flex-col pb-24 relative overflow-hidden text-foreground">
       <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-20 pointer-events-none" />
@@ -222,7 +278,7 @@ export default function Home() {
           <div className="flex items-center gap-4">
             <div className="text-right">
               <div className="text-xs text-muted-foreground font-mono">CREDITS</div>
-              <div className="text-xl font-bold font-orbitron text-neon-yellow">{creditBalance.toLocaleString()}</div>
+              <div className="text-xl font-bold font-orbitron text-neon-yellow">{credits.toLocaleString()}</div>
             </div>
             {/* User Avatar or something could go here */}
             <div className="flex gap-2">
@@ -270,7 +326,7 @@ export default function Home() {
               </div>
             ) : (
               robots.slice(0, 4).map(robot => (
-                <Link key={robot.id} href={`/robots/${robot.id}`}>
+                <Link key={robot.id} href={'/robots/' + robot.id}>
                   <div className="glass-panel p-3 rounded-lg flex items-center gap-4 hover:border-white/50 transition-all cursor-pointer group">
                     <RobotSVG parts={robot.parts} colors={robot.colors} size={60} />
                     <div className="flex-1 min-w-0">
@@ -289,6 +345,7 @@ export default function Home() {
           </div>
         </section>
 
+        <AdBanner />
         <TutorialModal />
       </main>
     </div>

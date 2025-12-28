@@ -2,15 +2,18 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import { httpsCallable } from "firebase/functions";
 import { collection, doc, getDoc, getDocs, orderBy, query } from "firebase/firestore";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from "recharts";
+import { ArrowLeft, Loader2, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import RobotSVG from "@/components/RobotSVG";
 import { useAuth } from "@/contexts/AuthContext";
 import { db, functions } from "@/lib/firebase";
 import { getItemLabel } from "@/lib/items";
 import { toast } from "sonner";
 import { RobotData } from "@/types/shared";
+import { useSound } from "@/contexts/SoundContext";
 
 
 type InventoryMap = Record<string, number>;
@@ -32,6 +35,7 @@ const getSkillIds = (skills?: RobotData["skills"]) => {
 
 export default function RobotDetail({ robotId }: { robotId: string }) {
   const { user } = useAuth();
+  const { playSE } = useSound();
   const [baseRobot, setBaseRobot] = useState<RobotData | null>(null);
   const [robots, setRobots] = useState<RobotData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -143,6 +147,7 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
         setInheritSkillId("");
       }
       toast.success("Synthesis completed");
+      playSE('se_levelup');
     } catch (error) {
       console.error("Synthesis failed:", error);
       const message = error instanceof Error ? error.message : "Synthesis failed";
@@ -168,6 +173,7 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
       setBaseRobot((prev) => (prev ? { ...prev, skills: data.baseSkills } : prev));
       if (data.success) {
         toast.success("Inheritance succeeded");
+        playSE('se_levelup');
       } else {
         toast.error("Inheritance failed");
       }
@@ -298,8 +304,22 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      <div className="min-h-screen bg-dark-bg p-4 flex flex-col pb-24 text-foreground">
+        <div className="max-w-2xl mx-auto w-full space-y-6">
+          <div className="flex items-center">
+            <Skeleton className="h-10 w-20" />
+          </div>
+          <Skeleton className="aspect-square w-full rounded-xl" />
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-full" />
+            <div className="grid grid-cols-2 gap-4">
+              <Skeleton className="h-24 w-full" />
+              <Skeleton className="h-24 w-full" />
+              <Skeleton className="h-24 w-full" />
+              <Skeleton className="h-24 w-full" />
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -357,6 +377,33 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
             <span className="text-[10px] text-muted-foreground">
               {Math.floor(progress)}%
             </span>
+          </div>
+        </div>
+
+        {/* Status Visualization */}
+        <div className="glass-panel p-6 rounded-xl border border-white/5 relative overflow-hidden">
+          <h3 className="text-sm font-bold text-neon-cyan mb-4 font-orbitron tracking-widest absolute top-4 left-6 z-10">STATUS ANALYSIS</h3>
+          <div className="h-[250px] w-full relative z-0">
+            <ResponsiveContainer width="100%" height="100%">
+              <RadarChart cx="50%" cy="50%" outerRadius="70%" data={[
+                { subject: 'HP', A: baseRobot.baseHp, fullMark: 500 },
+                { subject: 'ATK', A: baseRobot.baseAttack, fullMark: 200 },
+                { subject: 'DEF', A: baseRobot.baseDefense, fullMark: 200 },
+                { subject: 'SPD', A: baseRobot.baseSpeed, fullMark: 200 },
+              ]}>
+                <PolarGrid stroke="#ffffff33" />
+                <PolarAngleAxis dataKey="subject" tick={{ fill: '#0ff', fontSize: 12, fontFamily: 'Orbitron' }} />
+                <PolarRadiusAxis angle={30} domain={[0, 200]} tick={false} axisLine={false} />
+                <Radar
+                  name="Stats"
+                  dataKey="A"
+                  stroke="#00f3ff"
+                  strokeWidth={2}
+                  fill="#00f3ff"
+                  fillOpacity={0.3}
+                />
+              </RadarChart>
+            </ResponsiveContainer>
           </div>
         </div>
 
