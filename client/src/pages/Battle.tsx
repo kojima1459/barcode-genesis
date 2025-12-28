@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
 import { db, functions } from "@/lib/firebase";
-import { collection, collectionGroup, getDocs, query, orderBy, limit } from "firebase/firestore";
+import { collection, collectionGroup, getDocs, query, orderBy, limit, where } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
-import { ArrowLeft, Loader2, Sword, Trophy } from "lucide-react";
+import { ArrowLeft, Loader2, Sword, Trophy, Search } from "lucide-react";
 import RobotSVG from "@/components/RobotSVG";
 import { Link } from "wouter";
 import { toast } from "sonner";
@@ -55,6 +56,8 @@ export default function Battle() {
   const [isBattling, setIsBattling] = useState(false);
 
   const [enemyRobots, setEnemyRobots] = useState<RobotData[]>([]);
+  const [friendId, setFriendId] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
 
   // 自分のロボット一覧取得
   useEffect(() => {
@@ -77,31 +80,64 @@ export default function Battle() {
 
   // 敵ロボット一覧取得（Collection Group Query）
   useEffect(() => {
-    const fetchEnemyRobots = async () => {
-      if (!user) return;
-      try {
-        // 自分以外のロボットを取得したいが、Firestoreの制約上クライアント側でフィルタリング
-        // collectionGroupを使って全ユーザーのロボットを取得
-        const q = query(collectionGroup(db, "robots"), orderBy("createdAt", "desc"), limit(20));
-        const snapshot = await getDocs(q);
-        
-        const data: RobotData[] = [];
-        snapshot.forEach(doc => {
-          // 自分のロボットは除外（親のパスに自分のUIDが含まれているかチェック）
-          if (!doc.ref.path.includes(user.uid)) {
-            data.push({ id: doc.id, ...doc.data() } as RobotData);
-          }
-        });
-        
-        setEnemyRobots(data);
-      } catch (error) {
-        console.error("Error fetching enemies:", error);
-        // インデックス未作成エラーの場合はモックデータを表示するなどのフォールバックが必要
-        // 今回はエラーを表示
-      }
-    };
-    fetchEnemyRobots();
+    loadRandomOpponents();
   }, [user]);
+
+  const loadRandomOpponents = async () => {
+    if (!user) return;
+    try {
+      // 自分以外のロボットを取得したいが、Firestoreの制約上クライアント側でフィルタリング
+      // collectionGroupを使って全ユーザーのロボットを取得
+      const q = query(collectionGroup(db, "robots"), orderBy("createdAt", "desc"), limit(20));
+      const snapshot = await getDocs(q);
+      
+      const data: RobotData[] = [];
+      snapshot.forEach(doc => {
+        // 自分のロボットは除外（親のパスに自分のUIDが含まれているかチェック）
+        if (!doc.ref.path.includes(user.uid)) {
+          data.push({ id: doc.id, ...doc.data() } as RobotData);
+        }
+      });
+      
+      setEnemyRobots(data);
+    } catch (error) {
+      console.error("Error fetching enemies:", error);
+    }
+  };
+
+  const searchFriend = async () => {
+    if (!friendId.trim()) return;
+    setIsSearching(true);
+    setEnemyRobots([]); // Clear current list
+    
+    try {
+      // Search robots by userId
+      // Note: collectionGroup queries by field require an index
+      const robotsRef = collectionGroup(db, 'robots');
+      const q = query(robotsRef, where('userId', '==', friendId.trim()));
+      const snapshot = await getDocs(q);
+      
+      const friendRobots: RobotData[] = [];
+      snapshot.forEach(doc => {
+        friendRobots.push({ id: doc.id, ...doc.data() } as RobotData);
+      });
+      
+      if (friendRobots.length === 0) {
+        toast.error("No robots found for this User ID");
+        // Fallback to random opponents
+        loadRandomOpponents();
+      } else {
+        setEnemyRobots(friendRobots);
+        toast.success(`Found ${friendRobots.length} robots!`);
+      }
+    } catch (error) {
+      console.error("Error searching friend:", error);
+      toast.error("Error searching friend. Make sure ID is correct.");
+      loadRandomOpponents();
+    } finally {
+      setIsSearching(false);
+    }
+  };
 
   // バトル開始
   const startBattle = async () => {
@@ -178,6 +214,9 @@ export default function Battle() {
             <Card>
               <CardContent className="p-6 space-y-4">
                 <h2 className="text-xl font-bold">Select Your Robot</h2>
+                <div className="text-xs text-muted-foreground mb-2">
+                  Your ID: <span className="font-mono bg-secondary px-1 rounded select-all">{user?.uid}</span>
+                </div>
                 <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto">
                   {robots.map(robot => (
                     <div 
@@ -196,6 +235,17 @@ export default function Battle() {
             <Card>
               <CardContent className="p-6 space-y-4">
                 <h2 className="text-xl font-bold">Select Opponent</h2>
+                <div className="flex gap-2">
+                  <Input 
+                    placeholder="Friend's User ID" 
+                    value={friendId}
+                    onChange={(e) => setFriendId(e.target.value)}
+                    className="font-mono text-xs"
+                  />
+                  <Button onClick={searchFriend} disabled={isSearching} size="sm" variant="secondary">
+                    {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                  </Button>
+                </div>
                 <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto">
                   {enemyRobots.length > 0 ? (
                     enemyRobots.map(robot => (
