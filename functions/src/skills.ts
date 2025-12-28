@@ -1,3 +1,4 @@
+import { randomInt } from "crypto";
 import { Skill } from "./types";
 
 export const SKILLS: Skill[] = [
@@ -105,7 +106,7 @@ export const getRandomSkills = (count: number, seed: number): Skill[] => {
 
 // ランダムに1つのスキルを取得する（シードなし、純粋なランダム）
 export const getRandomSkill = (): Skill => {
-  const index = Math.floor(Math.random() * SKILLS.length);
+  const index = randomInt(0, SKILLS.length);
   return SKILLS[index];
 };
 

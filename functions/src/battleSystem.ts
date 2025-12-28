@@ -1,5 +1,6 @@
 import { RobotData, Skill } from "./types";
 import { getSkillById } from "./skills";
+import { SeededRandom } from "./seededRandom";
 
 const resolveSkills = (skills: RobotData["skills"]): Skill[] => {
   if (!Array.isArray(skills)) return [];
@@ -42,13 +43,31 @@ interface BattleResult {
   };
 }
 
-export const simulateBattle = (robot1: RobotData, robot2: RobotData): BattleResult => {
+const MAX_TURNS = 30;
+const toDamage = (value: number): number => Math.max(1, Math.floor(value));
+
+const getElementMultiplier = (attacker: RobotData, defender: RobotData): number => {
+  const attackerType = attacker.elementType ?? 0;
+  const defenderType = defender.elementType ?? 0;
+  if (!attackerType || !defenderType || attackerType === defenderType) return 1;
+
+  // Use a simple cyclic order (1->2->...->7->1) for advantage/weakness.
+  const advantage = (attackerType % 7) + 1;
+  const disadvantage = ((attackerType + 5) % 7) + 1;
+
+  if (defenderType === advantage) return 1.5;
+  if (defenderType === disadvantage) return 0.75;
+  return 1;
+};
+
+export const simulateBattle = (robot1: RobotData, robot2: RobotData, battleId?: string): BattleResult => {
   let hp1 = robot1.baseHp;
   let hp2 = robot2.baseHp;
   const logs: BattleLog[] = [];
   let turn = 1;
   const robot1Skills = resolveSkills(robot1.skills);
   const robot2Skills = resolveSkills(robot2.skills);
+  const rng = new SeededRandom(battleId ?? `${robot1.id ?? "robot1"}-${robot2.id ?? "robot2"}`);
 
   // 素早さで先攻後攻を決定
   let attacker = robot1.baseSpeed >= robot2.baseSpeed ? robot1 : robot2;
@@ -58,19 +77,20 @@ export const simulateBattle = (robot1: RobotData, robot2: RobotData): BattleResu
   let attackerSkills = robot1.baseSpeed >= robot2.baseSpeed ? robot1Skills : robot2Skills;
   let defenderSkills = robot1.baseSpeed >= robot2.baseSpeed ? robot2Skills : robot1Skills;
 
-  // 最大20ターンで決着をつける
-  while (hp1 > 0 && hp2 > 0 && turn <= 20) {
+  // 最大30ターンで決着をつける
+  while (hp1 > 0 && hp2 > 0 && turn <= MAX_TURNS) {
     let damage = 0;
     let isCritical = false;
     let action: 'attack' | 'skill' = 'attack';
     let skillName = undefined;
     let message = "";
+    const elementMultiplier = getElementMultiplier(attacker, defender);
 
     // スキル発動判定
     let skill: Skill | null = null;
     if (attackerSkills.length > 0) {
       for (const s of attackerSkills) {
-        if (Math.random() < s.triggerRate) {
+        if (rng.next() < s.triggerRate) {
           skill = s;
           break; // 1ターンに1つだけ発動
         }
@@ -84,7 +104,7 @@ export const simulateBattle = (robot1: RobotData, robot2: RobotData): BattleResu
       switch (skill.type) {
         case 'attack':
           const baseDamage = Math.max(1, attacker.baseAttack - (defender.baseDefense / 2));
-          damage = Math.floor(baseDamage * skill.power);
+          damage = toDamage(baseDamage * skill.power * elementMultiplier);
           message = `${attacker.name} uses ${skill.name}! Dealt ${damage} damage!`;
           break;
         case 'heal':
@@ -101,18 +121,18 @@ export const simulateBattle = (robot1: RobotData, robot2: RobotData): BattleResu
           break;
         default: // defense, buff, debuff (簡易実装: ダメージボーナス)
           const bonusDamage = Math.floor(attacker.baseAttack * 0.5);
-          damage = bonusDamage;
+          damage = toDamage(bonusDamage * elementMultiplier);
           message = `${attacker.name} uses ${skill.name}! Dealt ${damage} damage!`;
           break;
       }
     } else {
       // 通常攻撃
       const baseDamage = Math.max(1, attacker.baseAttack - (defender.baseDefense / 2));
-      const multiplier = 0.8 + Math.random() * 0.4;
-      isCritical = Math.random() < 0.1;
+      const multiplier = 0.8 + rng.next() * 0.4;
+      isCritical = rng.next() < 0.1;
       
-      damage = Math.floor(baseDamage * multiplier);
-      if (isCritical) damage = Math.floor(damage * 1.5);
+      damage = toDamage(baseDamage * multiplier * elementMultiplier);
+      if (isCritical) damage = toDamage(damage * 1.5);
       message = `${attacker.name} attacks ${defender.name} for ${damage} damage!`;
     }
 
@@ -152,8 +172,28 @@ export const simulateBattle = (robot1: RobotData, robot2: RobotData): BattleResu
     turn++;
   }
 
-  const winnerId = (hp1 > 0 ? robot1.id : robot2.id)!;
-  const loserId = (hp1 > 0 ? robot2.id : robot1.id)!;
+  let winnerId: string;
+  let loserId: string;
+
+  if (hp1 <= 0 || hp2 <= 0) {
+    winnerId = (hp1 > 0 ? robot1.id : robot2.id)!;
+    loserId = (hp1 > 0 ? robot2.id : robot1.id)!;
+  } else {
+    const ratio1 = hp1 / robot1.baseHp;
+    const ratio2 = hp2 / robot2.baseHp;
+    if (ratio1 === ratio2) {
+      if (hp1 === hp2) {
+        winnerId = robot1.id!;
+        loserId = robot2.id!;
+      } else {
+        winnerId = (hp1 > hp2 ? robot1.id : robot2.id)!;
+        loserId = (hp1 > hp2 ? robot2.id : robot1.id)!;
+      }
+    } else {
+      winnerId = (ratio1 > ratio2 ? robot1.id : robot2.id)!;
+      loserId = (ratio1 > ratio2 ? robot2.id : robot1.id)!;
+    }
+  }
 
   return {
     winnerId,

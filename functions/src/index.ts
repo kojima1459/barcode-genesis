@@ -1,5 +1,6 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
+import { randomInt } from "crypto";
 import { assertRobotNotExists, DuplicateRobotError, generateRobotFromBarcode, InvalidBarcodeError } from "./robotGenerator";
 import { simulateBattle } from "./battleSystem";
 import { GenerateRobotRequest, GenerateRobotResponse } from "./types";
@@ -381,7 +382,7 @@ export const inheritSkill = functions.https.onCall(async (data: any, context) =>
       throw new functions.https.HttpsError('failed-precondition', 'Base robot has reached the skill limit');
     }
 
-    const success = Math.random() < INHERIT_SUCCESS_RATE;
+    const success = (randomInt(0, 1_000_000) / 1_000_000) < INHERIT_SUCCESS_RATE;
     const nextSkills = success ? [...baseSkills, skillId] : baseSkills;
 
     if (success) {
