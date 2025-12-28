@@ -1,10 +1,11 @@
-import { RobotData } from "./types";
+import { RobotData, Skill } from "./types";
 
 interface BattleLog {
   turn: number;
   attackerId: string;
   defenderId: string;
   action: 'attack' | 'skill';
+  skillName?: string;
   damage: number;
   isCritical: boolean;
   attackerHp: number;
@@ -36,37 +37,84 @@ export const simulateBattle = (robot1: RobotData, robot2: RobotData): BattleResu
 
   // 最大20ターンで決着をつける
   while (hp1 > 0 && hp2 > 0 && turn <= 20) {
-    // ダメージ計算 (簡易版: 攻撃力 - 防御力/2)
-    const baseDamage = Math.max(1, attacker.baseAttack - (defender.baseDefense / 2));
-    // ランダム要素 (0.8 ~ 1.2倍)
-    const multiplier = 0.8 + Math.random() * 0.4;
-    // クリティカル判定 (10%)
-    const isCritical = Math.random() < 0.1;
-    
-    let damage = Math.floor(baseDamage * multiplier);
-    if (isCritical) damage = Math.floor(damage * 1.5);
+    let damage = 0;
+    let isCritical = false;
+    let action: 'attack' | 'skill' = 'attack';
+    let skillName = undefined;
+    let message = "";
 
-    // HP減少
-    if (attacker.id === robot1.id) {
-      hp2 -= damage;
-      defenderHp = hp2;
-      attackerHp = hp1;
+    // スキル発動判定
+    let skill: Skill | null = null;
+    if (attacker.skills && attacker.skills.length > 0) {
+      for (const s of attacker.skills) {
+        if (Math.random() < s.triggerRate) {
+          skill = s;
+          break; // 1ターンに1つだけ発動
+        }
+      }
+    }
+
+    if (skill) {
+      action = 'skill';
+      skillName = skill.name;
+      
+      switch (skill.type) {
+        case 'attack':
+          const baseDamage = Math.max(1, attacker.baseAttack - (defender.baseDefense / 2));
+          damage = Math.floor(baseDamage * skill.power);
+          message = `${attacker.name} uses ${skill.name}! Dealt ${damage} damage!`;
+          break;
+        case 'heal':
+          const healAmount = Math.floor(attacker.baseHp * skill.power);
+          if (attacker.id === robot1.id) {
+            hp1 = Math.min(robot1.baseHp, hp1 + healAmount);
+            attackerHp = hp1;
+          } else {
+            hp2 = Math.min(robot2.baseHp, hp2 + healAmount);
+            attackerHp = hp2;
+          }
+          message = `${attacker.name} uses ${skill.name}! Recovered ${healAmount} HP!`;
+          damage = 0;
+          break;
+        default: // defense, buff, debuff (簡易実装: ダメージボーナス)
+          const bonusDamage = Math.floor(attacker.baseAttack * 0.5);
+          damage = bonusDamage;
+          message = `${attacker.name} uses ${skill.name}! Dealt ${damage} damage!`;
+          break;
+      }
     } else {
-      hp1 -= damage;
-      defenderHp = hp1;
-      attackerHp = hp2;
+      // 通常攻撃
+      const baseDamage = Math.max(1, attacker.baseAttack - (defender.baseDefense / 2));
+      const multiplier = 0.8 + Math.random() * 0.4;
+      isCritical = Math.random() < 0.1;
+      
+      damage = Math.floor(baseDamage * multiplier);
+      if (isCritical) damage = Math.floor(damage * 1.5);
+      message = `${attacker.name} attacks ${defender.name} for ${damage} damage!`;
+    }
+
+    // HP減少（回復以外）
+    if (damage > 0) {
+      if (attacker.id === robot1.id) {
+        hp2 -= damage;
+        defenderHp = hp2;
+      } else {
+        hp1 -= damage;
+        defenderHp = hp1;
+      }
     }
 
     logs.push({
       turn,
       attackerId: attacker.id,
       defenderId: defender.id,
-      action: 'attack',
+      action,
+      skillName,
       damage,
       isCritical,
       attackerHp: Math.max(0, attackerHp),
       defenderHp: Math.max(0, defenderHp),
-      message: `${attacker.name} attacks ${defender.name} for ${damage} damage!`
+      message
     });
 
     if (hp1 <= 0 || hp2 <= 0) break;

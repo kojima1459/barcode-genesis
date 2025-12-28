@@ -20,6 +20,16 @@ export interface RobotColors {
   glow: string;      // HEX color
 }
 
+export interface Skill {
+  id: string;
+  name: string;
+  description: string;
+  type: 'attack' | 'defense' | 'heal' | 'buff' | 'debuff';
+  power: number;
+  accuracy: number;
+  triggerRate: number; // 発動率 (0.0 - 1.0)
+}
+
 // ロボットデータ
 export interface RobotData {
   id?: string;
@@ -47,7 +57,7 @@ export interface RobotData {
   colors: RobotColors;
   
   // スキル
-  skills: number[];         // スキルIDの配列
+  skills: Skill[];         // スキルオブジェクトの配列
   
   // メタデータ
   createdAt: Date | any;    // Firestore Timestamp

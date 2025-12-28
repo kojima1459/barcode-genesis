@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
 import { db, functions } from "@/lib/firebase";
-import { collection, getDocs, query, orderBy } from "firebase/firestore";
+import { collection, collectionGroup, getDocs, query, orderBy, limit } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { ArrowLeft, Loader2, Sword, Trophy } from "lucide-react";
 import RobotSVG from "@/components/RobotSVG";
@@ -54,9 +54,11 @@ export default function Battle() {
   const [currentLogIndex, setCurrentLogIndex] = useState(-1);
   const [isBattling, setIsBattling] = useState(false);
 
-  // ロボット一覧取得
+  const [enemyRobots, setEnemyRobots] = useState<RobotData[]>([]);
+
+  // 自分のロボット一覧取得
   useEffect(() => {
-    const fetchRobots = async () => {
+    const fetchMyRobots = async () => {
       if (!user) return;
       try {
         const q = query(collection(db, "users", user.uid, "robots"), orderBy("createdAt", "desc"));
@@ -65,12 +67,40 @@ export default function Battle() {
         setRobots(data);
       } catch (error) {
         console.error(error);
-        toast.error("Failed to load robots");
+        toast.error("Failed to load your robots");
       } finally {
         setLoading(false);
       }
     };
-    fetchRobots();
+    fetchMyRobots();
+  }, [user]);
+
+  // 敵ロボット一覧取得（Collection Group Query）
+  useEffect(() => {
+    const fetchEnemyRobots = async () => {
+      if (!user) return;
+      try {
+        // 自分以外のロボットを取得したいが、Firestoreの制約上クライアント側でフィルタリング
+        // collectionGroupを使って全ユーザーのロボットを取得
+        const q = query(collectionGroup(db, "robots"), orderBy("createdAt", "desc"), limit(20));
+        const snapshot = await getDocs(q);
+        
+        const data: RobotData[] = [];
+        snapshot.forEach(doc => {
+          // 自分のロボットは除外（親のパスに自分のUIDが含まれているかチェック）
+          if (!doc.ref.path.includes(user.uid)) {
+            data.push({ id: doc.id, ...doc.data() } as RobotData);
+          }
+        });
+        
+        setEnemyRobots(data);
+      } catch (error) {
+        console.error("Error fetching enemies:", error);
+        // インデックス未作成エラーの場合はモックデータを表示するなどのフォールバックが必要
+        // 今回はエラーを表示
+      }
+    };
+    fetchEnemyRobots();
   }, [user]);
 
   // バトル開始
@@ -114,7 +144,7 @@ export default function Battle() {
   };
 
   const myRobot = robots.find(r => r.id === selectedRobotId);
-  const enemyRobot = robots.find(r => r.id === enemyRobotId);
+  const enemyRobot = enemyRobots.find(r => r.id === enemyRobotId) || robots.find(r => r.id === enemyRobotId);
 
   // 現在のHP計算
   const getCurrentHp = (robotId: string) => {
@@ -167,16 +197,25 @@ export default function Battle() {
               <CardContent className="p-6 space-y-4">
                 <h2 className="text-xl font-bold">Select Opponent</h2>
                 <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto">
-                  {robots.filter(r => r.id !== selectedRobotId).map(robot => (
-                    <div 
-                      key={robot.id}
-                      onClick={() => setEnemyRobotId(robot.id)}
-                      className={`p-2 border rounded cursor-pointer hover:bg-secondary/10 ${enemyRobotId === robot.id ? 'border-destructive bg-destructive/10' : ''}`}
-                    >
-                      <div className="text-sm font-bold truncate">{robot.name}</div>
-                      <div className="text-xs text-muted-foreground">HP: {robot.baseHp}</div>
+                  {enemyRobots.length > 0 ? (
+                    enemyRobots.map(robot => (
+                      <div 
+                        key={robot.id}
+                        onClick={() => setEnemyRobotId(robot.id)}
+                        className={`p-2 border rounded cursor-pointer hover:bg-secondary/10 ${enemyRobotId === robot.id ? 'border-destructive bg-destructive/10' : ''}`}
+                      >
+                        <div className="text-sm font-bold truncate">{robot.name}</div>
+                        <div className="text-xs text-muted-foreground">HP: {robot.baseHp}</div>
+                        <div className="text-[10px] text-muted-foreground truncate">User: {robot.id.substring(0, 4)}...</div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="col-span-2 text-center text-muted-foreground py-4">
+                      No opponents found.
+                      <br />
+                      <span className="text-xs">Create more robots or wait for other players!</span>
                     </div>
-                  ))}
+                  )}
                 </div>
               </CardContent>
             </Card>

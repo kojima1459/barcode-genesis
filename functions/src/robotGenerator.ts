@@ -1,5 +1,6 @@
 import { RobotData, RobotParts, RobotColors } from './types';
 import * as admin from 'firebase-admin';
+import { getRandomSkills } from './skills';
 
 // 定数定義
 const RARITY_NAMES = ["Common", "Uncommon", "Rare", "Epic", "Legendary"];
@@ -103,26 +104,7 @@ function generateColors(digits: number[]): RobotColors {
 }
 
 // スキル選択
-function selectSkills(digits: number[], rarity: number): number[] {
-  const skillCount = Math.min(rarity, 4); // レアリティ数だけスキルを持つ（最大4）
-  const skills: number[] = [];
-  
-  // P5, D をシードとして使用
-  let seed = digits[10] * 10 + digits[12];
-  
-  for (let i = 0; i < skillCount; i++) {
-    // 簡易的な乱数生成
-    seed = (seed * 9301 + 49297) % 233280;
-    const skillId = (seed % 10) + 1; // 1-10のスキルID
-    if (!skills.includes(skillId)) {
-      skills.push(skillId);
-    } else {
-      i--; // 重複したら再抽選
-    }
-  }
-  
-  return skills.sort((a, b) => a - b);
-}
+// getRandomSkills関数を使用するため、この関数は削除または置換
 
 // メイン生成関数
 export function generateRobotData(barcode: string, userId: string): RobotData {
@@ -133,7 +115,11 @@ export function generateRobotData(barcode: string, userId: string): RobotData {
   const element = calculateElement(digits);
   const parts = selectParts(digits);
   const colors = generateColors(digits);
-  const skills = selectSkills(digits, rarity);
+  // スキル選択
+  // P5, D をシードとして使用
+  const seed = digits[10] * 10 + digits[12];
+  const skillCount = Math.min(rarity, 3); // 最大3つ
+  const skills = getRandomSkills(skillCount, seed);
   
   // 名前生成 (簡易版: 属性 + レアリティ + IDの一部)
   const name = `${element.name} ${RARITY_NAMES[rarity-1]} Unit-${barcode.slice(-4)}`;
