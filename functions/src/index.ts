@@ -116,6 +116,48 @@ export const startBattle = functions.https.onCall(async (data: any, context) => 
     // バトルシミュレーション実行
     const result = simulateBattle(myRobot, enemyRobot);
 
+    // Update win/loss records and EXP
+    // Note: This assumes enemy is also a user robot. For CPU, we skip update.
+    // For friend battle, we need to find the owner of the enemy robot.
+    // Since we don't pass enemyUserId, we'll search for it or assume it's in the robot data if we added it.
+    // For now, we only update MY robot's stats to keep it simple and safe.
+    
+    const myRobotRef = admin.firestore().collection('users').doc(userId).collection('robots').doc(myRobotId);
+
+    await admin.firestore().runTransaction(async (t) => {
+      const doc = await t.get(myRobotRef);
+      if (!doc.exists) return;
+      
+      const robot = doc.data() as any;
+      const isWinner = result.winnerId === myRobotId;
+      
+      if (isWinner) {
+        const currentExp = (robot.exp || 0) + result.rewards.exp;
+        const currentLevel = robot.level || 1;
+        const expToNextLevel = currentLevel * 100;
+        
+        let updates: any = {
+          exp: currentExp,
+          wins: (robot.wins || 0) + 1
+        };
+        
+        // Level Up Logic
+        if (currentExp >= expToNextLevel) {
+          updates.level = currentLevel + 1;
+          updates.baseHp = Math.floor(robot.baseHp * 1.1);
+          updates.baseAttack = Math.floor(robot.baseAttack * 1.1);
+          updates.baseDefense = Math.floor(robot.baseDefense * 1.1);
+          updates.baseSpeed = Math.floor(robot.baseSpeed * 1.1);
+        }
+        
+        t.update(myRobotRef, updates);
+      } else {
+        t.update(myRobotRef, {
+          losses: (robot.losses || 0) + 1
+        });
+      }
+    });
+
     return { success: true, result };
 
   } catch (error) {
