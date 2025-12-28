@@ -2,8 +2,21 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.generateRobotFromBarcode = exports.generateRobotData = exports.assertRobotNotExists = exports.DuplicateRobotError = exports.assertValidBarcode = exports.InvalidBarcodeError = void 0;
 // 定数定義
-const RARITY_NAMES = ["Common", "Uncommon", "Rare", "Epic", "Legendary"];
-const ELEMENT_NAMES = ["Fire", "Water", "Wind", "Earth", "Light", "Dark", "Machine"];
+const RARITY_NAMES = ["ノーマル", "レア", "スーパーレア", "ウルトラレア", "レジェンド"];
+const ELEMENT_NAMES = ["ファイア", "アクア", "ウィンド", "アース", "ライト", "ダーク", "メカ"];
+// 名前パーツ（小中学生向けのかっこいい名前）
+const NAME_PREFIXES = [
+    "ゴースト", "サンダー", "ブレイズ", "シャドウ", "ストーム",
+    "フレア", "アイス", "ダーク", "ライト", "メタル",
+    "ドラゴン", "ファントム", "サイバー", "ネオ", "アルファ",
+    "オメガ", "ゼロ", "プライム", "マックス", "ギガ"
+];
+const NAME_SUFFIXES = [
+    "ナイト", "マスター", "キング", "エース", "ウォリアー",
+    "ハンター", "ブレイカー", "バスター", "ライダー", "ファイター",
+    "セイバー", "ガーディアン", "ストライカー", "シューター", "ドライバー",
+    "ブレイド", "ウイング", "スター", "クロス", "ビート"
+];
 const BARCODE_PATTERN = /^\d{13}$/;
 class InvalidBarcodeError extends Error {
     constructor(message = "Barcode must be a 13-digit string.") {
@@ -127,8 +140,10 @@ function generateRobotData(barcode, userId) {
     const colors = generateColors(digits);
     // スキルはWeek4で継承に移行するため初期は空
     const skills = [];
-    // 名前生成 (簡易版: 属性 + レアリティ + IDの一部)
-    const name = `${element.name} ${RARITY_NAMES[rarity - 1]} Unit-${barcode.slice(-4)}`;
+    // 名前生成（かっこいい日本語名）
+    const prefixIndex = (digits[0] + digits[1]) % NAME_PREFIXES.length;
+    const suffixIndex = (digits[2] + digits[3]) % NAME_SUFFIXES.length;
+    const name = `${NAME_PREFIXES[prefixIndex]}${NAME_SUFFIXES[suffixIndex]}`;
     return Object.assign(Object.assign({ userId,
         name, sourceBarcode: barcode, rarity, rarityName: RARITY_NAMES[rarity - 1] }, stats), { elementType: element.id, elementName: element.name, level: 1, xp: 0, experience: 0, experienceToNext: 100, parts,
         colors,

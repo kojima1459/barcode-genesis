@@ -11,6 +11,7 @@ import { ArrowLeft, Copy, Edit2, Save, User, Trophy, Sword, Shield } from "lucid
 import { Link } from "wouter";
 import { toast } from "sonner";
 import RobotSVG from "@/components/RobotSVG";
+import { RobotData } from "@/types/shared";
 
 interface UserProfile {
   displayName?: string;
@@ -18,18 +19,7 @@ interface UserProfile {
   battles?: number;
 }
 
-interface RobotData {
-  id: string;
-  name: string;
-  rarityName: string;
-  baseHp: number;
-  baseAttack: number;
-  baseDefense: number;
-  baseSpeed: number;
-  parts: any;
-  colors: any;
-  level?: number;
-}
+
 
 export default function Profile() {
   const { t } = useLanguage();
@@ -135,8 +125,8 @@ export default function Profile() {
                 <div className="flex items-center gap-4">
                   {isEditing ? (
                     <div className="flex gap-2 w-full max-w-sm">
-                      <Input 
-                        value={newName} 
+                      <Input
+                        value={newName}
                         onChange={(e) => setNewName(e.target.value)}
                         placeholder="Enter name"
                       />
@@ -194,10 +184,10 @@ export default function Profile() {
             <CardContent>
               <div className="flex items-center gap-8">
                 <div className="w-32 h-32 bg-secondary/20 rounded-lg flex items-center justify-center">
-                  <RobotSVG 
-                    parts={robots[0].parts} 
-                    colors={robots[0].colors} 
-                    size={100} 
+                  <RobotSVG
+                    parts={robots[0].parts}
+                    colors={robots[0].colors}
+                    size={100}
                   />
                 </div>
                 <div>

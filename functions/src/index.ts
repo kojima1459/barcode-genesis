@@ -1,11 +1,15 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
+import { onSchedule } from "firebase-functions/v2/scheduler";
+import { onDocumentUpdated } from "firebase-functions/v2/firestore";
 import { randomInt } from "crypto";
 import { assertRobotNotExists, DuplicateRobotError, generateRobotFromBarcode, InvalidBarcodeError } from "./robotGenerator";
 import { simulateBattle } from "./battleSystem";
 import { GenerateRobotRequest, GenerateRobotResponse } from "./types";
 import { getRandomSkill, normalizeSkillIds } from "./skills";
+import { SeededRandom } from "./seededRandom";
 
+// Force rebuild: 2025-12-29T03:18:00
 admin.initializeApp();
 
 const ITEM_CATALOG = {
@@ -63,7 +67,7 @@ export const generateRobot = functions.https.onCall(async (data: GenerateRobotRe
   }
 
   const { barcode } = data ?? {};
-  
+
   // バリデーション
   if (!barcode || typeof barcode !== 'string') {
     throw new functions.https.HttpsError(
@@ -80,7 +84,7 @@ export const generateRobot = functions.https.onCall(async (data: GenerateRobotRe
 
     // ロボットデータ生成
     const robotData = generateRobotFromBarcode(barcode, userId);
-    
+
     await db.runTransaction(async (t) => {
       const existing = await t.get(robotRef);
       assertRobotNotExists(existing.exists);
@@ -99,7 +103,7 @@ export const generateRobot = functions.https.onCall(async (data: GenerateRobotRe
         credits: admin.firestore.FieldValue.increment(0)
       }, { merge: true });
     });
-      
+
     return {
       robotId: robotRef.id,
       robot: {
@@ -107,7 +111,7 @@ export const generateRobot = functions.https.onCall(async (data: GenerateRobotRe
         id: robotRef.id
       }
     };
-    
+
   } catch (error) {
     console.error("Error generating robot:", error);
     if (error instanceof InvalidBarcodeError) {
@@ -138,117 +142,284 @@ const MATERIAL_LEVEL_XP = 25;
 const LEVEL_XP = 100;
 const INHERIT_SUCCESS_RATE = 0.35;
 const MAX_SKILLS = 4;
+const K_FACTOR = 32;
 
 const getRobotXp = (robot: any): number => {
   const xp = robot?.xp ?? robot?.exp ?? robot?.experience ?? 0;
   return typeof xp === "number" ? xp : 0;
 };
 
-export const startBattle = functions.https.onCall(async (data: any, context) => {
+// ELOレーティング期待勝率計算
+const expectedWinRate = (playerRating: number, opponentRating: number): number => {
+  return 1 / (1 + Math.pow(10, (opponentRating - playerRating) / 400));
+};
+
+// レーティング変動計算
+const calculateRatingChange = (
+  playerRating: number,
+  opponentRating: number,
+  result: 'win' | 'loss' | 'draw'
+): number => {
+  const expected = expectedWinRate(playerRating, opponentRating);
+  let actual: number;
+  if (result === 'win') actual = 1.0;
+  else if (result === 'loss') actual = 0.0;
+  else actual = 0.5;
+  return Math.round(K_FACTOR * (actual - expected));
+};
+
+// 対戦相手検索
+const findOpponent = async (db: admin.firestore.Firestore, playerId: string, playerRating: number) => {
+  // ランキング±100以内を検索
+  const opponents = await db
+    .collection('users')
+    .where('rankingPoints', '>=', playerRating - 100)
+    .where('rankingPoints', '<=', playerRating + 100)
+    .limit(20)
+    .get();
+
+  // 自分を除外
+  const candidates = opponents.docs
+    .filter(doc => doc.id !== playerId)
+    .map(doc => ({ uid: doc.id, ...doc.data() }));
+
+  if (candidates.length === 0) {
+    // 該当者なし → CPU生成
+    const cpuRobot = generateRobotFromBarcode(String(Math.floor(Math.random() * 1e13)).padStart(13, '0'), 'cpu');
+    return {
+      isCPU: true,
+      user: {
+        uid: 'cpu',
+        username: 'CPU',
+        rankingPoints: 1000
+      },
+      robot: cpuRobot
+    };
+  }
+
+  // ランダム選択
+  const rng = new SeededRandom(Date.now().toString());
+  const selectedUser = candidates[rng.nextInt(0, candidates.length - 1)];
+
+  // 選択されたユーザーの最強ロボット取得
+  const robotsSnap = await db
+    .collection('users').doc(selectedUser.uid as string)
+    .collection('robots')
+    .orderBy('totalWins', 'desc')
+    .limit(1)
+    .get();
+
+  let robot;
+  if (robotsSnap.empty) {
+    // ロボットを持っていない場合はCPUロボットを使用
+    robot = generateRobotFromBarcode(String(Math.floor(Math.random() * 1e13)).padStart(13, '0'), selectedUser.uid as string);
+  } else {
+    robot = robotsSnap.docs[0].data();
+  }
+
+  return {
+    isCPU: false,
+    user: selectedUser,
+    robot
+  };
+};
+
+const BATTLE_ITEM_IDS = ['repair_kit', 'attack_boost', 'defense_boost', 'critical_lens'];
+
+export const matchBattle = functions.https.onCall(async (data: any, context) => {
   if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'Auth required');
   }
 
-  const { myRobotId, enemyRobotId } = data;
+  const { playerRobotId, useItemId } = data;
   const userId = context.auth.uid;
+  const db = admin.firestore();
+
+  // アイテムID検証
+  if (useItemId && !BATTLE_ITEM_IDS.includes(useItemId)) {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid battle item');
+  }
 
   try {
-    // 自分のロボットを取得
-    const myRobotDoc = await admin.firestore()
-      .collection('users')
-      .doc(userId)
-      .collection('robots')
-      .doc(myRobotId)
+    // 1. プレイヤーロボット取得
+    const playerRobotSnap = await db
+      .collection('users').doc(userId)
+      .collection('robots').doc(playerRobotId)
       .get();
 
-    if (!myRobotDoc.exists) {
-      throw new functions.https.HttpsError('not-found', 'My robot not found');
+    if (!playerRobotSnap.exists) {
+      throw new functions.https.HttpsError('not-found', 'Robot not found');
     }
 
-    // 敵ロボットを取得（今回は自分のロボット同士で戦う簡易版とする、またはCPU）
-    // 本来は他のユーザーのロボットを取得するが、デモ用に自分のコレクションから取得
-    const enemyRobotDoc = await admin.firestore()
-      .collection('users')
-      .doc(userId)
-      .collection('robots')
-      .doc(enemyRobotId)
-      .get();
+    const playerRobot = { id: playerRobotSnap.id, ...playerRobotSnap.data() } as any;
 
-    if (!enemyRobotDoc.exists) {
-      throw new functions.https.HttpsError('not-found', 'Enemy robot not found');
+    // 2. プレイヤー情報取得（ランキングポイント）
+    const playerSnap = await db.collection('users').doc(userId).get();
+    const player = playerSnap.data() || {};
+    const playerRating = typeof player.rankingPoints === 'number' ? player.rankingPoints : 1000;
+    const currentWinStreak = typeof player.currentWinStreak === 'number' ? player.currentWinStreak : 0;
+
+    // アイテム所持事前チェック（UXのため。厳密なチェックはトランザクション内で）
+    if (useItemId) {
+      const itemSnap = await db.collection('users').doc(userId).collection('inventory').doc(useItemId).get();
+      const qty = itemSnap.data()?.qty ?? 0;
+      if (qty < 1) {
+        throw new functions.https.HttpsError('failed-precondition', 'Item not in inventory');
+      }
     }
 
-    const myRobot = { id: myRobotDoc.id, ...myRobotDoc.data() } as any;
-    const enemyRobot = { id: enemyRobotDoc.id, ...enemyRobotDoc.data() } as any;
+    // 3. 対戦相手選択
+    const opponent = await findOpponent(db, userId, playerRating);
+    const opponentRobot = { ...opponent.robot, id: opponent.robot.id || 'opponent_robot' };
 
-    // バトルシミュレーション実行
-    const result = simulateBattle(myRobot, enemyRobot);
+    // 4. バトル実行
+    const battleId = db.collection('battles').doc().id;
+    const playerItems = useItemId ? [useItemId] : [];
+    const battleResult = simulateBattle(playerRobot as any, opponentRobot as any, battleId, playerItems);
 
-    // Update win/loss records and EXP
-    // Note: This assumes enemy is also a user robot. For CPU, we skip update.
-    // For friend battle, we need to find the owner of the enemy robot.
-    // Since we don't pass enemyUserId, we'll search for it or assume it's in the robot data if we added it.
-    // For now, we only update MY robot's stats to keep it simple and safe.
-    
-    const myRobotRef = admin.firestore().collection('users').doc(userId).collection('robots').doc(myRobotId);
+    // 勝敗判定
+    const winnerIsPlayer = battleResult.winnerId === playerRobot.id;
+    const winnerIsOpponent = battleResult.winnerId === opponentRobot.id;
+    const resultType = winnerIsPlayer ? 'win' : winnerIsOpponent ? 'loss' : 'draw';
 
-    await admin.firestore().runTransaction(async (t) => {
-      const doc = await t.get(myRobotRef);
-      if (!doc.exists) return;
-      
-      const robot = doc.data() as any;
-      const isWinner = result.winnerId === myRobotId;
-      
-      if (isWinner) {
-        const currentExp = getRobotXp(robot) + result.rewards.exp;
-        const currentLevel = robot.level || 1;
-        const expToNextLevel = currentLevel * 100;
-        
-        let updates: any = {
-          xp: currentExp,
-          wins: (robot.wins || 0) + 1,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp()
-        };
-        
-        // Level Up Logic
-        if (currentExp >= expToNextLevel) {
-          const newLevel = currentLevel + 1;
-          updates.level = newLevel;
-          updates.baseHp = Math.floor(robot.baseHp * 1.1);
-          updates.baseAttack = Math.floor(robot.baseAttack * 1.1);
-          updates.baseDefense = Math.floor(robot.baseDefense * 1.1);
-          updates.baseSpeed = Math.floor(robot.baseSpeed * 1.1);
+    // 5. ランキングポイント計算
+    const opponentUser = opponent.user as any;
+    const opponentRating = typeof opponentUser.rankingPoints === 'number' ? opponentUser.rankingPoints : 1000;
+    let ratingChange = calculateRatingChange(playerRating, opponentRating, resultType);
 
-          // Skill Acquisition & Upgrade Logic
-          // New skill at Lv.3, Lv.5, Lv.10
-          if ([3, 5, 10].includes(newLevel)) {
-            const newSkill = getRandomSkill();
-            const currentSkills = normalizeSkillIds(robot.skills);
-            const alreadyHasSkill = currentSkills.includes(newSkill.id);
+    // 連勝ボーナス
+    if (winnerIsPlayer && currentWinStreak >= 3) {
+      ratingChange = Math.round(ratingChange * 1.2);
+    }
 
-            if (alreadyHasSkill) {
-              result.rewards.upgradedSkill = newSkill.name;
-            } else if (currentSkills.length < 4) {
-              currentSkills.push(newSkill.id);
-              result.rewards.newSkill = newSkill.name;
-              updates.skills = currentSkills;
-            }
-          }
+    // BOT戦は半分
+    if (opponent.isCPU) {
+      ratingChange = Math.round(ratingChange * 0.5);
+    }
+
+    // 6. 経験値計算
+    const experienceGained = battleResult.rewards.exp;
+
+    // 7. Firestore更新（トランザクション）
+    await db.runTransaction(async (transaction) => {
+      // アイテム消費
+      if (useItemId) {
+        const itemRef = db.collection('users').doc(userId).collection('inventory').doc(useItemId);
+        const itemDoc = await transaction.get(itemRef);
+
+        if (!itemDoc.exists || (itemDoc.data()?.qty ?? 0) < 1) {
+          throw new functions.https.HttpsError('failed-precondition', 'Item not in inventory');
         }
-        
-        t.update(myRobotRef, updates);
-      } else {
-        t.update(myRobotRef, {
-          losses: (robot.losses || 0) + 1,
+
+        transaction.update(itemRef, {
+          qty: admin.firestore.FieldValue.increment(-1),
           updatedAt: admin.firestore.FieldValue.serverTimestamp()
         });
       }
+      // バトル結果保存
+      transaction.set(db.collection('battles').doc(battleId), {
+        id: battleId,
+        playerId: userId,
+        playerUsername: player.username || 'Unknown',
+        playerRobotId: playerRobotId,
+        playerRobotSnapshot: playerRobot,
+        opponentId: opponent.user.uid,
+        opponentUsername: opponentUser.username,
+        opponentRobotSnapshot: opponentRobot,
+        winner: resultType === 'win' ? 'player' : resultType === 'loss' ? 'opponent' : 'draw',
+        turnCount: battleResult.logs.length, // logs array length is roughly turn count * 2 actions
+        playerFinalHp: 0, // simulateBattle doesn't return final HP in result, needed fix if critical. Using logs or 0 for now.
+        opponentFinalHp: 0,
+        experienceGained,
+        rankingPointsChange: ratingChange,
+        battleLog: battleResult.logs,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        duration: 0 // placeholder
+      });
+
+      // プレイヤー統計更新
+      const playerUpdates: any = {
+        totalBattles: admin.firestore.FieldValue.increment(1),
+        rankingPoints: admin.firestore.FieldValue.increment(ratingChange),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      };
+
+      if (winnerIsPlayer) {
+        playerUpdates.totalWins = admin.firestore.FieldValue.increment(1);
+        playerUpdates.currentWinStreak = admin.firestore.FieldValue.increment(1);
+      } else if (winnerIsOpponent) {
+        playerUpdates.totalLosses = admin.firestore.FieldValue.increment(1);
+        playerUpdates.currentWinStreak = 0;
+      } else {
+        playerUpdates.totalDraws = admin.firestore.FieldValue.increment(1);
+      }
+
+      transaction.update(db.collection('users').doc(userId), playerUpdates);
+
+      // ロボット統計更新
+      // simulateBattle handles level up logic, we need to adapt it here or keep it.
+      // The original startBattle had leveling logic inside transaction.
+      // We should replicate that.
+
+      const currentExp = getRobotXp(playerRobot) + experienceGained;
+      const currentLevel = playerRobot.level || 1;
+      const expToNextLevel = currentLevel * 100;
+
+      let robotUpdates: any = {
+        xp: currentExp, // Using xp as per previous implementation
+        totalBattles: admin.firestore.FieldValue.increment(1), // Added for spec
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      };
+
+      if (winnerIsPlayer) {
+        robotUpdates.wins = admin.firestore.FieldValue.increment(1); // Using wins as per previous implementation
+        robotUpdates.totalWins = admin.firestore.FieldValue.increment(1); // Added for spec
+      } else if (winnerIsOpponent) {
+        robotUpdates.losses = admin.firestore.FieldValue.increment(1); // Using losses
+        robotUpdates.totalLosses = admin.firestore.FieldValue.increment(1); // Added for spec
+      }
+
+      // Level Up Logic
+      if (currentExp >= expToNextLevel) {
+        const newLevel = currentLevel + 1;
+        robotUpdates.level = newLevel;
+        robotUpdates.baseHp = Math.floor(playerRobot.baseHp * 1.1);
+        robotUpdates.baseAttack = Math.floor(playerRobot.baseAttack * 1.1);
+        robotUpdates.baseDefense = Math.floor(playerRobot.baseDefense * 1.1);
+        robotUpdates.baseSpeed = Math.floor(playerRobot.baseSpeed * 1.1);
+
+        // Skill Acquisition
+        if ([3, 5, 10].includes(newLevel)) {
+          const newSkill = getRandomSkill();
+          const currentSkills = normalizeSkillIds(playerRobot.skills);
+          if (!currentSkills.includes(newSkill.id) && currentSkills.length < 4) {
+            currentSkills.push(newSkill.id);
+            robotUpdates.skills = currentSkills;
+            battleResult.rewards.newSkill = newSkill.name;
+          }
+        }
+      }
+
+      transaction.update(
+        db.collection('users').doc(userId).collection('robots').doc(playerRobotId),
+        robotUpdates
+      );
     });
 
-    return { success: true, result };
+    return {
+      battleId,
+      result: {
+        winner: resultType === 'win' ? 'player' : resultType === 'loss' ? 'opponent' : 'draw',
+        log: battleResult.logs,
+        // Adapt to frontend expectations if necessary
+      },
+      experienceGained,
+      rankingPointsChange: ratingChange,
+      rewards: battleResult.rewards // Pass rewards for UI
+    };
 
   } catch (error) {
-    console.error("Battle error:", error);
+    console.error("Match battle error:", error);
     throw new functions.https.HttpsError('internal', 'Battle failed');
   }
 });
@@ -722,3 +893,547 @@ export const followUser = functions.https.onCall(async (data: any, context) => {
 
   return { ok: true };
 });
+
+// ランキング更新スケジュール関数
+export const updateRanking = onSchedule({ schedule: '0 0 * * *', timeZone: 'Asia/Tokyo' }, async (event) => {
+  const db = admin.firestore();
+
+  // 全ユーザーをランキングポイント順に取得
+  const usersSnap = await db
+    .collection('users')
+    .orderBy('rankingPoints', 'desc')
+    .limit(100)
+    .get();
+
+  const topPlayers = usersSnap.docs.map((doc, index) => ({
+    userId: doc.id,
+    username: doc.data().username,
+    rankingPoints: doc.data().rankingPoints,
+    totalWins: doc.data().totalWins,
+    rank: index + 1
+  }));
+
+  // ランキングドキュメント更新
+  await db.collection('ranking').doc('global').set({
+    period: 'global',
+    topPlayers,
+    lastUpdated: admin.firestore.FieldValue.serverTimestamp()
+  });
+
+  console.log('Ranking updated:', topPlayers.length, 'players');
+});
+
+// 実績チェックトリガー
+export const checkAchievements = onDocumentUpdated('users/{userId}', async (event) => {
+  const beforeData = event.data?.before.data();
+  const afterData = event.data?.after.data();
+  const userId = event.params.userId;
+
+  if (!beforeData || !afterData) return;
+
+  const db = admin.firestore();
+
+  // 変更を検出
+  const changes = {
+    totalWins: (afterData.totalWins || 0) - (beforeData.totalWins || 0),
+    currentWinStreak: afterData.currentWinStreak || 0,
+    rankingPoints: afterData.rankingPoints || 0
+  };
+
+  const unlockAchievement = async (achievementId: number) => {
+    const achievementRef = db
+      .collection('users').doc(userId)
+      .collection('achievements').doc(String(achievementId));
+
+    const achievementSnap = await achievementRef.get();
+
+    if (!achievementSnap.exists || !achievementSnap.data()?.isCompleted) {
+      await achievementRef.set({
+        achievementId,
+        progress: 1,
+        target: 1,
+        isCompleted: true,
+        completedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+
+      console.log('Achievement unlocked:', userId, achievementId);
+    }
+  };
+
+  // 実績チェック
+  if (changes.totalWins > 0) {
+    // 初陣（1勝）
+    if (afterData.totalWins === 1) {
+      await unlockAchievement(1);
+    }
+
+    // 百戦錬磨（100勝）
+    if (afterData.totalWins === 100) {
+      await unlockAchievement(2);
+    }
+  }
+
+  // 三連勝
+  if (changes.currentWinStreak >= 3 && (beforeData.currentWinStreak || 0) < 3) {
+    await unlockAchievement(4);
+  }
+
+  // ランキングポイント1500
+  if (changes.rankingPoints >= 1500 && (beforeData.rankingPoints || 0) < 1500) {
+    await unlockAchievement(45);
+  }
+});
+
+// =====================================
+// アイテム使用関連
+// =====================================
+
+// 強化アイテムの効果定義
+const UPGRADE_ITEMS = {
+  power_core: { stat: 'baseAttack', value: 5 },
+  shield_plate: { stat: 'baseDefense', value: 5 },
+  speed_chip: { stat: 'baseSpeed', value: 5 },
+  hp_module: { stat: 'baseHp', value: 50 },
+} as const;
+
+type UpgradeItemId = keyof typeof UPGRADE_ITEMS;
+
+const isUpgradeItemId = (id: string): id is UpgradeItemId => {
+  return Object.prototype.hasOwnProperty.call(UPGRADE_ITEMS, id);
+};
+
+// コスメティックアイテムの定義
+const COSMETIC_ITEMS = ['gold_coating', 'neon_glow', 'flame_aura', 'ice_armor'] as const;
+
+type CosmeticItemId = typeof COSMETIC_ITEMS[number];
+
+const isCosmeticItemId = (id: string): id is CosmeticItemId => {
+  return COSMETIC_ITEMS.includes(id as CosmeticItemId);
+};
+
+// ロボット強化アイテム使用API
+export const useUpgradeItem = functions.https.onCall(async (data: any, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', '認証が必要です');
+  }
+
+  const { robotId, itemId } = data;
+
+  if (typeof robotId !== 'string' || typeof itemId !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', '無効なパラメータです');
+  }
+
+  if (!isUpgradeItemId(itemId)) {
+    throw new functions.https.HttpsError('invalid-argument', '無効なアイテムです');
+  }
+
+  const userId = context.auth.uid;
+  const db = admin.firestore();
+  const userRef = db.collection('users').doc(userId);
+  const robotRef = userRef.collection('robots').doc(robotId);
+  const inventoryRef = userRef.collection('inventory').doc(itemId);
+
+  const result = await db.runTransaction(async (t) => {
+    const [robotSnap, inventorySnap] = await Promise.all([
+      t.get(robotRef),
+      t.get(inventoryRef)
+    ]);
+
+    if (!robotSnap.exists) {
+      throw new functions.https.HttpsError('not-found', 'ロボットが見つかりません');
+    }
+
+    const inventoryData = inventorySnap.data();
+    const qty = inventoryData?.qty ?? 0;
+
+    if (qty < 1) {
+      throw new functions.https.HttpsError('failed-precondition', 'アイテムが不足しています');
+    }
+
+    const robotData = robotSnap.data() as any;
+    const item = UPGRADE_ITEMS[itemId];
+    const currentValue = robotData[item.stat] ?? 0;
+    const newValue = currentValue + item.value;
+
+    // ロボットのステータス更新
+    t.update(robotRef, {
+      [item.stat]: newValue,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    // インベントリ減少
+    t.update(inventoryRef, {
+      qty: qty - 1,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    return {
+      robotId,
+      stat: item.stat,
+      oldValue: currentValue,
+      newValue,
+      itemUsed: itemId,
+      remainingQty: qty - 1
+    };
+  });
+
+  return result;
+});
+
+// コスメティックアイテム適用API
+export const applyCosmeticItem = functions.https.onCall(async (data: any, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', '認証が必要です');
+  }
+
+  const { robotId, itemId } = data;
+
+  if (typeof robotId !== 'string' || typeof itemId !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', '無効なパラメータです');
+  }
+
+  if (!isCosmeticItemId(itemId)) {
+    throw new functions.https.HttpsError('invalid-argument', '無効なコスメティックアイテムです');
+  }
+
+  const userId = context.auth.uid;
+  const db = admin.firestore();
+  const userRef = db.collection('users').doc(userId);
+  const robotRef = userRef.collection('robots').doc(robotId);
+  const inventoryRef = userRef.collection('inventory').doc(itemId);
+
+  const result = await db.runTransaction(async (t) => {
+    const [robotSnap, inventorySnap] = await Promise.all([
+      t.get(robotRef),
+      t.get(inventoryRef)
+    ]);
+
+    if (!robotSnap.exists) {
+      throw new functions.https.HttpsError('not-found', 'ロボットが見つかりません');
+    }
+
+    const inventoryData = inventorySnap.data();
+    const qty = inventoryData?.qty ?? 0;
+
+    if (qty < 1) {
+      throw new functions.https.HttpsError('failed-precondition', 'アイテムが不足しています');
+    }
+
+    const robotData = robotSnap.data() as any;
+    const currentCosmetics: string[] = robotData.cosmetics || [];
+
+    // 既に適用済みかチェック
+    if (currentCosmetics.includes(itemId)) {
+      throw new functions.https.HttpsError('already-exists', 'このコスメティックは既に適用されています');
+    }
+
+    // ロボットにコスメティック追加
+    t.update(robotRef, {
+      cosmetics: [...currentCosmetics, itemId],
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    // インベントリ減少
+    t.update(inventoryRef, {
+      qty: qty - 1,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    return {
+      robotId,
+      cosmeticApplied: itemId,
+      allCosmetics: [...currentCosmetics, itemId],
+      remainingQty: qty - 1
+    };
+  });
+
+  return result;
+});
+
+// =====================================
+// Stripe決済関連
+// =====================================
+import Stripe from 'stripe';
+import { defineSecret } from "firebase-functions/params";
+
+const stripeSecretKey = defineSecret("STRIPE_SECRET_KEY");
+
+// Stripe Price IDs（Stripeダッシュボードで作成済み）
+const STRIPE_PRICES = {
+  credits_100: { priceId: 'price_1SjPcuRy3cnjpOGFNMSku9Op', credits: 100 },
+  credits_500: { priceId: 'price_1SjPsxRy3cnjpOGFK5rCDh9q', credits: 500 },
+  credits_1200: { priceId: 'price_1SjPqhRy3cnjpOGF1EIsZba4', credits: 1200 },
+  premium_monthly: { priceId: 'price_1SjPgiRy3cnjpOGFbq8hgztq' },
+} as const;
+
+type CreditPackId = 'credits_100' | 'credits_500' | 'credits_1200';
+
+const isCreditPackId = (id: string): id is CreditPackId => {
+  return id === 'credits_100' || id === 'credits_500' || id === 'credits_1200';
+};
+
+// Stripe Checkout セッション作成（クレジットパック購入）
+export const createCheckoutSession = functions
+  .runWith({ secrets: [stripeSecretKey] })
+  .https.onCall(async (data: any, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError('unauthenticated', '認証が必要です');
+    }
+
+    const { packId, successUrl, cancelUrl } = data;
+
+    if (!packId || !successUrl || !cancelUrl) {
+      throw new functions.https.HttpsError('invalid-argument', '必要なパラメータが不足しています');
+    }
+
+    if (!isCreditPackId(packId)) {
+      throw new functions.https.HttpsError('invalid-argument', '無効なパックIDです');
+    }
+
+    const pack = STRIPE_PRICES[packId];
+    const userId = context.auth.uid;
+
+    const stripe = new Stripe(stripeSecretKey.value(), { apiVersion: '2025-12-15.clover' });
+
+    try {
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items: [{
+          price: pack.priceId,
+          quantity: 1,
+        }],
+        mode: 'payment',
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+        metadata: {
+          userId,
+          packId,
+          credits: String(pack.credits),
+          type: 'credit_pack',
+        },
+      });
+
+      return { sessionId: session.id, url: session.url };
+    } catch (error) {
+      console.error('Stripe checkout error:', error);
+      throw new functions.https.HttpsError('internal', '決済セッションの作成に失敗しました');
+    }
+  });
+
+// Stripe Checkout セッション作成（プレミアム会員サブスク）
+export const createSubscriptionSession = functions
+  .runWith({ secrets: [stripeSecretKey] })
+  .https.onCall(async (data: any, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError('unauthenticated', '認証が必要です');
+    }
+
+    const { successUrl, cancelUrl } = data;
+
+    if (!successUrl || !cancelUrl) {
+      throw new functions.https.HttpsError('invalid-argument', '必要なパラメータが不足しています');
+    }
+
+    const userId = context.auth.uid;
+    const stripe = new Stripe(stripeSecretKey.value(), { apiVersion: '2025-12-15.clover' });
+
+    try {
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items: [{
+          price: STRIPE_PRICES.premium_monthly.priceId,
+          quantity: 1,
+        }],
+        mode: 'subscription',
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+        metadata: {
+          userId,
+          type: 'premium_subscription',
+        },
+      });
+
+      return { sessionId: session.id, url: session.url };
+    } catch (error) {
+      console.error('Stripe subscription error:', error);
+      throw new functions.https.HttpsError('internal', 'サブスクリプションセッションの作成に失敗しました');
+    }
+  });
+
+// Stripe カスタマーポータルセッション作成
+export const createPortalSession = functions
+  .runWith({ secrets: [stripeSecretKey] })
+  .https.onCall(async (data: any, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError('unauthenticated', '認証が必要です');
+    }
+
+    const { returnUrl } = data;
+    if (!returnUrl) {
+      throw new functions.https.HttpsError('invalid-argument', 'Return URL is required');
+    }
+
+    const userId = context.auth.uid;
+    const db = admin.firestore();
+    const userSnap = await db.collection('users').doc(userId).get();
+    const userData = userSnap.data();
+    const stripeCustomerId = userData?.stripeCustomerId;
+
+    if (!stripeCustomerId) {
+      throw new functions.https.HttpsError('failed-precondition', 'サブスクリプション情報が見つかりません');
+    }
+
+    const stripe = new Stripe(stripeSecretKey.value(), { apiVersion: '2025-12-15.clover' });
+
+    try {
+      const session = await stripe.billingPortal.sessions.create({
+        customer: stripeCustomerId,
+        return_url: returnUrl,
+      });
+
+      return { url: session.url };
+    } catch (error) {
+      console.error('Portal session error:', error);
+      throw new functions.https.HttpsError('internal', 'ポータルセッションの作成に失敗しました');
+    }
+  });
+
+// Stripe Webhook（決済完了時の処理）
+const stripeWebhookSecret = defineSecret("STRIPE_WEBHOOK_SECRET");
+
+export const stripeWebhook = functions
+  .runWith({ secrets: [stripeSecretKey, stripeWebhookSecret] })
+  .https.onRequest(async (req, res) => {
+    const stripe = new Stripe(stripeSecretKey.value(), { apiVersion: '2025-12-15.clover' });
+
+    const sig = req.headers['stripe-signature'];
+    if (!sig) {
+      res.status(400).send('Missing stripe-signature');
+      return;
+    }
+
+    let event: Stripe.Event;
+
+    try {
+      // Webhook署名検証
+      event = stripe.webhooks.constructEvent(
+        req.rawBody,
+        sig,
+        stripeWebhookSecret.value()
+      );
+    } catch (err) {
+      console.error('Webhook verification failed:', err);
+      res.status(400).send('Webhook signature verification failed');
+      return;
+    }
+
+    const db = admin.firestore();
+
+    try {
+      switch (event.type) {
+        case 'checkout.session.completed': {
+          const session = event.data.object as Stripe.Checkout.Session;
+          const metadata = session.metadata || {};
+          const userId = metadata.userId;
+          const type = metadata.type;
+
+          if (!userId) {
+            console.error('No userId in metadata');
+            break;
+          }
+
+          const userRef = db.collection('users').doc(userId);
+          const eventRef = db.collection('webhook_events').doc(event.id);
+
+          await db.runTransaction(async (t) => {
+            const eventDoc = await t.get(eventRef);
+            if (eventDoc.exists) {
+              console.log(`Event ${event.id} already processed`);
+              return;
+            }
+
+            if (type === 'credit_pack') {
+              const credits = parseInt(metadata.credits || '0', 10);
+              if (credits > 0) {
+                t.update(userRef, {
+                  credits: admin.firestore.FieldValue.increment(credits),
+                  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                });
+                console.log(`Added ${credits} credits to user ${userId}`);
+              }
+            } else if (type === 'premium_subscription') {
+              t.update(userRef, {
+                isPremium: true,
+                stripeCustomerId: session.customer,
+                premiumStartedAt: admin.firestore.FieldValue.serverTimestamp(),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              });
+              console.log(`User ${userId} upgraded to premium`);
+            }
+
+            // Mark event as processed
+            t.set(eventRef, {
+              processedAt: admin.firestore.FieldValue.serverTimestamp(),
+              type: event.type
+            });
+
+            // Save purchase history (outside transaction or inside? inside is safer)
+            const purchaseRef = db.collection('purchases').doc(); // Auto ID
+            t.set(purchaseRef, {
+              userId,
+              type,
+              sessionId: session.id,
+              amountTotal: session.amount_total,
+              currency: session.currency,
+              metadata,
+              createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+          });
+
+          break;
+        }
+
+        case 'customer.subscription.deleted': {
+          // サブスク解約時
+          const subscription = event.data.object as Stripe.Subscription;
+          const customerId = subscription.customer as string;
+
+          // customerId からユーザーを検索（メタデータにuserIdがない場合）
+          const purchasesSnap = await db.collection('purchases')
+            .where('type', '==', 'premium_subscription')
+            .orderBy('createdAt', 'desc')
+            .limit(1)
+            .get();
+
+          // TODO: より堅牢な実装が必要（stripeCustomerIdをユーザーに保存するなど）
+          console.log('Subscription cancelled:', customerId, 'purchases found:', purchasesSnap.size);
+          // customerId からユーザーを検索してダウングレード
+          const usersSnap = await db.collection('users')
+            .where('stripeCustomerId', '==', customerId)
+            .limit(1)
+            .get();
+
+          if (!usersSnap.empty) {
+            const userDoc = usersSnap.docs[0];
+            await userDoc.ref.update({
+              isPremium: false,
+              premiumEndedAt: admin.firestore.FieldValue.serverTimestamp(),
+              updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+            console.log(`Subscription cancelled for user ${userDoc.id} (Customer: ${customerId})`);
+          } else {
+            console.warn(`User not found for cancelled subscription (Customer: ${customerId})`);
+            // エラーを投げずログのみ。リトライしてもユーザーが見つかるわけではないため。
+          }
+          break;
+        }
+      }
+
+      res.json({ received: true });
+    } catch (error) {
+      console.error('Webhook processing error:', error);
+      res.status(500).send('Webhook processing failed');
+    }
+  });
+

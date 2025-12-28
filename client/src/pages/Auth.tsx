@@ -1,12 +1,14 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "wouter";
 
 export default function Auth() {
   const { signInWithGoogle, user } = useAuth();
+  const { t } = useLanguage();
   const [isLoading, setIsLoading] = useState(false);
   const [, setLocation] = useLocation();
 
@@ -32,9 +34,9 @@ export default function Auth() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-3xl font-bold">Barcode Genesis</CardTitle>
+          <CardTitle className="text-3xl font-bold">{t('app_title')}</CardTitle>
           <CardDescription>
-            Scan barcodes, generate robots, and battle!
+            {t('login_desc')}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
@@ -44,10 +46,10 @@ export default function Auth() {
               🤖
             </div>
           </div>
-          
-          <Button 
-            size="lg" 
-            className="w-full" 
+
+          <Button
+            size="lg"
+            className="w-full"
             onClick={handleLogin}
             disabled={isLoading}
           >
@@ -73,7 +75,7 @@ export default function Auth() {
                 />
               </svg>
             )}
-            Sign in with Google
+            {t('login_google')}
           </Button>
         </CardContent>
       </Card>

@@ -10,26 +10,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { db, functions } from "@/lib/firebase";
 import { getItemLabel } from "@/lib/items";
 import { toast } from "sonner";
+import { RobotData } from "@/types/shared";
 
-interface RobotData {
-  id: string;
-  name: string;
-  rarityName: string;
-  baseHp: number;
-  baseAttack: number;
-  baseDefense: number;
-  baseSpeed: number;
-  parts: any;
-  colors: any;
-  level?: number;
-  xp?: number;
-  exp?: number;
-  skills?: Array<string | { id?: string }>;
-  equipped?: {
-    slot1?: string | null;
-    slot2?: string | null;
-  };
-}
 
 type InventoryMap = Record<string, number>;
 
@@ -67,6 +49,12 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
   });
   const [equipError, setEquipError] = useState<string | null>(null);
   const [equippingSlot, setEquippingSlot] = useState<"slot1" | "slot2" | null>(null);
+  const [upgradeItemId, setUpgradeItemId] = useState("");
+  const [isUpgrading, setIsUpgrading] = useState(false);
+  const [upgradeError, setUpgradeError] = useState<string | null>(null);
+  const [cosmeticItemId, setCosmeticItemId] = useState("");
+  const [isApplyingCosmetic, setIsApplyingCosmetic] = useState(false);
+  const [cosmeticError, setCosmeticError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) {
@@ -237,6 +225,77 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
     }
   };
 
+  // 強化アイテム使用
+  const handleUpgrade = async () => {
+    if (!baseRobot || !upgradeItemId) return;
+    setUpgradeError(null);
+    setIsUpgrading(true);
+    try {
+      const useUpgrade = httpsCallable(functions, "useUpgradeItem");
+      const result = await useUpgrade({ robotId: baseRobot.id, itemId: upgradeItemId });
+      const data = result.data as {
+        robotId: string;
+        stat: string;
+        oldValue: number;
+        newValue: number;
+        remainingQty: number;
+      };
+
+      // ロボットのステータス更新
+      setBaseRobot((prev) =>
+        prev ? { ...prev, [data.stat]: data.newValue } : prev
+      );
+      // インベントリ更新
+      setInventory((prev) => ({
+        ...prev,
+        [upgradeItemId]: data.remainingQty
+      }));
+      setUpgradeItemId("");
+      toast.success(`${data.stat} が ${data.oldValue} → ${data.newValue} に上昇！`);
+    } catch (error) {
+      console.error("Upgrade failed:", error);
+      const message = error instanceof Error ? error.message : "強化に失敗しました";
+      setUpgradeError(message);
+    } finally {
+      setIsUpgrading(false);
+    }
+  };
+
+  // コスメティックアイテム適用
+  const handleApplyCosmetic = async () => {
+    if (!baseRobot || !cosmeticItemId) return;
+    setCosmeticError(null);
+    setIsApplyingCosmetic(true);
+    try {
+      const applyCosmetic = httpsCallable(functions, "applyCosmeticItem");
+      const result = await applyCosmetic({ robotId: baseRobot.id, itemId: cosmeticItemId });
+      const data = result.data as {
+        robotId: string;
+        cosmeticApplied: string;
+        allCosmetics: string[];
+        remainingQty: number;
+      };
+
+      // ロボットのコスメティック更新
+      setBaseRobot((prev) =>
+        prev ? { ...prev, cosmetics: data.allCosmetics } : prev
+      );
+      // インベントリ更新
+      setInventory((prev) => ({
+        ...prev,
+        [cosmeticItemId]: data.remainingQty
+      }));
+      setCosmeticItemId("");
+      toast.success(`${data.cosmeticApplied} を適用しました！`);
+    } catch (error) {
+      console.error("Cosmetic apply failed:", error);
+      const message = error instanceof Error ? error.message : "適用に失敗しました";
+      setCosmeticError(message);
+    } finally {
+      setIsApplyingCosmetic(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -255,59 +314,92 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
       </div>
     );
   }
+  if (loading) return <div className="flex justify-center p-8 min-h-screen items-center bg-dark-bg"><Loader2 className="animate-spin text-neon-cyan" /></div>;
+  if (!baseRobot) return <div className="p-8 text-center text-white bg-dark-bg min-h-screen">Robot not found</div>;
+
+  const { level, nextLevelExp, progress } = getLevelInfo(baseRobot);
 
   return (
-    <div className="min-h-screen bg-background p-4 flex flex-col">
-      <header className="flex items-center mb-6 max-w-4xl mx-auto w-full">
-        <Link href="/collection">
-          <Button variant="ghost" className="mr-4">
-            <ArrowLeft className="h-5 w-5 mr-2" />
-            Back
-          </Button>
-        </Link>
-        <h1 className="text-2xl font-bold text-primary">Robot Detail</h1>
-      </header>
+    <div className="min-h-screen bg-dark-bg p-4 flex flex-col pb-24 relative overflow-hidden text-foreground">
+      <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-20 pointer-events-none" />
 
-      <main className="flex-1 max-w-4xl mx-auto w-full space-y-6">
-        <Card>
-          <CardContent className="p-4 flex flex-col md:flex-row gap-4">
-            <div className="w-full md:w-1/3 flex items-center justify-center bg-secondary/20 rounded-lg p-4">
-              <RobotSVG parts={baseRobot.parts} colors={baseRobot.colors} size={180} />
+      <main className="max-w-2xl mx-auto w-full relative z-10 space-y-6">
+        {/* Navigation */}
+        <div className="flex items-center">
+          <Link href="/collection">
+            <Button variant="ghost" className="text-white hover:text-neon-cyan pl-0">
+              <ArrowLeft className="mr-2 h-4 w-4" /> BACK
+            </Button>
+          </Link>
+        </div>
+
+        {/* Robot Header Card */}
+        <div className="glass-panel p-8 rounded-2xl border-neon-cyan relative text-center">
+          <div className="absolute top-4 left-4 border border-neon-cyan px-2 py-0.5 text-[10px] text-neon-cyan font-orbitron">
+            ID: {baseRobot.id.substring(0, 6)}
+          </div>
+
+          <div className="flex justify-center mb-6 drop-shadow-[0_0_30px_rgba(0,243,255,0.3)]">
+            <RobotSVG parts={baseRobot.parts} colors={baseRobot.colors} size={240} />
+          </div>
+
+          <h1 className="text-3xl font-black italic tracking-wider text-white mb-1">{baseRobot.name}</h1>
+          <div className="text-neon-cyan font-orbitron text-sm mb-4">
+            {baseRobot.rarityName} // {baseRobot.elementName || "Neutral"}
+          </div>
+
+          {/* Level & XP */}
+          <div className="bg-black/40 rounded-full p-2 border border-white/10 flex items-center gap-3 px-4">
+            <span className="font-bold text-sm">Lv.{level}</span>
+            <div className="flex-1 h-2 bg-black/60 rounded-full overflow-hidden">
+              <div className="h-full bg-neon-yellow" style={{ width: `${progress}%` }} />
             </div>
-            <div className="flex-1 space-y-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-xl font-bold">{baseRobot.name}</h2>
-                <span className="text-xs px-2 py-0.5 rounded bg-primary/10 text-primary font-medium">
-                  {baseRobot.rarityName}
-                </span>
-              </div>
-              <div className="text-sm text-muted-foreground">
-                Lv.{baseRobot.level || 1} / XP {baseRobot.xp ?? baseRobot.exp ?? 0}
-              </div>
-              <div className="text-sm text-muted-foreground">
-                Skills: {baseSkillIds.length > 0 ? baseSkillIds.join(", ") : "None"}
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground mt-2">
-                <div className="flex justify-between">
-                  <span>HP</span>
-                  <span className="font-mono text-foreground">{baseRobot.baseHp}</span>
+            <span className="text-[10px] text-muted-foreground">
+              {Math.floor(progress)}%
+            </span>
+          </div>
+        </div>
+
+        {/* Status Grid */}
+        <div className="grid grid-cols-2 gap-4">
+          {/* Simple Status Cards with Neon Styled Borders */}
+          <div className="glass-panel p-4 rounded-xl border-l-4 border-l-red-500">
+            <div className="text-xs text-muted-foreground uppercase tracking-wider">Attack</div>
+            <div className="text-2xl font-bold font-orbitron">{baseRobot.baseAttack}</div>
+          </div>
+          <div className="glass-panel p-4 rounded-xl border-l-4 border-l-blue-500">
+            <div className="text-xs text-muted-foreground uppercase tracking-wider">Defense</div>
+            <div className="text-2xl font-bold font-orbitron">{baseRobot.baseDefense}</div>
+          </div>
+          <div className="glass-panel p-4 rounded-xl border-l-4 border-l-green-500">
+            <div className="text-xs text-muted-foreground uppercase tracking-wider">Speed</div>
+            <div className="text-2xl font-bold font-orbitron">{baseRobot.baseSpeed}</div>
+          </div>
+          <div className="glass-panel p-4 rounded-xl border-l-4 border-l-yellow-500">
+            <div className="text-xs text-muted-foreground uppercase tracking-wider">HP</div>
+            <div className="text-2xl font-bold font-orbitron">{baseRobot.baseHp}</div>
+          </div>
+        </div>
+
+        {/* Skills Section (Placeholder for improved skill listing) */}
+        {baseRobot.skills && baseRobot.skills.length > 0 && (
+          <div className="glass-panel p-4 rounded-xl">
+            <h3 className="text-sm font-bold text-neon-purple mb-4 font-orbitron">ACTIVE SKILLS</h3>
+            <div className="space-y-2">
+              {baseRobot.skills.map((skill, i) => (
+                <div key={i} className="p-3 bg-white/5 rounded border border-white/5 flex items-center gap-3">
+                  <div className="w-8 h-8 rounded bg-neon-purple/20 flex items-center justify-center text-neon-purple">
+                    <Zap className="w-4 h-4" />
+                  </div>
+                  <div>
+                    {/* Assuming skill is string or object, simplified for display */}
+                    <div className="font-bold text-sm">{typeof skill === 'string' ? skill : (skill as any).name || 'Unknown Skill'}</div>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span>ATK</span>
-                  <span className="font-mono text-foreground">{baseRobot.baseAttack}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>DEF</span>
-                  <span className="font-mono text-foreground">{baseRobot.baseDefense}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>SPD</span>
-                  <span className="font-mono text-foreground">{baseRobot.baseSpeed}</span>
-                </div>
-              </div>
+              ))}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        )}
 
         <section className="space-y-3">
           <h2 className="text-lg font-semibold">Equipment</h2>
@@ -432,6 +524,66 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
             Inherit
           </Button>
           {inheritError && <p className="text-sm text-destructive">{inheritError}</p>}
+        </section>
+
+        {/* 強化アイテム使用 */}
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold">ロボット強化</h2>
+          <p className="text-sm text-muted-foreground">強化アイテムを使用してステータスを永久に上昇させます。</p>
+          <div className="flex flex-col sm:flex-row gap-2 max-w-md">
+            <select
+              value={upgradeItemId}
+              onChange={(event) => setUpgradeItemId(event.target.value)}
+              className="border rounded px-3 py-2 bg-background text-sm flex-1"
+            >
+              <option value="">アイテムを選択</option>
+              {Object.entries(inventory)
+                .filter(([id, qty]) => qty > 0 && ['power_core', 'shield_plate', 'speed_chip', 'hp_module'].includes(id))
+                .map(([itemId, qty]) => (
+                  <option key={itemId} value={itemId}>
+                    {getItemLabel(itemId)} (x{qty})
+                  </option>
+                ))}
+            </select>
+            <Button
+              onClick={handleUpgrade}
+              disabled={isUpgrading || !upgradeItemId}
+            >
+              {isUpgrading && <Loader2 className="h-4 w-4 animate-spin" />}
+              使用する
+            </Button>
+          </div>
+          {upgradeError && <p className="text-sm text-destructive">{upgradeError}</p>}
+        </section>
+
+        {/* コスメティック適用 */}
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold">カスタマイズ</h2>
+          <p className="text-sm text-muted-foreground">コスメティックアイテムでロボットの見た目を変更します。</p>
+          <div className="flex flex-col sm:flex-row gap-2 max-w-md">
+            <select
+              value={cosmeticItemId}
+              onChange={(event) => setCosmeticItemId(event.target.value)}
+              className="border rounded px-3 py-2 bg-background text-sm flex-1"
+            >
+              <option value="">アイテムを選択</option>
+              {Object.entries(inventory)
+                .filter(([id, qty]) => qty > 0 && ['gold_coating', 'neon_glow', 'flame_aura', 'ice_armor'].includes(id))
+                .map(([itemId, qty]) => (
+                  <option key={itemId} value={itemId}>
+                    {getItemLabel(itemId)} (x{qty})
+                  </option>
+                ))}
+            </select>
+            <Button
+              onClick={handleApplyCosmetic}
+              disabled={isApplyingCosmetic || !cosmeticItemId}
+            >
+              {isApplyingCosmetic && <Loader2 className="h-4 w-4 animate-spin" />}
+              適用する
+            </Button>
+          </div>
+          {cosmeticError && <p className="text-sm text-destructive">{cosmeticError}</p>}
         </section>
       </main>
     </div>
