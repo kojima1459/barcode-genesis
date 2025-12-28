@@ -31,6 +31,15 @@ Open `http://localhost:3000` in a browser.
 4. In Emulator UI (`http://localhost:4000/firestore`), set `/users/{uid}.credits` to a test value (ex: 500).
 5. Open Shop → purchase items → confirm credits/inventory change.
 6. Open Collection → Details on a robot → equip items in slot1/slot2 → unequip and confirm inventory returns.
+
+## Week6 (Daily missions / Login bonus / Follow) emulator check
+1. `firebase emulators:start --only auth,firestore,functions`
+2. `VITE_USE_EMULATORS=1 npm run dev`
+3. Login bonus: open Home → "Claim bonus" once; second click should fail with `failed-precondition`.
+4. Streak test: set `/users/{uid}.lastLoginDateKey` to yesterday (JST) in Emulator UI, then claim again to see streak +1.
+5. Daily missions: call "Daily Missions" to create `/users/{uid}/missions/{dateKey}`.
+   - In Emulator UI, edit a mission's `progress` to match `target`, then claim from Home.
+6. Follow: enter a target UID in Home → Follow, confirm `publicUsers/{uid}/following/{targetUid}`.
 7. grantBattleRewards is not implemented yet; it needs a server-side battle record source to avoid client spoofing.
 
 ## Other commands

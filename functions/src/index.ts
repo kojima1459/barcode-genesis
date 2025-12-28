@@ -24,6 +24,33 @@ const isItemId = (itemId: string): itemId is ItemId => {
   return Object.prototype.hasOwnProperty.call(ITEM_CATALOG, itemId);
 };
 
+const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
+const LOGIN_BONUS_CREDITS = 50;
+const DAILY_MISSIONS = [
+  { id: "scan_barcode", title: "Scan 1 barcode", target: 1, rewardCredits: 30 },
+  { id: "win_battle", title: "Win 1 battle", target: 1, rewardCredits: 40 },
+  { id: "synthesize", title: "Synthesize 1 robot", target: 1, rewardCredits: 50 }
+];
+
+const getJstDateKey = (date: Date = new Date()): string => {
+  const jst = new Date(date.getTime() + JST_OFFSET_MS);
+  return jst.toISOString().slice(0, 10);
+};
+
+const getYesterdayJstDateKey = (): string => {
+  const jst = new Date(Date.now() + JST_OFFSET_MS);
+  jst.setUTCDate(jst.getUTCDate() - 1);
+  return jst.toISOString().slice(0, 10);
+};
+
+const buildDailyMissions = () => {
+  return DAILY_MISSIONS.map((mission) => ({
+    ...mission,
+    progress: 0,
+    claimed: false
+  }));
+};
+
 const getUserCredits = (user: any): number => {
   const credits = user?.credits ?? 0;
   return typeof credits === "number" ? credits : 0;
@@ -527,4 +554,173 @@ export const equipItem = functions.https.onCall(async (data: any, context) => {
   });
 
   return result;
+});
+
+// ログインボーナスAPI
+export const claimLoginBonus = functions.https.onCall(async (_data: any, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Auth required');
+  }
+
+  const userId = context.auth.uid;
+  const userRef = admin.firestore().collection('users').doc(userId);
+  const todayKey = getJstDateKey();
+  const yesterdayKey = getYesterdayJstDateKey();
+
+  const result = await admin.firestore().runTransaction(async (t) => {
+    const userSnap = await t.get(userRef);
+    const userData = userSnap.exists ? userSnap.data() : {};
+    const lastLoginDateKey = userData?.lastLoginDateKey;
+
+    if (lastLoginDateKey === todayKey) {
+      throw new functions.https.HttpsError('failed-precondition', 'Already claimed today');
+    }
+
+    const currentStreak = typeof userData?.loginStreak === "number" ? userData.loginStreak : 0;
+    const newStreak = lastLoginDateKey === yesterdayKey ? currentStreak + 1 : 1;
+    const credits = getUserCredits(userData);
+    const newCredits = credits + LOGIN_BONUS_CREDITS;
+
+    t.set(userRef, {
+      credits: newCredits,
+      lastLoginDateKey: todayKey,
+      loginStreak: newStreak,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+
+    return { streak: newStreak, credits: newCredits };
+  });
+
+  return result;
+});
+
+// デイリーミッション取得/生成API
+export const getDailyMissions = functions.https.onCall(async (_data: any, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Auth required');
+  }
+
+  const userId = context.auth.uid;
+  const userRef = admin.firestore().collection('users').doc(userId);
+  const dateKey = getJstDateKey();
+  const missionsRef = userRef.collection('missions').doc(dateKey);
+
+  const result = await admin.firestore().runTransaction(async (t) => {
+    const missionSnap = await t.get(missionsRef);
+    if (missionSnap.exists) {
+      const data = missionSnap.data() || {};
+      const missions = Array.isArray(data.missions) ? data.missions : buildDailyMissions();
+      return { dateKey, missions };
+    }
+
+    const missions = buildDailyMissions();
+    t.set(missionsRef, {
+      dateKey,
+      missions,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    return { dateKey, missions };
+  });
+
+  return result;
+});
+
+// デイリーミッション報酬受取API
+export const claimMissionReward = functions.https.onCall(async (data: any, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Auth required');
+  }
+
+  const dateKey = data?.dateKey;
+  const missionId = data?.missionId;
+
+  if (typeof dateKey !== "string" || typeof missionId !== "string") {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid input');
+  }
+
+  const todayKey = getJstDateKey();
+  if (dateKey !== todayKey) {
+    throw new functions.https.HttpsError('failed-precondition', 'Invalid mission date');
+  }
+
+  const userId = context.auth.uid;
+  const userRef = admin.firestore().collection('users').doc(userId);
+  const missionsRef = userRef.collection('missions').doc(dateKey);
+
+  const result = await admin.firestore().runTransaction(async (t) => {
+    const [userSnap, missionSnap] = await Promise.all([t.get(userRef), t.get(missionsRef)]);
+    if (!missionSnap.exists) {
+      throw new functions.https.HttpsError('not-found', 'Missions not found');
+    }
+
+    const missionData = missionSnap.data() || {};
+    const missions = Array.isArray(missionData.missions) ? missionData.missions : [];
+    const missionIndex = missions.findIndex((mission: any) => mission?.id === missionId);
+
+    if (missionIndex === -1) {
+      throw new functions.https.HttpsError('not-found', 'Mission not found');
+    }
+
+    const mission = missions[missionIndex];
+    const claimed = mission?.claimed === true;
+    const progress = typeof mission?.progress === "number" ? mission.progress : 0;
+    const target = typeof mission?.target === "number" ? mission.target : 0;
+
+    if (claimed) {
+      throw new functions.https.HttpsError('failed-precondition', 'Mission already claimed');
+    }
+
+    if (progress < target) {
+      throw new functions.https.HttpsError('failed-precondition', 'Mission not completed');
+    }
+
+    const rewardCredits = typeof mission?.rewardCredits === "number" ? mission.rewardCredits : 0;
+    const credits = getUserCredits(userSnap.exists ? userSnap.data() : {});
+    const newCredits = credits + rewardCredits;
+
+    const nextMissions = missions.map((entry: any, index: number) => {
+      if (index !== missionIndex) return entry;
+      return { ...entry, claimed: true };
+    });
+
+    t.set(missionsRef, { missions: nextMissions }, { merge: true });
+    t.set(userRef, { credits: newCredits }, { merge: true });
+
+    return { credits: newCredits, missionId };
+  });
+
+  return result;
+});
+
+// フォローAPI
+export const followUser = functions.https.onCall(async (data: any, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Auth required');
+  }
+
+  const targetUid = data?.targetUid;
+  if (typeof targetUid !== "string" || targetUid.trim().length === 0) {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid target user');
+  }
+
+  const userId = context.auth.uid;
+  if (userId === targetUid) {
+    throw new functions.https.HttpsError('failed-precondition', 'Cannot follow yourself');
+  }
+
+  const publicUsersRef = admin.firestore().collection('publicUsers');
+  const userRef = publicUsersRef.doc(userId);
+  const targetRef = publicUsersRef.doc(targetUid);
+  const followingRef = userRef.collection('following').doc(targetUid);
+  const followersRef = targetRef.collection('followers').doc(userId);
+
+  await admin.firestore().runTransaction(async (t) => {
+    t.set(userRef, { uid: userId, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    t.set(targetRef, { uid: targetUid, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    t.set(followingRef, { uid: targetUid, createdAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    t.set(followersRef, { uid: userId, createdAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+  });
+
+  return { ok: true };
 });
