@@ -691,6 +691,11 @@ export const claimMissionReward = functions.https.onCall(async (data: any, conte
   return result;
 });
 
+import { createCheckoutSession, stripeWebhook } from "./stripe";
+
+// Export Stripe functions
+export { createCheckoutSession, stripeWebhook };
+
 // フォローAPI
 export const followUser = functions.https.onCall(async (data: any, context) => {
   if (!context.auth) {

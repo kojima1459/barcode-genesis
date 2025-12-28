@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
 import { db, functions } from "@/lib/firebase";
 import { SHOP_ITEMS } from "@/lib/items";
+import { PRODUCTS } from "../../../shared/products";
 import { toast } from "sonner";
 
 type InventoryMap = Record<string, number>;
@@ -27,6 +28,7 @@ export default function Shop() {
   const [purchaseQty, setPurchaseQty] = useState<Record<string, number>>({});
   const [purchasingItemId, setPurchasingItemId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [buyingProduct, setBuyingProduct] = useState<string | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -65,6 +67,24 @@ export default function Shop() {
   }, [user]);
 
   const qtyOptions = useMemo(() => Array.from({ length: 10 }, (_, index) => index + 1), []);
+
+  const handleBuyCoins = async (productId: string) => {
+    if (!user) return;
+    setBuyingProduct(productId);
+    try {
+      const createCheckoutSession = httpsCallable(functions, "createCheckoutSession");
+      const result = await createCheckoutSession({ productId });
+      const { url } = result.data as { url: string };
+      if (url) {
+        window.location.href = url;
+      }
+    } catch (error) {
+      console.error("Checkout failed:", error);
+      toast.error("Failed to start checkout");
+    } finally {
+      setBuyingProduct(null);
+    }
+  };
 
   const handlePurchase = async (itemId: string) => {
     if (!user) return;
@@ -112,8 +132,40 @@ export default function Shop() {
         <div className="ml-auto text-sm text-muted-foreground">Credits: {credits}</div>
       </header>
 
-      <main className="flex-1 max-w-4xl mx-auto w-full space-y-4">
+      <main className="flex-1 max-w-4xl mx-auto w-full space-y-8">
+        {/* Coin Shop Section */}
+        <section>
+          <h2 className="text-xl font-bold mb-4 text-primary">Buy Coins</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {PRODUCTS.map((product) => (
+              <Card key={product.id} className="border-primary/20">
+                <CardHeader>
+                  <CardTitle className="text-lg">{product.name}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="aspect-square bg-secondary/20 rounded-lg flex items-center justify-center text-4xl">
+                    💰
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-yellow-500">{product.amount} Coins</div>
+                    <div className="text-sm text-muted-foreground">{product.description}</div>
+                  </div>
+                  <Button 
+                    className="w-full" 
+                    onClick={() => handleBuyCoins(product.id)}
+                    disabled={buyingProduct === product.id}
+                  >
+                    {buyingProduct === product.id && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                    ¥{product.price}
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
+
         {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
+        <h2 className="text-xl font-bold text-primary">Item Shop</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {SHOP_ITEMS.map((item) => (
             <Card key={item.id}>
