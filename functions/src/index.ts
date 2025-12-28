@@ -1,6 +1,7 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import { generateRobotData } from "./robotGenerator";
+import { simulateBattle } from "./battleSystem";
 import { GenerateRobotRequest, GenerateRobotResponse } from "./types";
 
 admin.initializeApp();
@@ -71,5 +72,54 @@ export const generateRobot = functions.https.onCall(async (data: GenerateRobotRe
       'internal',
       'An error occurred while generating the robot.'
     );
+  }
+});
+
+// バトル開始API
+export const startBattle = functions.https.onCall(async (data: any, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Auth required');
+  }
+
+  const { myRobotId, enemyRobotId } = data;
+  const userId = context.auth.uid;
+
+  try {
+    // 自分のロボットを取得
+    const myRobotDoc = await admin.firestore()
+      .collection('users')
+      .doc(userId)
+      .collection('robots')
+      .doc(myRobotId)
+      .get();
+
+    if (!myRobotDoc.exists) {
+      throw new functions.https.HttpsError('not-found', 'My robot not found');
+    }
+
+    // 敵ロボットを取得（今回は自分のロボット同士で戦う簡易版とする、またはCPU）
+    // 本来は他のユーザーのロボットを取得するが、デモ用に自分のコレクションから取得
+    const enemyRobotDoc = await admin.firestore()
+      .collection('users')
+      .doc(userId)
+      .collection('robots')
+      .doc(enemyRobotId)
+      .get();
+
+    if (!enemyRobotDoc.exists) {
+      throw new functions.https.HttpsError('not-found', 'Enemy robot not found');
+    }
+
+    const myRobot = { id: myRobotDoc.id, ...myRobotDoc.data() } as any;
+    const enemyRobot = { id: enemyRobotDoc.id, ...enemyRobotDoc.data() } as any;
+
+    // バトルシミュレーション実行
+    const result = simulateBattle(myRobot, enemyRobot);
+
+    return { success: true, result };
+
+  } catch (error) {
+    console.error("Battle error:", error);
+    throw new functions.https.HttpsError('internal', 'Battle failed');
   }
 });

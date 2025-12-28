@@ -8,6 +8,7 @@ import { Loader2, LogOut, Scan, Sword } from "lucide-react";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import RobotSVG from "@/components/RobotSVG";
 import { toast } from "sonner";
+import { Link } from "wouter";
 
 // 型定義（本来は共有型を使うべきだが、簡易的に定義）
 interface RobotData {
@@ -84,17 +85,37 @@ export default function Home() {
               </CardContent>
             </Card>
 
-            <Card className="cursor-pointer hover:border-primary transition-colors opacity-50">
-              <CardContent className="flex flex-col items-center justify-center h-64 gap-4">
-                <div className="p-4 rounded-full bg-destructive/10 text-destructive">
-                  <Sword className="h-12 w-12" />
-                </div>
-                <h2 className="text-2xl font-bold">Battle</h2>
-                <p className="text-muted-foreground text-center">
-                  Coming soon in Week 2
-                </p>
-              </CardContent>
-            </Card>
+            <Link href="/collection" className="w-full">
+              <Card className="cursor-pointer hover:border-primary transition-colors h-full">
+                <CardContent className="flex flex-col items-center justify-center h-64 gap-4">
+                  <div className="p-4 rounded-full bg-secondary text-secondary-foreground">
+                    <RobotSVG 
+                      parts={{head:1,face:1,body:1,armLeft:1,armRight:1,legLeft:1,legRight:1,backpack:1,weapon:1,accessory:1}} 
+                      colors={{primary:'#3b82f6',secondary:'#1e40af',accent:'#60a5fa',glow:'#93c5fd'}} 
+                      size={48} 
+                    />
+                  </div>
+                  <h2 className="text-2xl font-bold">Collection</h2>
+                  <p className="text-muted-foreground text-center">
+                    View your robot army
+                  </p>
+                </CardContent>
+              </Card>
+            </Link>
+
+            <Link href="/battle" className="w-full">
+              <Card className="cursor-pointer hover:border-primary transition-colors h-full">
+                <CardContent className="flex flex-col items-center justify-center h-64 gap-4">
+                  <div className="p-4 rounded-full bg-destructive/10 text-destructive">
+                    <Sword className="h-12 w-12" />
+                  </div>
+                  <h2 className="text-2xl font-bold">Battle</h2>
+                  <p className="text-muted-foreground text-center">
+                    Fight with your robots!
+                  </p>
+                </CardContent>
+              </Card>
+            </Link>
           </div>
         )}
 
