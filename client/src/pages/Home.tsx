@@ -11,6 +11,8 @@ import { toast } from "sonner";
 import { Link } from "wouter";
 import { useLanguage } from "@/contexts/LanguageContext";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import ShareButton from "@/components/ShareButton";
+import TutorialModal from "@/components/TutorialModal";
 
 // 型定義（本来は共有型を使うべきだが、簡易的に定義）
 interface RobotData {
@@ -71,6 +73,7 @@ export default function Home() {
       </header>
 
       <main className="flex-1 flex flex-col items-center justify-center gap-8 max-w-4xl mx-auto w-full">
+        <TutorialModal />
         
         {mode === 'menu' && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full">
@@ -244,9 +247,19 @@ export default function Home() {
                   </div>
                 </div>
 
-                <Button className="w-full" size="lg" onClick={() => setMode('menu')}>
-                  {t('save_return')}
-                </Button>
+                <div className="flex gap-2">
+                  <Button className="flex-1" size="lg" onClick={() => setMode('menu')}>
+                    {t('save_return')}
+                  </Button>
+                  <ShareButton 
+                    text={t('share_robot_text')
+                      .replace('{name}', robot.name)
+                      .replace('{rarity}', robot.rarityName)
+                      .replace('{power}', String(robot.baseAttack + robot.baseDefense + robot.baseSpeed + robot.baseHp))}
+                    variant="secondary"
+                    size="lg"
+                  />
+                </div>
               </div>
             </div>
           </div>

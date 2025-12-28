@@ -5,6 +5,7 @@ export const translations = {
     // Common
     app_title: "バーコードジェネシス",
     back: "戻る",
+    next: "次へ",
     loading: "読み込み中...",
     error: "エラーが発生しました",
     success: "成功しました",
@@ -80,11 +81,29 @@ export const translations = {
     skill_repair: "修理",
     skill_charge: "チャージ",
     skill_jamming: "ジャミング",
+    
+    // Share
+    share_x: "Xでシェア",
+    share_robot_text: "{name} ({rarity}) を生成しました！ 戦闘力: {power}",
+    share_battle_win: "{name}が勝利しました！ レベル: {level}",
+    share_battle_lose: "{name}は敗北しました...",
+    
+    // Tutorial
+    tutorial_welcome_title: "バーコードジェネシスへようこそ！",
+    tutorial_welcome_desc: "この世界では、バーコードから強力なロボットを生成し、戦わせることができます。",
+    tutorial_step1_title: "1. バーコードをスキャン",
+    tutorial_step1_desc: "身の回りにある商品のバーコードをスキャンして、あなただけのロボットを見つけましょう。",
+    tutorial_step2_title: "2. ロボットを育成",
+    tutorial_step2_desc: "バトルに勝利すると経験値を獲得し、レベルアップ！新しいスキルを覚えることもあります。",
+    tutorial_step3_title: "3. ランキングを目指せ",
+    tutorial_step3_desc: "最強のロボット軍団を作り上げ、ランキング上位を目指しましょう！",
+    tutorial_start: "冒険を始める",
   },
   en: {
     // Common
     app_title: "Barcode Genesis",
     back: "Back",
+    next: "Next",
     loading: "Loading...",
     error: "An error occurred",
     success: "Success",
@@ -160,5 +179,22 @@ export const translations = {
     skill_repair: "Repair",
     skill_charge: "Charge",
     skill_jamming: "Jamming",
+    
+    // Share
+    share_x: "Share on X",
+    share_robot_text: "Generated {name} ({rarity})! Power: {power}",
+    share_battle_win: "{name} won the battle! Level: {level}",
+    share_battle_lose: "{name} lost the battle...",
+    
+    // Tutorial
+    tutorial_welcome_title: "Welcome to Barcode Genesis!",
+    tutorial_welcome_desc: "In this world, you can generate powerful robots from barcodes and battle with them.",
+    tutorial_step1_title: "1. Scan Barcode",
+    tutorial_step1_desc: "Scan barcodes from products around you to discover your unique robots.",
+    tutorial_step2_title: "2. Train Your Robots",
+    tutorial_step2_desc: "Win battles to gain EXP and level up! You might even learn new skills.",
+    tutorial_step3_title: "3. Aim for the Top",
+    tutorial_step3_desc: "Build the strongest robot army and climb the leaderboard!",
+    tutorial_start: "Start Adventure",
   }
 };

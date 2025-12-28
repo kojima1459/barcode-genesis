@@ -12,6 +12,7 @@ import { Link } from "wouter";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { useLanguage } from "@/contexts/LanguageContext";
+import ShareButton from "@/components/ShareButton";
 
 interface RobotData {
   id: string;
@@ -393,19 +394,35 @@ export default function Battle() {
               </CardContent>
             </Card>
 
-            {!isBattling && (
-              <div className="flex justify-center">
+            {!isBattling && battleResult && (
+              <div className="flex justify-center gap-4">
                 <Button onClick={() => { 
                   setBattleResult(null); 
                   setIsBattling(false); 
-                  // ロボットデータを再取得して最新のEXP/レベルを反映させるためにリロード推奨だが、
-                  // UX的にはState更新が望ましい。今回は簡易的にリロードボタンにするか、
-                  // 親コンポーネントで再取得する仕組みが必要。
-                  // ここではシンプルにページリロードを促すか、再取得関数を呼ぶ。
                   window.location.reload();
                 }}>
                   {t('play_again')}
                 </Button>
+                
+                {(() => {
+                  const myRobot = robots.find(r => r.id === selectedRobotId);
+                  if (!myRobot) return null;
+                  
+                  const isWin = battleResult.winnerId === myRobot.id;
+                  const shareText = isWin 
+                    ? t('share_battle_win')
+                        .replace('{name}', myRobot.name)
+                        .replace('{level}', String(getLevelInfo(myRobot).level))
+                    : t('share_battle_lose')
+                        .replace('{name}', myRobot.name);
+                  
+                  return (
+                    <ShareButton 
+                      text={shareText}
+                      variant="secondary"
+                    />
+                  );
+                })()}
               </div>
             )}
           </div>
