@@ -1,6 +1,5 @@
 import { RobotData, RobotParts, RobotColors } from './types';
 import * as admin from 'firebase-admin';
-import { getRandomSkills } from './skills';
 
 // 定数定義
 const RARITY_NAMES = ["Common", "Uncommon", "Rare", "Epic", "Legendary"];
@@ -103,9 +102,6 @@ function generateColors(digits: number[]): RobotColors {
   };
 }
 
-// スキル選択
-// getRandomSkills関数を使用するため、この関数は削除または置換
-
 // メイン生成関数
 export function generateRobotData(barcode: string, userId: string): RobotData {
   const digits = parseBarcode(barcode);
@@ -115,11 +111,8 @@ export function generateRobotData(barcode: string, userId: string): RobotData {
   const element = calculateElement(digits);
   const parts = selectParts(digits);
   const colors = generateColors(digits);
-  // スキル選択
-  // P5, D をシードとして使用
-  const seed = digits[10] * 10 + digits[12];
-  const skillCount = Math.min(rarity, 3); // 最大3つ
-  const skills = getRandomSkills(skillCount, seed);
+  // スキルはWeek4で継承に移行するため初期は空
+  const skills: string[] = [];
   
   // 名前生成 (簡易版: 属性 + レアリティ + IDの一部)
   const name = `${element.name} ${RARITY_NAMES[rarity-1]} Unit-${barcode.slice(-4)}`;
@@ -136,6 +129,7 @@ export function generateRobotData(barcode: string, userId: string): RobotData {
     elementName: element.name,
     
     level: 1,
+    xp: 0,
     experience: 0,
     experienceToNext: 100,
     

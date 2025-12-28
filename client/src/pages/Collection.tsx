@@ -130,6 +130,12 @@ export default function Collection() {
                         <span className="font-mono text-foreground">{robot.baseSpeed}</span>
                       </div>
                     </div>
+
+                    <Link href={`/robots/${robot.id}`} className="block mt-3">
+                      <Button variant="secondary" size="sm" className="w-full">
+                        Details
+                      </Button>
+                    </Link>
                   </div>
                 </CardContent>
               </Card>

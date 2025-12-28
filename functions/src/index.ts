@@ -2,10 +2,15 @@ import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import { generateRobotData } from "./robotGenerator";
 import { simulateBattle } from "./battleSystem";
-import { GenerateRobotRequest, GenerateRobotResponse, Skill } from "./types";
-import { getRandomSkill } from "./skills";
+import { GenerateRobotRequest, GenerateRobotResponse } from "./types";
+import { getRandomSkill, normalizeSkillIds } from "./skills";
 
 admin.initializeApp();
+
+const normalizeBarcodeId = (barcode: string): string => {
+  const digits = barcode.replace(/[^0-9]/g, "");
+  return digits.padEnd(13, "0").slice(0, 13);
+};
 
 // ロボット生成API
 export const generateRobot = functions.https.onCall(async (data: GenerateRobotRequest, context): Promise<GenerateRobotResponse> => {
@@ -30,12 +35,14 @@ export const generateRobot = functions.https.onCall(async (data: GenerateRobotRe
   try {
     const userId = context.auth.uid;
     
+    const normalizedBarcode = normalizeBarcodeId(barcode);
+
     // 既存チェック: 同じバーコードのロボットを既に持っているか？
     const existingRobots = await admin.firestore()
       .collection('users')
       .doc(userId)
       .collection('robots')
-      .where('sourceBarcode', '==', barcode)
+      .where('sourceBarcode', '==', normalizedBarcode)
       .get();
       
     if (!existingRobots.empty) {
@@ -46,14 +53,16 @@ export const generateRobot = functions.https.onCall(async (data: GenerateRobotRe
     }
 
     // ロボットデータ生成
-    const robotData = generateRobotData(barcode, userId);
+    const robotData = generateRobotData(normalizedBarcode, userId);
     
     // Firestoreに保存
-    const robotRef = await admin.firestore()
+    const robotRef = admin.firestore()
       .collection('users')
       .doc(userId)
       .collection('robots')
-      .add(robotData);
+      .doc(normalizedBarcode);
+
+    await robotRef.set(robotData);
       
     // IDを追加して返す
     return {
@@ -77,6 +86,17 @@ export const generateRobot = functions.https.onCall(async (data: GenerateRobotRe
 });
 
 // バトル開始API
+const MATERIAL_MAX_COUNT = 5;
+const MATERIAL_LEVEL_XP = 25;
+const LEVEL_XP = 100;
+const INHERIT_SUCCESS_RATE = 0.35;
+const MAX_SKILLS = 4;
+
+const getRobotXp = (robot: any): number => {
+  const xp = robot?.xp ?? robot?.exp ?? robot?.experience ?? 0;
+  return typeof xp === "number" ? xp : 0;
+};
+
 export const startBattle = functions.https.onCall(async (data: any, context) => {
   if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'Auth required');
@@ -133,13 +153,14 @@ export const startBattle = functions.https.onCall(async (data: any, context) => 
       const isWinner = result.winnerId === myRobotId;
       
       if (isWinner) {
-        const currentExp = (robot.exp || 0) + result.rewards.exp;
+        const currentExp = getRobotXp(robot) + result.rewards.exp;
         const currentLevel = robot.level || 1;
         const expToNextLevel = currentLevel * 100;
         
         let updates: any = {
-          exp: currentExp,
-          wins: (robot.wins || 0) + 1
+          xp: currentExp,
+          wins: (robot.wins || 0) + 1,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
         };
         
         // Level Up Logic
@@ -155,40 +176,24 @@ export const startBattle = functions.https.onCall(async (data: any, context) => 
           // New skill at Lv.3, Lv.5, Lv.10
           if ([3, 5, 10].includes(newLevel)) {
             const newSkill = getRandomSkill();
-            const currentSkills = (robot.skills || []) as Skill[];
-            const existingSkillIndex = currentSkills.findIndex(s => s.id === newSkill.id);
+            const currentSkills = normalizeSkillIds(robot.skills);
+            const alreadyHasSkill = currentSkills.includes(newSkill.id);
 
-            if (existingSkillIndex !== -1) {
-              // Upgrade existing skill
-              const skillToUpgrade = currentSkills[existingSkillIndex];
-              skillToUpgrade.power = parseFloat((skillToUpgrade.power * 1.2).toFixed(2)); // +20% power
-              skillToUpgrade.triggerRate = Math.min(1.0, parseFloat((skillToUpgrade.triggerRate + 0.05).toFixed(2))); // +5% trigger rate
-              skillToUpgrade.name = `${skillToUpgrade.name}+`; // Add + mark
-              currentSkills[existingSkillIndex] = skillToUpgrade;
-              
-              // Update result for client
-              result.rewards.upgradedSkill = skillToUpgrade.name;
-            } else {
-              // Learn new skill
-              if (currentSkills.length < 4) {
-                currentSkills.push(newSkill);
-                // Update result for client
-                result.rewards.newSkill = newSkill.name;
-              } else {
-                // Replace random skill if full (simplified) or just ignore
-                // For now, let's just add it up to 5 skills
-                currentSkills.push(newSkill);
-                result.rewards.newSkill = newSkill.name;
-              }
+            if (alreadyHasSkill) {
+              result.rewards.upgradedSkill = newSkill.name;
+            } else if (currentSkills.length < 4) {
+              currentSkills.push(newSkill.id);
+              result.rewards.newSkill = newSkill.name;
+              updates.skills = currentSkills;
             }
-            updates.skills = currentSkills;
           }
         }
         
         t.update(myRobotRef, updates);
       } else {
         t.update(myRobotRef, {
-          losses: (robot.losses || 0) + 1
+          losses: (robot.losses || 0) + 1,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
         });
       }
     });
@@ -199,4 +204,149 @@ export const startBattle = functions.https.onCall(async (data: any, context) => 
     console.error("Battle error:", error);
     throw new functions.https.HttpsError('internal', 'Battle failed');
   }
+});
+
+// 合成API
+export const synthesizeRobots = functions.https.onCall(async (data: any, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Auth required');
+  }
+
+  const baseRobotId = data?.baseRobotId;
+  const materialRobotIds = data?.materialRobotIds;
+
+  if (typeof baseRobotId !== "string" || !Array.isArray(materialRobotIds)) {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid input');
+  }
+
+  const normalizedMaterials = materialRobotIds.filter((id: unknown) => typeof id === "string" && id.trim().length > 0) as string[];
+
+  if (normalizedMaterials.length !== materialRobotIds.length) {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid material robot IDs');
+  }
+
+  if (normalizedMaterials.length < 1 || normalizedMaterials.length > MATERIAL_MAX_COUNT) {
+    throw new functions.https.HttpsError('invalid-argument', 'Materials must be between 1 and 5');
+  }
+
+  if (normalizedMaterials.includes(baseRobotId)) {
+    throw new functions.https.HttpsError('invalid-argument', 'Base robot cannot be a material');
+  }
+
+  const uniqueMaterialIds = new Set(normalizedMaterials);
+  if (uniqueMaterialIds.size !== normalizedMaterials.length) {
+    throw new functions.https.HttpsError('invalid-argument', 'Duplicate material robot IDs');
+  }
+
+  const userId = context.auth.uid;
+  const robotsRef = admin.firestore().collection('users').doc(userId).collection('robots');
+  const baseRef = robotsRef.doc(baseRobotId);
+  const materialRefs = normalizedMaterials.map((id) => robotsRef.doc(id));
+
+  const result = await admin.firestore().runTransaction(async (t) => {
+    const baseSnap = await t.get(baseRef);
+    if (!baseSnap.exists) {
+      throw new functions.https.HttpsError('not-found', 'Base robot not found');
+    }
+
+    const materialSnaps = await Promise.all(materialRefs.map((ref) => t.get(ref)));
+    materialSnaps.forEach((snap, index) => {
+      if (!snap.exists) {
+        throw new functions.https.HttpsError('not-found', `Material robot not found: ${normalizedMaterials[index]}`);
+      }
+    });
+
+    const baseData = baseSnap.data() as any;
+    const baseXp = getRobotXp(baseData);
+
+    const gainedXp = materialSnaps.reduce((total, snap) => {
+      const material = snap.data() as any;
+      const materialXp = getRobotXp(material);
+      const materialLevel = typeof material.level === "number" ? material.level : 1;
+      return total + materialXp + materialLevel * MATERIAL_LEVEL_XP;
+    }, 0);
+
+    const newXp = baseXp + gainedXp;
+    const newLevel = Math.floor(newXp / LEVEL_XP) + 1;
+
+    t.update(baseRef, {
+      xp: newXp,
+      level: newLevel,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    materialRefs.forEach((ref) => t.delete(ref));
+
+    return { baseRobotId: baseRef.id, newLevel, newXp };
+  });
+
+  return result;
+});
+
+// 継承API
+export const inheritSkill = functions.https.onCall(async (data: any, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Auth required');
+  }
+
+  const baseRobotId = data?.baseRobotId;
+  const materialRobotId = data?.materialRobotId;
+  const skillId = data?.skillId;
+
+  if (typeof baseRobotId !== "string" || typeof materialRobotId !== "string" || typeof skillId !== "string") {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid input');
+  }
+
+  if (baseRobotId === materialRobotId) {
+    throw new functions.https.HttpsError('invalid-argument', 'Material robot cannot be the base robot');
+  }
+
+  const userId = context.auth.uid;
+  const robotsRef = admin.firestore().collection('users').doc(userId).collection('robots');
+  const baseRef = robotsRef.doc(baseRobotId);
+  const materialRef = robotsRef.doc(materialRobotId);
+
+  const result = await admin.firestore().runTransaction(async (t) => {
+    const [baseSnap, materialSnap] = await Promise.all([t.get(baseRef), t.get(materialRef)]);
+
+    if (!baseSnap.exists) {
+      throw new functions.https.HttpsError('not-found', 'Base robot not found');
+    }
+
+    if (!materialSnap.exists) {
+      throw new functions.https.HttpsError('not-found', 'Material robot not found');
+    }
+
+    const baseData = baseSnap.data() as any;
+    const materialData = materialSnap.data() as any;
+
+    const baseSkills = normalizeSkillIds(baseData.skills);
+    const materialSkills = normalizeSkillIds(materialData.skills);
+
+    if (!materialSkills.includes(skillId)) {
+      throw new functions.https.HttpsError('failed-precondition', 'Material robot does not have the skill');
+    }
+
+    if (baseSkills.includes(skillId)) {
+      throw new functions.https.HttpsError('already-exists', 'Base robot already has the skill');
+    }
+
+    if (baseSkills.length >= MAX_SKILLS) {
+      throw new functions.https.HttpsError('failed-precondition', 'Base robot has reached the skill limit');
+    }
+
+    const success = Math.random() < INHERIT_SUCCESS_RATE;
+    const nextSkills = success ? [...baseSkills, skillId] : baseSkills;
+
+    if (success) {
+      t.update(baseRef, {
+        skills: nextSkills,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+    }
+
+    return { success, baseSkills: nextSkills };
+  });
+
+  return result;
 });

@@ -26,6 +26,7 @@ interface RobotData {
   parts: any;
   colors: any;
   level?: number;
+  xp?: number;
   exp?: number;
   wins?: number;
 }
@@ -230,7 +231,7 @@ export default function Battle() {
   // レベルとEXPの計算ヘルパー
   const getLevelInfo = (robot: RobotData) => {
     const level = robot.level || 1;
-    const exp = robot.exp || 0;
+    const exp = robot.xp ?? robot.exp ?? 0;
     const nextLevelExp = level * 100;
     const progress = Math.min(100, (exp / nextLevelExp) * 100);
     return { level, exp, nextLevelExp, progress };

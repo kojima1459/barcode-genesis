@@ -1,7 +1,7 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
-import { getFunctions } from "firebase/functions";
+import { getAuth, GoogleAuthProvider, connectAuthEmulator } from "firebase/auth";
+import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
+import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
 
 // 環境変数から設定を読み込む
 // 注意: 実際の開発では .env ファイルを使用しますが、
@@ -21,3 +21,9 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const functions = getFunctions(app);
 export const googleProvider = new GoogleAuthProvider();
+
+if (import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === "1") {
+  connectAuthEmulator(auth, "http://localhost:9099");
+  connectFirestoreEmulator(db, "localhost", 8082);
+  connectFunctionsEmulator(functions, "localhost", 5001);
+}

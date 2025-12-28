@@ -108,3 +108,23 @@ export const getRandomSkill = (): Skill => {
   const index = Math.floor(Math.random() * SKILLS.length);
   return SKILLS[index];
 };
+
+export const getSkillById = (skillId: string): Skill | undefined => {
+  return SKILLS.find((skill) => skill.id === skillId);
+};
+
+export const normalizeSkillIds = (skills: unknown): string[] => {
+  if (!Array.isArray(skills)) return [];
+  const ids = new Set<string>();
+  for (const skill of skills) {
+    if (typeof skill === "string") {
+      ids.add(skill);
+      continue;
+    }
+    if (skill && typeof skill === "object" && "id" in skill) {
+      const id = (skill as { id?: unknown }).id;
+      if (typeof id === "string") ids.add(id);
+    }
+  }
+  return Array.from(ids);
+};

@@ -48,16 +48,18 @@ export interface RobotData {
   elementName: string;
   
   // レベル
-  level: number;
-  experience: number;
-  experienceToNext: number;
+  level?: number;
+  xp?: number;
+  exp?: number; // legacy field
+  experience?: number; // legacy field
+  experienceToNext?: number; // legacy field
   
   // 外観
   parts: RobotParts;
   colors: RobotColors;
   
   // スキル
-  skills: Skill[];         // スキルオブジェクトの配列
+  skills?: Array<string | Skill>; // skill IDs (string) or legacy skill objects
   
   // メタデータ
   createdAt: Date | any;    // Firestore Timestamp

@@ -1,4 +1,21 @@
 import { RobotData, Skill } from "./types";
+import { getSkillById } from "./skills";
+
+const resolveSkills = (skills: RobotData["skills"]): Skill[] => {
+  if (!Array.isArray(skills)) return [];
+  const resolved: Skill[] = [];
+  for (const skill of skills) {
+    if (typeof skill === "string") {
+      const found = getSkillById(skill);
+      if (found) resolved.push(found);
+      continue;
+    }
+    if (skill && typeof skill === "object") {
+      resolved.push(skill as Skill);
+    }
+  }
+  return resolved;
+};
 
 interface BattleLog {
   turn: number;
@@ -30,12 +47,16 @@ export const simulateBattle = (robot1: RobotData, robot2: RobotData): BattleResu
   let hp2 = robot2.baseHp;
   const logs: BattleLog[] = [];
   let turn = 1;
+  const robot1Skills = resolveSkills(robot1.skills);
+  const robot2Skills = resolveSkills(robot2.skills);
 
   // 素早さで先攻後攻を決定
   let attacker = robot1.baseSpeed >= robot2.baseSpeed ? robot1 : robot2;
   let defender = robot1.baseSpeed >= robot2.baseSpeed ? robot2 : robot1;
   let attackerHp = robot1.baseSpeed >= robot2.baseSpeed ? hp1 : hp2;
   let defenderHp = robot1.baseSpeed >= robot2.baseSpeed ? hp2 : hp1;
+  let attackerSkills = robot1.baseSpeed >= robot2.baseSpeed ? robot1Skills : robot2Skills;
+  let defenderSkills = robot1.baseSpeed >= robot2.baseSpeed ? robot2Skills : robot1Skills;
 
   // 最大20ターンで決着をつける
   while (hp1 > 0 && hp2 > 0 && turn <= 20) {
@@ -47,8 +68,8 @@ export const simulateBattle = (robot1: RobotData, robot2: RobotData): BattleResu
 
     // スキル発動判定
     let skill: Skill | null = null;
-    if (attacker.skills && attacker.skills.length > 0) {
-      for (const s of attacker.skills) {
+    if (attackerSkills.length > 0) {
+      for (const s of attackerSkills) {
         if (Math.random() < s.triggerRate) {
           skill = s;
           break; // 1ターンに1つだけ発動
@@ -125,6 +146,9 @@ export const simulateBattle = (robot1: RobotData, robot2: RobotData): BattleResu
     const tempRobot = attacker;
     attacker = defender;
     defender = tempRobot;
+    const tempSkills = attackerSkills;
+    attackerSkills = defenderSkills;
+    defenderSkills = tempSkills;
     turn++;
   }
 

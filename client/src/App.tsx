@@ -14,6 +14,7 @@ import Collection from "@/pages/Collection";
 import Leaderboard from "@/pages/Leaderboard";
 import Profile from "@/pages/Profile";
 import Home from "@/pages/Home";
+import RobotDetail from "@/pages/RobotDetail";
 
 function Router() {
   return (
@@ -21,6 +22,9 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/battle" component={Battle} />
       <Route path="/collection" component={Collection} />
+      <Route path="/robots/:robotId">
+        {(params) => <RobotDetail robotId={params.robotId} />}
+      </Route>
       <Route path="/leaderboard" component={Leaderboard} />
       <Route path="/profile" component={Profile} />
       <Route path="/404" component={NotFound} />
