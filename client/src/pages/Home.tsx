@@ -13,6 +13,9 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import ShareButton from "@/components/ShareButton";
 import TutorialModal from "@/components/TutorialModal";
+import SoundSettings from "@/components/SoundSettings";
+import { useSound } from "@/contexts/SoundContext";
+import { useEffect } from "react";
 
 // 型定義（本来は共有型を使うべきだが、簡易的に定義）
 interface RobotData {
@@ -29,12 +32,18 @@ interface RobotData {
 
 export default function Home() {
   const { t } = useLanguage();
+  const { playBGM, playSE } = useSound();
   const { user, logout } = useAuth();
   const [mode, setMode] = useState<'menu' | 'scan' | 'result'>('menu');
   const [isGenerating, setIsGenerating] = useState(false);
   const [robot, setRobot] = useState<RobotData | null>(null);
 
+  useEffect(() => {
+    playBGM('bgm_menu');
+  }, [playBGM]);
+
   const handleScan = async (barcode: string) => {
+    playSE('se_scan');
     setIsGenerating(true);
     try {
       const generateRobot = httpsCallable(functions, 'generateRobot');
@@ -62,10 +71,16 @@ export default function Home() {
       <header className="flex justify-between items-center mb-8">
         <h1 className="text-2xl font-bold text-primary">{t('app_title')}</h1>
         <div className="flex items-center gap-4">
+          <SoundSettings />
           <LanguageSwitcher />
-          <span className="text-sm text-muted-foreground hidden sm:inline">
-            {user?.email}
-          </span>
+          <Link href="/profile">
+            <Button variant="ghost" className="text-sm text-muted-foreground hidden sm:inline-flex items-center gap-2">
+              <span className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs">
+                👤
+              </span>
+              {user?.email}
+            </Button>
+          </Link>
           <Button variant="ghost" size="icon" onClick={() => logout()}>
             <LogOut className="h-5 w-5" />
           </Button>
@@ -79,7 +94,10 @@ export default function Home() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full">
             <Card 
               className="cursor-pointer hover:border-primary transition-colors"
-              onClick={() => setMode('scan')}
+              onClick={() => {
+                playSE('se_click');
+                setMode('scan');
+              }}
             >
               <CardContent className="flex flex-col items-center justify-center h-64 gap-4">
                 <div className="p-4 rounded-full bg-primary/10 text-primary">
@@ -92,7 +110,7 @@ export default function Home() {
               </CardContent>
             </Card>
 
-            <Link href="/collection" className="w-full">
+            <Link href="/collection" className="w-full" onClick={() => playSE('se_click')}>
               <Card className="cursor-pointer hover:border-primary transition-colors h-full">
                 <CardContent className="flex flex-col items-center justify-center h-64 gap-4">
                   <div className="p-4 rounded-full bg-secondary text-secondary-foreground">
@@ -110,7 +128,7 @@ export default function Home() {
               </Card>
             </Link>
 
-            <Link href="/battle" className="w-full">
+            <Link href="/battle" className="w-full" onClick={() => playSE('se_click')}>
               <Card className="cursor-pointer hover:border-primary transition-colors h-full">
                 <CardContent className="flex flex-col items-center justify-center h-64 gap-4">
                   <div className="p-4 rounded-full bg-destructive/10 text-destructive">
@@ -124,7 +142,7 @@ export default function Home() {
               </Card>
             </Link>
 
-            <Link href="/leaderboard" className="w-full">
+            <Link href="/leaderboard" className="w-full" onClick={() => playSE('se_click')}>
               <Card className="cursor-pointer hover:border-primary transition-colors h-full">
                 <CardContent className="flex flex-col items-center justify-center h-64 gap-4">
                   <div className="p-4 rounded-full bg-yellow-500/10 text-yellow-500">

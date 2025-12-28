@@ -8,9 +8,11 @@ import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
+import { SoundProvider } from "@/contexts/SoundContext";
 import Battle from "@/pages/Battle";
 import Collection from "@/pages/Collection";
 import Leaderboard from "@/pages/Leaderboard";
+import Profile from "@/pages/Profile";
 import Home from "@/pages/Home";
 
 function Router() {
@@ -20,6 +22,7 @@ function Router() {
       <Route path="/battle" component={Battle} />
       <Route path="/collection" component={Collection} />
       <Route path="/leaderboard" component={Leaderboard} />
+      <Route path="/profile" component={Profile} />
       <Route path="/404" component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />
@@ -36,14 +39,16 @@ function App() {
   return (
     <ErrorBoundary>
       <LanguageProvider>
-        <ThemeProvider defaultTheme="dark">
+        <SoundProvider>
+          <ThemeProvider defaultTheme="dark">
           <AuthProvider>
             <TooltipProvider>
               <Toaster />
               <Router />
             </TooltipProvider>
-          </AuthProvider>
-        </ThemeProvider>
+            </AuthProvider>
+          </ThemeProvider>
+        </SoundProvider>
       </LanguageProvider>
     </ErrorBoundary>
   );

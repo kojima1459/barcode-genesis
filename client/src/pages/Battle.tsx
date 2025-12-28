@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { useLanguage } from "@/contexts/LanguageContext";
 import ShareButton from "@/components/ShareButton";
+import { useSound } from "@/contexts/SoundContext";
 
 interface RobotData {
   id: string;
@@ -55,6 +56,7 @@ interface BattleResult {
 
 export default function Battle() {
   const { t } = useLanguage();
+  const { playBGM, playSE } = useSound();
   const { user } = useAuth();
   const [robots, setRobots] = useState<RobotData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -151,6 +153,8 @@ export default function Battle() {
   // バトル開始
   const startBattle = async () => {
     if (!selectedRobotId || !enemyRobotId) return;
+    
+    playBGM('bgm_battle');
     setIsBattling(true);
     setBattleResult(null);
     setCurrentLogIndex(-1);
@@ -164,6 +168,20 @@ export default function Battle() {
         setBattleResult(data.result);
         // ログ再生開始
         playBattleLogs(data.result.logs);
+        
+        // 結果SE予約（アニメーション終了後）
+        const animationDuration = data.result.logs.length * 1000 + 500;
+        setTimeout(() => {
+          if (data.result.winnerId === selectedRobotId) {
+            playSE('se_win');
+            if (data.result.rewards.newSkill || data.result.rewards.upgradedSkill) {
+              setTimeout(() => playSE('se_levelup'), 1500);
+            }
+          } else {
+            playSE('se_lose');
+          }
+        }, animationDuration);
+
       } else {
         toast.error("Battle failed to start");
         setIsBattling(false);
@@ -180,6 +198,13 @@ export default function Battle() {
     let index = 0;
     const interval = setInterval(() => {
       setCurrentLogIndex(index);
+      
+      // SE再生
+      const log = logs[index];
+      if (log && log.damage > 0) {
+        playSE('se_attack');
+      }
+
       index++;
       if (index >= logs.length) {
         clearInterval(interval);

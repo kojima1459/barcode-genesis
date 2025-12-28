@@ -98,6 +98,10 @@ export const translations = {
     tutorial_step3_title: "3. ランキングを目指せ",
     tutorial_step3_desc: "最強のロボット軍団を作り上げ、ランキング上位を目指しましょう！",
     tutorial_start: "冒険を始める",
+    
+    // Sound
+    sound_settings: "サウンド設定",
+    volume: "音量",
   },
   en: {
     // Common
@@ -196,5 +200,9 @@ export const translations = {
     tutorial_step3_title: "3. Aim for the Top",
     tutorial_step3_desc: "Build the strongest robot army and climb the leaderboard!",
     tutorial_start: "Start Adventure",
+    
+    // Sound
+    sound_settings: "Sound Settings",
+    volume: "Volume",
   }
 };
