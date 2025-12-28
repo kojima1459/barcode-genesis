@@ -136,6 +136,74 @@ export const generateRobot = functions.https.onCall(async (data: GenerateRobotRe
   }
 });
 
+// レア度に応じたクレジット変換レート
+const RARITY_CREDIT_VALUE: Record<string, number> = {
+  'Common': 10,
+  'Rare': 30,
+  'Epic': 100,
+  'Legendary': 500,
+};
+
+// 一括分解API
+export const batchDisassemble = functions.https.onCall(async (data: { robotIds: string[] }, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Auth required');
+  }
+
+  const { robotIds } = data;
+  if (!Array.isArray(robotIds) || robotIds.length === 0) {
+    throw new functions.https.HttpsError('invalid-argument', 'robotIds must be a non-empty array');
+  }
+
+  if (robotIds.length > 50) {
+    throw new functions.https.HttpsError('invalid-argument', 'Cannot disassemble more than 50 robots at once');
+  }
+
+  const userId = context.auth.uid;
+  const db = admin.firestore();
+
+  try {
+    let totalCredits = 0;
+    let deletedCount = 0;
+
+    await db.runTransaction(async (transaction) => {
+      const robotRefs = robotIds.map(id =>
+        db.collection('users').doc(userId).collection('robots').doc(id)
+      );
+
+      // Fetch all robots to validate and calculate credits
+      const robotSnaps = await Promise.all(robotRefs.map(ref => transaction.get(ref)));
+
+      for (const snap of robotSnaps) {
+        if (snap.exists) {
+          const robotData = snap.data();
+          const rarityName = robotData?.rarityName || 'Common';
+          const creditValue = RARITY_CREDIT_VALUE[rarityName] || 10;
+          totalCredits += creditValue;
+          deletedCount++;
+          transaction.delete(snap.ref);
+        }
+      }
+
+      // Update user credits
+      if (totalCredits > 0) {
+        const userRef = db.collection('users').doc(userId);
+        transaction.update(userRef, {
+          credits: admin.firestore.FieldValue.increment(totalCredits)
+        });
+      }
+    });
+
+    return {
+      creditsGained: totalCredits,
+      robotsDeleted: deletedCount
+    };
+  } catch (error) {
+    console.error('batchDisassemble error:', error);
+    throw new functions.https.HttpsError('internal', 'Failed to disassemble robots');
+  }
+});
+
 // バトル開始API
 const MATERIAL_MAX_COUNT = 5;
 const MATERIAL_LEVEL_XP = 25;

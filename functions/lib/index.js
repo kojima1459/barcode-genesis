@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.stripeWebhook = exports.createSubscriptionSession = exports.createCheckoutSession = exports.applyCosmeticItem = exports.useUpgradeItem = exports.checkAchievements = exports.updateRanking = exports.followUser = exports.claimMissionReward = exports.getDailyMissions = exports.claimLoginBonus = exports.equipItem = exports.purchaseItem = exports.inheritSkill = exports.synthesizeRobots = exports.matchBattle = exports.generateRobot = void 0;
+exports.stripeWebhook = exports.createPortalSession = exports.createSubscriptionSession = exports.createCheckoutSession = exports.applyCosmeticItem = exports.useUpgradeItem = exports.checkAchievements = exports.updateRanking = exports.followUser = exports.claimMissionReward = exports.getDailyMissions = exports.claimLoginBonus = exports.equipItem = exports.purchaseItem = exports.inheritSkill = exports.synthesizeRobots = exports.matchBattle = exports.batchDisassemble = exports.generateRobot = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
@@ -89,6 +89,62 @@ exports.generateRobot = functions.https.onCall(async (data, context) => {
             throw error;
         }
         throw new functions.https.HttpsError('internal', 'An error occurred while generating the robot.');
+    }
+});
+// レア度に応じたクレジット変換レート
+const RARITY_CREDIT_VALUE = {
+    'Common': 10,
+    'Rare': 30,
+    'Epic': 100,
+    'Legendary': 500,
+};
+// 一括分解API
+exports.batchDisassemble = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'Auth required');
+    }
+    const { robotIds } = data;
+    if (!Array.isArray(robotIds) || robotIds.length === 0) {
+        throw new functions.https.HttpsError('invalid-argument', 'robotIds must be a non-empty array');
+    }
+    if (robotIds.length > 50) {
+        throw new functions.https.HttpsError('invalid-argument', 'Cannot disassemble more than 50 robots at once');
+    }
+    const userId = context.auth.uid;
+    const db = admin.firestore();
+    try {
+        let totalCredits = 0;
+        let deletedCount = 0;
+        await db.runTransaction(async (transaction) => {
+            const robotRefs = robotIds.map(id => db.collection('users').doc(userId).collection('robots').doc(id));
+            // Fetch all robots to validate and calculate credits
+            const robotSnaps = await Promise.all(robotRefs.map(ref => transaction.get(ref)));
+            for (const snap of robotSnaps) {
+                if (snap.exists) {
+                    const robotData = snap.data();
+                    const rarityName = (robotData === null || robotData === void 0 ? void 0 : robotData.rarityName) || 'Common';
+                    const creditValue = RARITY_CREDIT_VALUE[rarityName] || 10;
+                    totalCredits += creditValue;
+                    deletedCount++;
+                    transaction.delete(snap.ref);
+                }
+            }
+            // Update user credits
+            if (totalCredits > 0) {
+                const userRef = db.collection('users').doc(userId);
+                transaction.update(userRef, {
+                    credits: admin.firestore.FieldValue.increment(totalCredits)
+                });
+            }
+        });
+        return {
+            creditsGained: totalCredits,
+            robotsDeleted: deletedCount
+        };
+    }
+    catch (error) {
+        console.error('batchDisassemble error:', error);
+        throw new functions.https.HttpsError('internal', 'Failed to disassemble robots');
     }
 });
 // バトル開始API
@@ -1010,6 +1066,38 @@ exports.createSubscriptionSession = functions
         throw new functions.https.HttpsError('internal', 'サブスクリプションセッションの作成に失敗しました');
     }
 });
+// Stripe カスタマーポータルセッション作成
+exports.createPortalSession = functions
+    .runWith({ secrets: [stripeSecretKey] })
+    .https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', '認証が必要です');
+    }
+    const { returnUrl } = data;
+    if (!returnUrl) {
+        throw new functions.https.HttpsError('invalid-argument', 'Return URL is required');
+    }
+    const userId = context.auth.uid;
+    const db = admin.firestore();
+    const userSnap = await db.collection('users').doc(userId).get();
+    const userData = userSnap.data();
+    const stripeCustomerId = userData === null || userData === void 0 ? void 0 : userData.stripeCustomerId;
+    if (!stripeCustomerId) {
+        throw new functions.https.HttpsError('failed-precondition', 'サブスクリプション情報が見つかりません');
+    }
+    const stripe = new stripe_1.default(stripeSecretKey.value(), { apiVersion: '2025-12-15.clover' });
+    try {
+        const session = await stripe.billingPortal.sessions.create({
+            customer: stripeCustomerId,
+            return_url: returnUrl,
+        });
+        return { url: session.url };
+    }
+    catch (error) {
+        console.error('Portal session error:', error);
+        throw new functions.https.HttpsError('internal', 'ポータルセッションの作成に失敗しました');
+    }
+});
 // Stripe Webhook（決済完了時の処理）
 const stripeWebhookSecret = (0, params_1.defineSecret)("STRIPE_WEBHOOK_SECRET");
 exports.stripeWebhook = functions
@@ -1044,33 +1132,48 @@ exports.stripeWebhook = functions
                     break;
                 }
                 const userRef = db.collection('users').doc(userId);
-                if (type === 'credit_pack') {
-                    const credits = parseInt(metadata.credits || '0', 10);
-                    if (credits > 0) {
-                        await userRef.update({
-                            credits: admin.firestore.FieldValue.increment(credits),
+                const eventRef = db.collection('webhook_events').doc(event.id);
+                await db.runTransaction(async (t) => {
+                    const eventDoc = await t.get(eventRef);
+                    if (eventDoc.exists) {
+                        console.log(`Event ${event.id} already processed`);
+                        return;
+                    }
+                    if (type === 'credit_pack') {
+                        const credits = parseInt(metadata.credits || '0', 10);
+                        if (credits > 0) {
+                            t.update(userRef, {
+                                credits: admin.firestore.FieldValue.increment(credits),
+                                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                            });
+                            console.log(`Added ${credits} credits to user ${userId}`);
+                        }
+                    }
+                    else if (type === 'premium_subscription') {
+                        t.update(userRef, {
+                            isPremium: true,
+                            stripeCustomerId: session.customer,
+                            premiumStartedAt: admin.firestore.FieldValue.serverTimestamp(),
                             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
                         });
-                        console.log(`Added ${credits} credits to user ${userId}`);
+                        console.log(`User ${userId} upgraded to premium`);
                     }
-                }
-                else if (type === 'premium_subscription') {
-                    await userRef.update({
-                        isPremium: true,
-                        premiumStartedAt: admin.firestore.FieldValue.serverTimestamp(),
-                        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                    // Mark event as processed
+                    t.set(eventRef, {
+                        processedAt: admin.firestore.FieldValue.serverTimestamp(),
+                        type: event.type
                     });
-                    console.log(`User ${userId} upgraded to premium`);
-                }
-                // 購入履歴を保存
-                await db.collection('purchases').add({
-                    userId,
-                    type,
-                    sessionId: session.id,
-                    amountTotal: session.amount_total,
-                    currency: session.currency,
-                    metadata,
-                    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                    // Save purchase history (outside transaction or inside? inside is safer)
+                    const purchaseRef = db.collection('purchases').doc(); // Auto ID
+                    t.set(purchaseRef, {
+                        userId,
+                        type,
+                        sessionId: session.id,
+                        amountTotal: session.amount_total,
+                        currency: session.currency,
+                        metadata,
+                        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                    });
                 });
                 break;
             }
@@ -1086,6 +1189,24 @@ exports.stripeWebhook = functions
                     .get();
                 // TODO: より堅牢な実装が必要（stripeCustomerIdをユーザーに保存するなど）
                 console.log('Subscription cancelled:', customerId, 'purchases found:', purchasesSnap.size);
+                // customerId からユーザーを検索してダウングレード
+                const usersSnap = await db.collection('users')
+                    .where('stripeCustomerId', '==', customerId)
+                    .limit(1)
+                    .get();
+                if (!usersSnap.empty) {
+                    const userDoc = usersSnap.docs[0];
+                    await userDoc.ref.update({
+                        isPremium: false,
+                        premiumEndedAt: admin.firestore.FieldValue.serverTimestamp(),
+                        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+                    });
+                    console.log(`Subscription cancelled for user ${userDoc.id} (Customer: ${customerId})`);
+                }
+                else {
+                    console.warn(`User not found for cancelled subscription (Customer: ${customerId})`);
+                    // エラーを投げずログのみ。リトライしてもユーザーが見つかるわけではないため。
+                }
                 break;
             }
         }

@@ -4,12 +4,15 @@ import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { useEffect, useRef, useState } from "react";
-import { Camera, Upload, AlertCircle, Keyboard } from "lucide-react";
+import { Camera, Upload, AlertCircle, Keyboard, CheckCircle2, Sun, Ruler } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface BarcodeScannerProps {
   onScanSuccess: (decodedText: string) => void;
   onScanFailure?: (error: any) => void;
 }
+
+type ScanStatus = 'idle' | 'searching' | 'detected' | 'success';
 
 export default function BarcodeScanner({ onScanSuccess, onScanFailure }: BarcodeScannerProps) {
   const [manualCode, setManualCode] = useState("");
@@ -17,11 +20,14 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showCameraOption, setShowCameraOption] = useState(false);
   const [showFallbackInput, setShowFallbackInput] = useState(false);
+  const [scanStatus, setScanStatus] = useState<ScanStatus>('idle');
+  const [scanMessage, setScanMessage] = useState<string>("");
+  const [showSuccess, setShowSuccess] = useState(false);
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannerRegionId = "html5qr-code-full-region";
+  const failureCountRef = useRef(0);
 
-  // コンポーネントのアンマウント時にクリーンアップ
   useEffect(() => {
     return () => {
       if (scannerRef.current && isScanning) {
@@ -33,6 +39,9 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
   const startScanning = async () => {
     setErrorMsg(null);
     setShowFallbackInput(false);
+    setScanStatus('searching');
+    setScanMessage('バーコードを探しています...');
+    failureCountRef.current = 0;
 
     try {
       if (!scannerRef.current) {
@@ -43,30 +52,36 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
       }
 
       await scannerRef.current.start(
-        { facingMode: "environment" }, // リアカメラ優先
+        { facingMode: "environment" },
         {
           fps: 10,
-          qrbox: { width: 300, height: 200 }, // サイズを拡大
-          // aspectRatio: 1.0, // アスペクト比制限を解除して視野を広く
+          qrbox: { width: 300, height: 200 },
           videoConstraints: {
-            focusMode: "continuous", // フォーカスモード指定（対応ブラウザのみ）
-            height: { min: 720 }, // 解像度担保
+            focusMode: "continuous",
+            height: { min: 720 },
           }
         } as any,
         (decodedText) => {
-          // 成功時
           handleScanSuccess(decodedText);
         },
         (errorMessage) => {
-          // 読み取り失敗（フレームごと）は無視
+          // Track failures for smart feedback
+          failureCountRef.current++;
+
+          if (failureCountRef.current > 30 && failureCountRef.current % 10 === 0) {
+            // After ~3 seconds of no detection
+            setScanMessage('バーコードが見つかりません。明るい場所で、カメラを10-15cm離してお試しください。');
+          } else if (failureCountRef.current > 10) {
+            setScanMessage('スキャン中... カメラを安定させてください');
+          }
         }
       );
       setIsScanning(true);
     } catch (err) {
       console.error("Camera start failed:", err);
       setIsScanning(false);
+      setScanStatus('idle');
 
-      // エラーハンドリング
       let message = "カメラを起動できませんでした。";
       if (err instanceof Error) {
         if (err.name === "NotAllowedError" || err.message.includes("Permission denied")) {
@@ -76,7 +91,7 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
         }
       }
       setErrorMsg(message);
-      setShowFallbackInput(true); // フォールバックを表示
+      setShowFallbackInput(true);
     }
   };
 
@@ -85,6 +100,8 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
       try {
         await scannerRef.current.stop();
         setIsScanning(false);
+        setScanStatus('idle');
+        setScanMessage('');
       } catch (err) {
         console.error("Failed to stop scanner", err);
       }
@@ -92,8 +109,22 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
   };
 
   const handleScanSuccess = async (decodedText: string) => {
+    setScanStatus('success');
+    setScanMessage('読み取り成功！');
+    setShowSuccess(true);
+
+    // Haptic feedback if available
+    if ('vibrate' in navigator) {
+      navigator.vibrate(100);
+    }
+
     await stopScanning();
-    onScanSuccess(decodedText);
+
+    // Delay to show success animation
+    setTimeout(() => {
+      setShowSuccess(false);
+      onScanSuccess(decodedText);
+    }, 500);
   };
 
   const handleManualSubmit = (e: React.FormEvent) => {
@@ -106,10 +137,9 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const imageFile = e.target.files[0];
-      setShowFallbackInput(false); // UIリセット
+      setShowFallbackInput(false);
       setErrorMsg("画像を解析中...");
 
-      // Html5Qrcodeのファイルスキャン機能を使用
       const html5QrCode = new Html5Qrcode("html5qr-code-temp");
       html5QrCode.scanFile(imageFile, true)
         .then(decodedText => {
@@ -118,8 +148,6 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
         })
         .catch(err => {
           console.warn("Scan failed, retrying without strict constraints...");
-          // 失敗した場合、制限を緩めて再試行（または単にエラー表示）
-          // 画像が鮮明でない場合が多い
           setErrorMsg("バーコードを読み取れませんでした。\n・バーコード全体が写っているか確認してください\n・明るい場所で撮影してください\n・ピントが合っているか確認してください");
         });
     }
@@ -181,16 +209,48 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
           id={scannerRegionId}
           className={`w-full overflow-hidden rounded-lg border bg-black/5 relative ${!isScanning ? 'hidden' : ''}`}
         >
+          {/* Smart Scan Guide Overlay */}
           {isScanning && (
-            <div className="absolute top-4 left-0 right-0 z-10 text-center pointer-events-none">
-              <span className="bg-black/50 text-white px-3 py-1 rounded-full text-sm">
-                バーコードを枠内に入れてください
-              </span>
+            <div className="absolute inset-0 z-10 pointer-events-none">
+              {/* Top message */}
+              <div className="absolute top-2 left-0 right-0 text-center">
+                <span className="bg-black/70 text-white px-3 py-1.5 rounded-full text-xs inline-flex items-center gap-1.5">
+                  {scanStatus === 'success' ? (
+                    <><CheckCircle2 className="w-4 h-4 text-green-400" /> {scanMessage}</>
+                  ) : (
+                    <>{scanMessage}</>
+                  )}
+                </span>
+              </div>
+
+              {/* Bottom hints */}
+              <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-3 text-xs">
+                <span className="bg-black/60 text-white/80 px-2 py-1 rounded flex items-center gap-1">
+                  <Ruler className="w-3 h-3" /> 10-15cm
+                </span>
+                <span className="bg-black/60 text-white/80 px-2 py-1 rounded flex items-center gap-1">
+                  <Sun className="w-3 h-3" /> 明るく
+                </span>
+              </div>
             </div>
           )}
+
+          {/* Success Flash */}
+          <AnimatePresence>
+            {showSuccess && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 bg-green-500/30 z-20 flex items-center justify-center"
+              >
+                <CheckCircle2 className="w-16 h-16 text-green-500" />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
-        {/* 一時的なスキャン用div (ファイルアップロード時などに使用) */}
+        {/* 一時的なスキャン用div */}
         <div id="html5qr-code-temp" className="hidden"></div>
 
         {/* サブオプション: カメラスキャン */}
@@ -208,7 +268,6 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
                   カメラを起動
                 </Button>
 
-                {/* 起動失敗時のフォールバック */}
                 {showFallbackInput && (
                   <div className="relative">
                     <input
@@ -238,3 +297,4 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
     </Card>
   );
 }
+
