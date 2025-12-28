@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
 import { functions } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
-import { Loader2, LogOut, Scan, Sword } from "lucide-react";
+import { Loader2, LogOut, Scan, Sword, Trophy } from "lucide-react";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import RobotSVG from "@/components/RobotSVG";
 import { toast } from "sonner";
@@ -112,6 +112,20 @@ export default function Home() {
                   <h2 className="text-2xl font-bold">Battle</h2>
                   <p className="text-muted-foreground text-center">
                     Fight with your robots!
+                  </p>
+                </CardContent>
+              </Card>
+            </Link>
+
+            <Link href="/leaderboard" className="w-full">
+              <Card className="cursor-pointer hover:border-primary transition-colors h-full">
+                <CardContent className="flex flex-col items-center justify-center h-64 gap-4">
+                  <div className="p-4 rounded-full bg-yellow-500/10 text-yellow-500">
+                    <Trophy className="h-12 w-12" />
+                  </div>
+                  <h2 className="text-2xl font-bold">Leaderboard</h2>
+                  <p className="text-muted-foreground text-center">
+                    Check top players
                   </p>
                 </CardContent>
               </Card>

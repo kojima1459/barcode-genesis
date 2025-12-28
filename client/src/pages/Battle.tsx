@@ -6,10 +6,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import { db, functions } from "@/lib/firebase";
 import { collection, collectionGroup, getDocs, query, orderBy, limit, where } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
-import { ArrowLeft, Loader2, Sword, Trophy, Search } from "lucide-react";
+import { ArrowLeft, Loader2, Sword, Trophy, Search, Star } from "lucide-react";
 import RobotSVG from "@/components/RobotSVG";
 import { Link } from "wouter";
 import { toast } from "sonner";
+import { Progress } from "@/components/ui/progress";
 
 interface RobotData {
   id: string;
@@ -21,6 +22,9 @@ interface RobotData {
   baseSpeed: number;
   parts: any;
   colors: any;
+  level?: number;
+  exp?: number;
+  wins?: number;
 }
 
 interface BattleLog {
@@ -193,6 +197,15 @@ export default function Battle() {
     return log.attackerId === robotId ? log.attackerHp : log.defenderHp;
   };
 
+  // レベルとEXPの計算ヘルパー
+  const getLevelInfo = (robot: RobotData) => {
+    const level = robot.level || 1;
+    const exp = robot.exp || 0;
+    const nextLevelExp = level * 100;
+    const progress = Math.min(100, (exp / nextLevelExp) * 100);
+    return { level, exp, nextLevelExp, progress };
+  };
+
   if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>;
 
   return (
@@ -218,16 +231,22 @@ export default function Battle() {
                   Your ID: <span className="font-mono bg-secondary px-1 rounded select-all">{user?.uid}</span>
                 </div>
                 <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto">
-                  {robots.map(robot => (
-                    <div 
-                      key={robot.id}
-                      onClick={() => setSelectedRobotId(robot.id)}
-                      className={`p-2 border rounded cursor-pointer hover:bg-secondary/10 ${selectedRobotId === robot.id ? 'border-primary bg-primary/10' : ''}`}
-                    >
-                      <div className="text-sm font-bold truncate">{robot.name}</div>
-                      <div className="text-xs text-muted-foreground">HP: {robot.baseHp}</div>
-                    </div>
-                  ))}
+                  {robots.map(robot => {
+                    const { level } = getLevelInfo(robot);
+                    return (
+                      <div 
+                        key={robot.id}
+                        onClick={() => setSelectedRobotId(robot.id)}
+                        className={`p-2 border rounded cursor-pointer hover:bg-secondary/10 ${selectedRobotId === robot.id ? 'border-primary bg-primary/10' : ''}`}
+                      >
+                        <div className="text-sm font-bold truncate">{robot.name}</div>
+                        <div className="flex justify-between items-center text-xs text-muted-foreground">
+                          <span>Lv.{level}</span>
+                          <span>HP: {robot.baseHp}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>
@@ -248,17 +267,23 @@ export default function Battle() {
                 </div>
                 <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto">
                   {enemyRobots.length > 0 ? (
-                    enemyRobots.map(robot => (
-                      <div 
-                        key={robot.id}
-                        onClick={() => setEnemyRobotId(robot.id)}
-                        className={`p-2 border rounded cursor-pointer hover:bg-secondary/10 ${enemyRobotId === robot.id ? 'border-destructive bg-destructive/10' : ''}`}
-                      >
-                        <div className="text-sm font-bold truncate">{robot.name}</div>
-                        <div className="text-xs text-muted-foreground">HP: {robot.baseHp}</div>
-                        <div className="text-[10px] text-muted-foreground truncate">User: {robot.id.substring(0, 4)}...</div>
-                      </div>
-                    ))
+                    enemyRobots.map(robot => {
+                      const { level } = getLevelInfo(robot);
+                      return (
+                        <div 
+                          key={robot.id}
+                          onClick={() => setEnemyRobotId(robot.id)}
+                          className={`p-2 border rounded cursor-pointer hover:bg-secondary/10 ${enemyRobotId === robot.id ? 'border-destructive bg-destructive/10' : ''}`}
+                        >
+                          <div className="text-sm font-bold truncate">{robot.name}</div>
+                          <div className="flex justify-between items-center text-xs text-muted-foreground">
+                            <span>Lv.{level}</span>
+                            <span>HP: {robot.baseHp}</span>
+                          </div>
+                          <div className="text-[10px] text-muted-foreground truncate">User: {robot.id.substring(0, 4)}...</div>
+                        </div>
+                      );
+                    })
                   ) : (
                     <div className="col-span-2 text-center text-muted-foreground py-4">
                       No opponents found.
@@ -289,13 +314,13 @@ export default function Battle() {
           <div className="space-y-8">
             <div className="flex justify-between items-center">
               {/* Player */}
-              <div className="text-center space-y-2">
+              <div className="text-center space-y-2 w-1/3">
                 <div className="relative">
                   <RobotSVG parts={myRobot.parts} colors={myRobot.colors} size={150} />
-                  {/* ダメージエフェクトなどをここに表示 */}
                 </div>
                 <div className="font-bold">{myRobot.name}</div>
-                <div className="w-32 h-2 bg-secondary rounded-full mx-auto overflow-hidden">
+                <div className="text-xs text-muted-foreground mb-1">Lv.{getLevelInfo(myRobot).level}</div>
+                <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
                   <div 
                     className="h-full bg-green-500 transition-all duration-500"
                     style={{ width: `${(getCurrentHp(myRobot.id) / myRobot.baseHp) * 100}%` }}
@@ -307,12 +332,13 @@ export default function Battle() {
               <div className="text-2xl font-bold text-muted-foreground">VS</div>
 
               {/* Enemy */}
-              <div className="text-center space-y-2">
+              <div className="text-center space-y-2 w-1/3">
                 <div className="relative">
                   <RobotSVG parts={enemyRobot.parts} colors={enemyRobot.colors} size={150} className="scale-x-[-1]" />
                 </div>
                 <div className="font-bold">{enemyRobot.name}</div>
-                <div className="w-32 h-2 bg-secondary rounded-full mx-auto overflow-hidden">
+                <div className="text-xs text-muted-foreground mb-1">Lv.{getLevelInfo(enemyRobot).level}</div>
+                <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
                   <div 
                     className="h-full bg-red-500 transition-all duration-500"
                     style={{ width: `${(getCurrentHp(enemyRobot.id) / enemyRobot.baseHp) * 100}%` }}
@@ -332,8 +358,22 @@ export default function Battle() {
                   </div>
                 ))}
                 {!isBattling && battleResult && (
-                  <div className="text-center py-4 font-bold text-xl text-primary animate-bounce">
-                    {battleResult.winnerId === myRobot.id ? "YOU WIN!" : "YOU LOSE..."}
+                  <div className="text-center py-4 space-y-2">
+                    <div className="font-bold text-xl text-primary animate-bounce">
+                      {battleResult.winnerId === myRobot.id ? "YOU WIN!" : "YOU LOSE..."}
+                    </div>
+                    {battleResult.winnerId === myRobot.id && (
+                      <div className="text-sm text-muted-foreground bg-secondary/20 p-2 rounded inline-block">
+                        <div className="flex items-center justify-center gap-2">
+                          <Star className="w-4 h-4 text-yellow-500" />
+                          <span>EXP Gained: +{battleResult.rewards.exp}</span>
+                        </div>
+                        {/* レベルアップ判定は簡易的に表示（本来はサーバーからのレスポンスに含めるべきだが、今回はEXP計算で推測） */}
+                        {(getLevelInfo(myRobot).exp + battleResult.rewards.exp) >= getLevelInfo(myRobot).nextLevelExp && (
+                          <div className="text-green-500 font-bold mt-1">LEVEL UP! Stats Increased!</div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </CardContent>
@@ -341,8 +381,16 @@ export default function Battle() {
 
             {!isBattling && (
               <div className="flex justify-center">
-                <Button onClick={() => { setBattleResult(null); setIsBattling(false); }}>
-                  Play Again
+                <Button onClick={() => { 
+                  setBattleResult(null); 
+                  setIsBattling(false); 
+                  // ロボットデータを再取得して最新のEXP/レベルを反映させるためにリロード推奨だが、
+                  // UX的にはState更新が望ましい。今回は簡易的にリロードボタンにするか、
+                  // 親コンポーネントで再取得する仕組みが必要。
+                  // ここではシンプルにページリロードを促すか、再取得関数を呼ぶ。
+                  window.location.reload();
+                }}>
+                  Play Again (Update Stats)
                 </Button>
               </div>
             )}
