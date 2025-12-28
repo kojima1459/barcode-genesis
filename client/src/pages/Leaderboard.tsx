@@ -7,6 +7,7 @@ import { ArrowLeft, Trophy, Medal, Crown } from "lucide-react";
 import { Link } from "wouter";
 import RobotSVG from "@/components/RobotSVG";
 import { Loader2 } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface RobotData {
   id: string;
@@ -20,6 +21,7 @@ interface RobotData {
 }
 
 export default function Leaderboard() {
+  const { t } = useLanguage();
   const [topRobots, setTopRobots] = useState<RobotData[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -75,19 +77,19 @@ export default function Leaderboard() {
         <Link href="/">
           <Button variant="ghost" className="mr-4">
             <ArrowLeft className="h-5 w-5 mr-2" />
-            Back
+            {t('back')}
           </Button>
         </Link>
         <h1 className="text-2xl font-bold text-primary flex items-center gap-2">
           <Trophy className="w-6 h-6 text-yellow-500" />
-          Leaderboard
+          {t('leaderboard')}
         </h1>
       </header>
 
       <main className="flex-1 max-w-4xl mx-auto w-full">
         <Card>
           <CardHeader>
-            <CardTitle>Top Battle Robots</CardTitle>
+            <CardTitle>{t('top_players')}</CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -96,7 +98,7 @@ export default function Leaderboard() {
               </div>
             ) : topRobots.length === 0 ? (
               <div className="text-center p-8 text-muted-foreground">
-                No battles recorded yet. Be the first to win!
+                {t('no_opponents')}
               </div>
             ) : (
               <div className="space-y-2">
@@ -127,7 +129,7 @@ export default function Leaderboard() {
                     
                     <div className="text-right ml-4">
                       <div className="font-bold text-lg text-primary">{robot.wins || 0}</div>
-                      <div className="text-xs text-muted-foreground">Wins</div>
+                      <div className="text-xs text-muted-foreground">{t('wins')}</div>
                     </div>
                   </div>
                 ))}

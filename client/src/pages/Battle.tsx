@@ -11,6 +11,7 @@ import RobotSVG from "@/components/RobotSVG";
 import { Link } from "wouter";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface RobotData {
   id: string;
@@ -52,6 +53,7 @@ interface BattleResult {
 }
 
 export default function Battle() {
+  const { t } = useLanguage();
   const { user } = useAuth();
   const [robots, setRobots] = useState<RobotData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -216,10 +218,10 @@ export default function Battle() {
         <Link href="/">
           <Button variant="ghost" className="mr-4">
             <ArrowLeft className="h-5 w-5 mr-2" />
-            Back
+            {t('back')}
           </Button>
         </Link>
-        <h1 className="text-2xl font-bold text-primary">Battle Arena</h1>
+        <h1 className="text-2xl font-bold text-primary">{t('battle_arena')}</h1>
       </header>
 
       <main className="flex-1 max-w-4xl mx-auto w-full space-y-8">
@@ -228,9 +230,9 @@ export default function Battle() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <Card>
               <CardContent className="p-6 space-y-4">
-                <h2 className="text-xl font-bold">Select Your Robot</h2>
+                <h2 className="text-xl font-bold">{t('select_robot')}</h2>
                 <div className="text-xs text-muted-foreground mb-2">
-                  Your ID: <span className="font-mono bg-secondary px-1 rounded select-all">{user?.uid}</span>
+                  {t('your_id')}: <span className="font-mono bg-secondary px-1 rounded select-all">{user?.uid}</span>
                 </div>
                 <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto">
                   {robots.map(robot => {
@@ -255,10 +257,10 @@ export default function Battle() {
 
             <Card>
               <CardContent className="p-6 space-y-4">
-                <h2 className="text-xl font-bold">Select Opponent</h2>
+                <h2 className="text-xl font-bold">{t('select_opponent')}</h2>
                 <div className="flex gap-2">
                   <Input 
-                    placeholder="Friend's User ID" 
+                    placeholder={t('friend_id_placeholder')} 
                     value={friendId}
                     onChange={(e) => setFriendId(e.target.value)}
                     className="font-mono text-xs"
@@ -288,9 +290,7 @@ export default function Battle() {
                     })
                   ) : (
                     <div className="col-span-2 text-center text-muted-foreground py-4">
-                      No opponents found.
-                      <br />
-                      <span className="text-xs">Create more robots or wait for other players!</span>
+                      {t('no_opponents')}
                     </div>
                   )}
                 </div>
@@ -305,7 +305,7 @@ export default function Battle() {
                 className="w-full md:w-auto px-12"
               >
                 <Sword className="mr-2 h-5 w-5" />
-                Start Battle
+                {t('start_battle')}
               </Button>
             </div>
           </div>
@@ -355,35 +355,35 @@ export default function Battle() {
               <CardContent className="p-4 space-y-2">
                 {battleResult?.logs.slice(0, currentLogIndex + 1).map((log, i) => (
                   <div key={i} className="text-sm border-b pb-1 last:border-0">
-                    <span className="font-bold text-primary">Turn {log.turn}:</span> {log.message}
-                    {log.isCritical && <span className="text-destructive font-bold ml-2">CRITICAL!</span>}
+                    <span className="font-bold text-primary">{t('turn')} {log.turn}:</span> {log.message}
+                    {log.isCritical && <span className="text-destructive font-bold ml-2">{t('critical')}</span>}
                   </div>
                 ))}
                 {!isBattling && battleResult && (
                   <div className="text-center py-4 space-y-2">
                     <div className="font-bold text-xl text-primary animate-bounce">
-                      {battleResult.winnerId === myRobot.id ? "YOU WIN!" : "YOU LOSE..."}
+                      {battleResult.winnerId === myRobot.id ? t('win') : t('lose')}
                     </div>
                     {battleResult.winnerId === myRobot.id && (
                       <div className="text-sm text-muted-foreground bg-secondary/20 p-2 rounded inline-block">
                         <div className="flex items-center justify-center gap-2">
                           <Star className="w-4 h-4 text-yellow-500" />
-                          <span>EXP Gained: +{battleResult.rewards.exp}</span>
+                          <span>{t('exp_gained')}: +{battleResult.rewards.exp}</span>
                         </div>
                         {/* レベルアップ判定は簡易的に表示（本来はサーバーからのレスポンスに含めるべきだが、今回はEXP計算で推測） */}
                         {(getLevelInfo(myRobot).exp + battleResult.rewards.exp) >= getLevelInfo(myRobot).nextLevelExp && (
-                          <div className="text-green-500 font-bold mt-1">LEVEL UP! Stats Increased!</div>
+                          <div className="text-green-500 font-bold mt-1">{t('level_up')}</div>
                         )}
                         
                         {/* スキル習得・強化通知 */}
                         {battleResult.rewards.newSkill && (
                           <div className="text-blue-500 font-bold mt-1 animate-pulse">
-                            New Skill Learned: {battleResult.rewards.newSkill}!
+                            {t('new_skill')}: {battleResult.rewards.newSkill}!
                           </div>
                         )}
                         {battleResult.rewards.upgradedSkill && (
                           <div className="text-purple-500 font-bold mt-1 animate-pulse">
-                            Skill Upgraded: {battleResult.rewards.upgradedSkill}!
+                            {t('skill_upgraded')}: {battleResult.rewards.upgradedSkill}!
                           </div>
                         )}
                       </div>
@@ -404,7 +404,7 @@ export default function Battle() {
                   // ここではシンプルにページリロードを促すか、再取得関数を呼ぶ。
                   window.location.reload();
                 }}>
-                  Play Again (Update Stats)
+                  {t('play_again')}
                 </Button>
               </div>
             )}

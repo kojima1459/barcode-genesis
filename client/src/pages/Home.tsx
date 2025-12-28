@@ -9,6 +9,8 @@ import BarcodeScanner from "@/components/BarcodeScanner";
 import RobotSVG from "@/components/RobotSVG";
 import { toast } from "sonner";
 import { Link } from "wouter";
+import { useLanguage } from "@/contexts/LanguageContext";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 // 型定義（本来は共有型を使うべきだが、簡易的に定義）
 interface RobotData {
@@ -24,6 +26,7 @@ interface RobotData {
 }
 
 export default function Home() {
+  const { t } = useLanguage();
   const { user, logout } = useAuth();
   const [mode, setMode] = useState<'menu' | 'scan' | 'result'>('menu');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -39,13 +42,13 @@ export default function Home() {
       if (data.success) {
         setRobot(data.robot);
         setMode('result');
-        toast.success("Robot generated successfully!");
+        toast.success(t('scan_success'));
       } else {
-        toast.error(data.error || "Failed to generate robot");
+        toast.error(data.error || t('scan_failed'));
       }
     } catch (error) {
       console.error(error);
-      toast.error("Error generating robot");
+      toast.error(t('error'));
     } finally {
       setIsGenerating(false);
     }
@@ -55,8 +58,9 @@ export default function Home() {
     <div className="min-h-screen bg-background p-4 flex flex-col">
       {/* Header */}
       <header className="flex justify-between items-center mb-8">
-        <h1 className="text-2xl font-bold text-primary">Barcode Genesis</h1>
+        <h1 className="text-2xl font-bold text-primary">{t('app_title')}</h1>
         <div className="flex items-center gap-4">
+          <LanguageSwitcher />
           <span className="text-sm text-muted-foreground hidden sm:inline">
             {user?.email}
           </span>
@@ -78,9 +82,9 @@ export default function Home() {
                 <div className="p-4 rounded-full bg-primary/10 text-primary">
                   <Scan className="h-12 w-12" />
                 </div>
-                <h2 className="text-2xl font-bold">Scan Barcode</h2>
+                <h2 className="text-2xl font-bold">{t('scan_barcode')}</h2>
                 <p className="text-muted-foreground text-center">
-                  Generate a new robot from any barcode
+                  {t('scan_desc')}
                 </p>
               </CardContent>
             </Card>
@@ -95,9 +99,9 @@ export default function Home() {
                       size={48} 
                     />
                   </div>
-                  <h2 className="text-2xl font-bold">Collection</h2>
+                  <h2 className="text-2xl font-bold">{t('collection')}</h2>
                   <p className="text-muted-foreground text-center">
-                    View your robot army
+                    {t('collection_desc')}
                   </p>
                 </CardContent>
               </Card>
@@ -109,9 +113,9 @@ export default function Home() {
                   <div className="p-4 rounded-full bg-destructive/10 text-destructive">
                     <Sword className="h-12 w-12" />
                   </div>
-                  <h2 className="text-2xl font-bold">Battle</h2>
+                  <h2 className="text-2xl font-bold">{t('battle')}</h2>
                   <p className="text-muted-foreground text-center">
-                    Fight with your robots!
+                    {t('battle_desc')}
                   </p>
                 </CardContent>
               </Card>
@@ -123,9 +127,9 @@ export default function Home() {
                   <div className="p-4 rounded-full bg-yellow-500/10 text-yellow-500">
                     <Trophy className="h-12 w-12" />
                   </div>
-                  <h2 className="text-2xl font-bold">Leaderboard</h2>
+                  <h2 className="text-2xl font-bold">{t('leaderboard')}</h2>
                   <p className="text-muted-foreground text-center">
-                    Check top players
+                    {t('leaderboard_desc')}
                   </p>
                 </CardContent>
               </Card>
@@ -136,15 +140,15 @@ export default function Home() {
         {mode === 'scan' && (
           <div className="w-full max-w-md space-y-4">
             <Button variant="ghost" onClick={() => setMode('menu')}>
-              ← Back to Menu
+              ← {t('back_to_menu')}
             </Button>
             
             {isGenerating ? (
               <Card>
                 <CardContent className="flex flex-col items-center justify-center h-64 gap-4">
                   <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                  <p>Analyzing barcode DNA...</p>
-                  <p className="text-sm text-muted-foreground">Constructing robot frame...</p>
+                  <p>{t('analyzing')}</p>
+                  <p className="text-sm text-muted-foreground">{t('constructing')}</p>
                 </CardContent>
               </Card>
             ) : (
@@ -156,7 +160,7 @@ export default function Home() {
         {mode === 'result' && robot && (
           <div className="w-full max-w-2xl space-y-4">
             <Button variant="ghost" onClick={() => setMode('menu')}>
-              ← Back to Menu
+              ← {t('back_to_menu')}
             </Button>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -181,7 +185,7 @@ export default function Home() {
                       {robot.rarityName}
                     </span>
                     <span className="px-2 py-1 rounded bg-secondary text-secondary-foreground text-sm font-bold">
-                      Level 1
+                      {t('level')} 1
                     </span>
                   </div>
                 </div>
@@ -189,7 +193,7 @@ export default function Home() {
                 <div className="space-y-4">
                   <div className="space-y-1">
                     <div className="flex justify-between text-sm">
-                      <span>HP</span>
+                      <span>{t('hp')}</span>
                       <span>{robot.baseHp}</span>
                     </div>
                     <div className="h-2 bg-secondary rounded-full overflow-hidden">
@@ -202,7 +206,7 @@ export default function Home() {
 
                   <div className="space-y-1">
                     <div className="flex justify-between text-sm">
-                      <span>Attack</span>
+                      <span>{t('attack')}</span>
                       <span>{robot.baseAttack}</span>
                     </div>
                     <div className="h-2 bg-secondary rounded-full overflow-hidden">
@@ -215,7 +219,7 @@ export default function Home() {
 
                   <div className="space-y-1">
                     <div className="flex justify-between text-sm">
-                      <span>Defense</span>
+                      <span>{t('defense')}</span>
                       <span>{robot.baseDefense}</span>
                     </div>
                     <div className="h-2 bg-secondary rounded-full overflow-hidden">
@@ -228,7 +232,7 @@ export default function Home() {
 
                   <div className="space-y-1">
                     <div className="flex justify-between text-sm">
-                      <span>Speed</span>
+                      <span>{t('speed')}</span>
                       <span>{robot.baseSpeed}</span>
                     </div>
                     <div className="h-2 bg-secondary rounded-full overflow-hidden">
@@ -241,7 +245,7 @@ export default function Home() {
                 </div>
 
                 <Button className="w-full" size="lg" onClick={() => setMode('menu')}>
-                  Save & Return
+                  {t('save_return')}
                 </Button>
               </div>
             </div>

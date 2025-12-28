@@ -8,6 +8,7 @@ import { ArrowLeft, Loader2, Trash2 } from "lucide-react";
 import RobotSVG from "@/components/RobotSVG";
 import { Link } from "wouter";
 import { toast } from "sonner";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 // 型定義（Home.tsxと共通化すべきだが、一旦ここで定義）
 interface RobotData {
@@ -24,6 +25,7 @@ interface RobotData {
 }
 
 export default function Collection() {
+  const { t } = useLanguage();
   const { user } = useAuth();
   const [robots, setRobots] = useState<RobotData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,12 +71,12 @@ export default function Collection() {
         <Link href="/">
           <Button variant="ghost" className="mr-4">
             <ArrowLeft className="h-5 w-5 mr-2" />
-            Back
+            {t('back')}
           </Button>
         </Link>
-        <h1 className="text-2xl font-bold text-primary">My Robot Collection</h1>
+        <h1 className="text-2xl font-bold text-primary">{t('collection')}</h1>
         <div className="ml-auto text-muted-foreground">
-          {robots.length} Robots
+          {robots.length} {t('total')}
         </div>
       </header>
 
@@ -112,19 +114,19 @@ export default function Collection() {
                     
                     <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
                       <div className="flex justify-between">
-                        <span>HP</span>
+                        <span>{t('hp')}</span>
                         <span className="font-mono text-foreground">{robot.baseHp}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span>ATK</span>
+                        <span>{t('attack')}</span>
                         <span className="font-mono text-foreground">{robot.baseAttack}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span>DEF</span>
+                        <span>{t('defense')}</span>
                         <span className="font-mono text-foreground">{robot.baseDefense}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span>SPD</span>
+                        <span>{t('speed')}</span>
                         <span className="font-mono text-foreground">{robot.baseSpeed}</span>
                       </div>
                     </div>
