@@ -7,12 +7,12 @@
 4. `firebase emulators:start --only auth,firestore,functions`
 5. `npm run dev`
 
-Open `http://localhost:3000` in a browser.
+Open `http://localhost:5173` in a browser.
 
 ## Notes
 - Run the emulator and the Vite dev server in separate terminals.
 - Firebase Functions target Node 18; use Node 18 if you want to avoid emulator warnings.
-- Emulator ports: Auth 9099, Firestore 8082, Functions 5001, UI 4000.
+- Emulator ports: Auth 9099, Firestore 8084, Functions 5001, UI 4000.
 
 ## Week4 (Synthesis/Inheritance) emulator check
 1. `firebase emulators:start --only auth,firestore,functions`

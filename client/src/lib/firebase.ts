@@ -24,6 +24,6 @@ export const googleProvider = new GoogleAuthProvider();
 
 if (import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === "1") {
   connectAuthEmulator(auth, "http://localhost:9099");
-  connectFirestoreEmulator(db, "localhost", 8082);
+  connectFirestoreEmulator(db, "localhost", 8084);
   connectFunctionsEmulator(functions, "localhost", 5001);
 }
