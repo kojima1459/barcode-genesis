@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import RobotSVG from "@/components/RobotSVG";
 import { useAuth } from "@/contexts/AuthContext";
 import { db, functions } from "@/lib/firebase";
+import { getItemLabel } from "@/lib/items";
 import { toast } from "sonner";
 
 interface RobotData {
@@ -24,7 +25,13 @@ interface RobotData {
   xp?: number;
   exp?: number;
   skills?: Array<string | { id?: string }>;
+  equipped?: {
+    slot1?: string | null;
+    slot2?: string | null;
+  };
 }
+
+type InventoryMap = Record<string, number>;
 
 const getSkillIds = (skills?: RobotData["skills"]) => {
   if (!Array.isArray(skills)) return [];
@@ -53,6 +60,13 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
   const [inheritSkillId, setInheritSkillId] = useState("");
   const [isSynthesizing, setIsSynthesizing] = useState(false);
   const [isInheriting, setIsInheriting] = useState(false);
+  const [inventory, setInventory] = useState<InventoryMap>({});
+  const [equipSelection, setEquipSelection] = useState<{ slot1: string; slot2: string }>({
+    slot1: "",
+    slot2: ""
+  });
+  const [equipError, setEquipError] = useState<string | null>(null);
+  const [equippingSlot, setEquippingSlot] = useState<"slot1" | "slot2" | null>(null);
 
   useEffect(() => {
     if (!user) {
@@ -77,8 +91,18 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
         const robotsSnap = await getDocs(robotsQuery);
         const robotsData = robotsSnap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as RobotData));
 
+        const inventorySnap = await getDocs(collection(db, "users", user.uid, "inventory"));
+        const inventoryData: InventoryMap = {};
+        inventorySnap.forEach((itemDoc) => {
+          const data = itemDoc.data();
+          if (typeof data.qty === "number") {
+            inventoryData[itemDoc.id] = data.qty;
+          }
+        });
+
         setBaseRobot({ id: baseSnap.id, ...baseSnap.data() } as RobotData);
         setRobots(robotsData);
+        setInventory(inventoryData);
       } catch (error) {
         console.error("Failed to load robot detail:", error);
         toast.error("Failed to load robot detail");
@@ -94,6 +118,11 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
   const baseSkillIds = useMemo(() => getSkillIds(baseRobot?.skills), [baseRobot]);
   const inheritMaterial = materialRobots.find((robot) => robot.id === inheritMaterialId) || null;
   const inheritSkillOptions = useMemo(() => getSkillIds(inheritMaterial?.skills), [inheritMaterial]);
+  const equipped = baseRobot?.equipped ?? {};
+  const inventoryOptions = useMemo(
+    () => Object.entries(inventory).filter(([, qty]) => qty > 0),
+    [inventory]
+  );
 
   const toggleMaterial = (id: string) => {
     setSelectedMaterials((prev) => {
@@ -160,6 +189,51 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
       setInheritError(message);
     } finally {
       setIsInheriting(false);
+    }
+  };
+
+  const handleEquip = async (slot: "slot1" | "slot2") => {
+    if (!baseRobot) return;
+    const itemId = equipSelection[slot];
+    if (!itemId) return;
+    setEquipError(null);
+    setEquippingSlot(slot);
+    try {
+      const equip = httpsCallable(functions, "equipItem");
+      const result = await equip({ robotId: baseRobot.id, slot, itemId });
+      const data = result.data as { equipped: { slot1?: string | null; slot2?: string | null }; inventory: InventoryMap };
+
+      setBaseRobot((prev) => (prev ? { ...prev, equipped: data.equipped } : prev));
+      setInventory((prev) => ({ ...prev, ...data.inventory }));
+      toast.success("Equipped");
+    } catch (error) {
+      console.error("Equip failed:", error);
+      const message = error instanceof Error ? error.message : "Equip failed";
+      setEquipError(message);
+    } finally {
+      setEquippingSlot(null);
+    }
+  };
+
+  const handleUnequip = async (slot: "slot1" | "slot2") => {
+    if (!baseRobot) return;
+    setEquipError(null);
+    setEquippingSlot(slot);
+    try {
+      const equip = httpsCallable(functions, "equipItem");
+      const result = await equip({ robotId: baseRobot.id, slot });
+      const data = result.data as { equipped: { slot1?: string | null; slot2?: string | null }; inventory: InventoryMap };
+
+      setBaseRobot((prev) => (prev ? { ...prev, equipped: data.equipped } : prev));
+      setInventory((prev) => ({ ...prev, ...data.inventory }));
+      setEquipSelection((prev) => ({ ...prev, [slot]: "" }));
+      toast.success("Unequipped");
+    } catch (error) {
+      console.error("Unequip failed:", error);
+      const message = error instanceof Error ? error.message : "Unequip failed";
+      setEquipError(message);
+    } finally {
+      setEquippingSlot(null);
     }
   };
 
@@ -234,6 +308,52 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
             </div>
           </CardContent>
         </Card>
+
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold">Equipment</h2>
+          <p className="text-sm text-muted-foreground">Equip up to 2 items from your inventory.</p>
+          <div className="grid gap-3">
+            {(["slot1", "slot2"] as const).map((slot) => (
+              <div key={slot} className="border rounded-lg p-3 space-y-2">
+                <div className="text-sm font-medium">
+                  {slot.toUpperCase()}: {equipped?.[slot] ? getItemLabel(equipped[slot] as string) : "Empty"}
+                </div>
+                <select
+                  value={equipSelection[slot]}
+                  onChange={(event) =>
+                    setEquipSelection((prev) => ({ ...prev, [slot]: event.target.value }))
+                  }
+                  className="border rounded px-2 py-1 bg-background text-sm w-full"
+                >
+                  <option value="">Select item</option>
+                  {inventoryOptions.map(([itemId, qty]) => (
+                    <option key={itemId} value={itemId}>
+                      {getItemLabel(itemId)} (x{qty})
+                    </option>
+                  ))}
+                </select>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => handleEquip(slot)}
+                    disabled={!equipSelection[slot] || equippingSlot === slot}
+                  >
+                    {equippingSlot === slot && <Loader2 className="h-4 w-4 animate-spin" />}
+                    Equip
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() => handleUnequip(slot)}
+                    disabled={!equipped?.[slot] || equippingSlot === slot}
+                  >
+                    {equippingSlot === slot && <Loader2 className="h-4 w-4 animate-spin" />}
+                    Unequip
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+          {equipError && <p className="text-sm text-destructive">{equipError}</p>}
+        </section>
 
         <section className="space-y-3">
           <h2 className="text-lg font-semibold">Synthesize</h2>

@@ -15,6 +15,7 @@ import Leaderboard from "@/pages/Leaderboard";
 import Profile from "@/pages/Profile";
 import Home from "@/pages/Home";
 import RobotDetail from "@/pages/RobotDetail";
+import Shop from "@/pages/Shop";
 
 function Router() {
   return (
@@ -22,6 +23,7 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/battle" component={Battle} />
       <Route path="/collection" component={Collection} />
+      <Route path="/shop" component={Shop} />
       <Route path="/robots/:robotId">
         {(params) => <RobotDetail robotId={params.robotId} />}
       </Route>

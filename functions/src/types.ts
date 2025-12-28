@@ -60,6 +60,11 @@ export interface RobotData {
   
   // スキル
   skills?: Array<string | Skill>; // skill IDs (string) or legacy skill objects
+
+  equipped?: {
+    slot1?: string | null;
+    slot2?: string | null;
+  };
   
   // メタデータ
   createdAt: Date | any;    // Firestore Timestamp

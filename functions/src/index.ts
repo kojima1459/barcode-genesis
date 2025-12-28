@@ -12,6 +12,23 @@ const normalizeBarcodeId = (barcode: string): string => {
   return digits.padEnd(13, "0").slice(0, 13);
 };
 
+const ITEM_CATALOG = {
+  power_core: { price: 100 },
+  shield_plate: { price: 80 },
+  speed_chip: { price: 60 }
+} as const;
+
+type ItemId = keyof typeof ITEM_CATALOG;
+
+const isItemId = (itemId: string): itemId is ItemId => {
+  return Object.prototype.hasOwnProperty.call(ITEM_CATALOG, itemId);
+};
+
+const getUserCredits = (user: any): number => {
+  const credits = user?.credits ?? 0;
+  return typeof credits === "number" ? credits : 0;
+};
+
 // ロボット生成API
 export const generateRobot = functions.https.onCall(async (data: GenerateRobotRequest, context): Promise<GenerateRobotResponse> => {
   // 認証チェック
@@ -34,7 +51,12 @@ export const generateRobot = functions.https.onCall(async (data: GenerateRobotRe
 
   try {
     const userId = context.auth.uid;
-    
+
+    await admin.firestore()
+      .collection('users')
+      .doc(userId)
+      .set({ credits: 0 }, { merge: true });
+
     const normalizedBarcode = normalizeBarcodeId(barcode);
 
     // 既存チェック: 同じバーコードのロボットを既に持っているか？
@@ -346,6 +368,162 @@ export const inheritSkill = functions.https.onCall(async (data: any, context) =>
     }
 
     return { success, baseSkills: nextSkills };
+  });
+
+  return result;
+});
+
+// 購入API
+export const purchaseItem = functions.https.onCall(async (data: any, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Auth required');
+  }
+
+  const itemId = data?.itemId;
+  const qty = data?.qty;
+
+  if (typeof itemId !== "string" || typeof qty !== "number") {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid input');
+  }
+
+  if (!Number.isInteger(qty) || qty < 1 || qty > 10) {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid quantity');
+  }
+
+  if (!isItemId(itemId)) {
+    throw new functions.https.HttpsError('invalid-argument', 'Unknown item');
+  }
+
+  const userId = context.auth.uid;
+  const userRef = admin.firestore().collection('users').doc(userId);
+  const inventoryRef = userRef.collection('inventory').doc(itemId);
+  const cost = ITEM_CATALOG[itemId].price * qty;
+
+  const result = await admin.firestore().runTransaction(async (t) => {
+    const userSnap = await t.get(userRef);
+    const userData = userSnap.exists ? userSnap.data() : {};
+    const credits = getUserCredits(userData);
+
+    if (credits < cost) {
+      throw new functions.https.HttpsError('failed-precondition', 'insufficient-funds');
+    }
+
+    const inventorySnap = await t.get(inventoryRef);
+    const currentQty = inventorySnap.exists && typeof inventorySnap.data()?.qty === "number"
+      ? inventorySnap.data()?.qty
+      : 0;
+    const newQty = currentQty + qty;
+    const newCredits = credits - cost;
+
+    t.set(userRef, { credits: newCredits }, { merge: true });
+    t.set(inventoryRef, { itemId, qty: newQty }, { merge: true });
+
+    return {
+      credits: newCredits,
+      inventoryDelta: { itemId, qty, totalQty: newQty }
+    };
+  });
+
+  return result;
+});
+
+// 装備API
+export const equipItem = functions.https.onCall(async (data: any, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Auth required');
+  }
+
+  const robotId = data?.robotId;
+  const slot = data?.slot;
+  const rawItemId = data?.itemId;
+  const itemId = typeof rawItemId === "string" && rawItemId.trim().length > 0
+    ? rawItemId
+    : undefined;
+
+  if (typeof robotId !== "string" || (slot !== "slot1" && slot !== "slot2")) {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid input');
+  }
+
+  if (itemId && !isItemId(itemId)) {
+    throw new functions.https.HttpsError('invalid-argument', 'Unknown item');
+  }
+
+  const slotKey = slot as "slot1" | "slot2";
+  const userId = context.auth.uid;
+  const userRef = admin.firestore().collection('users').doc(userId);
+  const robotRef = userRef.collection('robots').doc(robotId);
+  const inventoryCollection = userRef.collection('inventory');
+
+  const result = await admin.firestore().runTransaction(async (t) => {
+    const robotSnap = await t.get(robotRef);
+    if (!robotSnap.exists) {
+      throw new functions.https.HttpsError('not-found', 'Robot not found');
+    }
+
+    const robotData = robotSnap.data() as any;
+    const equipped = (robotData.equipped ?? {}) as { slot1?: string | null; slot2?: string | null };
+    const currentItem = equipped[slotKey] ?? null;
+    const inventoryUpdates: Record<string, number> = {};
+
+    if (!itemId) {
+      if (!currentItem) {
+        return { equipped, inventory: inventoryUpdates };
+      }
+
+      const returnRef = inventoryCollection.doc(currentItem);
+      const returnSnap = await t.get(returnRef);
+      const returnQty = returnSnap.exists && typeof returnSnap.data()?.qty === "number"
+        ? returnSnap.data()?.qty
+        : 0;
+      const newReturnQty = returnQty + 1;
+
+      t.set(returnRef, { itemId: currentItem, qty: newReturnQty }, { merge: true });
+      t.update(robotRef, {
+        [`equipped.${slotKey}`]: null,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      inventoryUpdates[currentItem] = newReturnQty;
+
+      return { equipped: { ...equipped, [slotKey]: null }, inventory: inventoryUpdates };
+    }
+
+    if (itemId === currentItem) {
+      return { equipped, inventory: inventoryUpdates };
+    }
+
+    const equipRef = inventoryCollection.doc(itemId);
+    const equipSnap = await t.get(equipRef);
+    const equipQty = equipSnap.exists && typeof equipSnap.data()?.qty === "number"
+      ? equipSnap.data()?.qty
+      : 0;
+
+    if (equipQty < 1) {
+      throw new functions.https.HttpsError('failed-precondition', 'insufficient-inventory');
+    }
+
+    const newEquipQty = equipQty - 1;
+    t.set(equipRef, { itemId, qty: newEquipQty }, { merge: true });
+    inventoryUpdates[itemId] = newEquipQty;
+
+    if (currentItem) {
+      const returnRef = inventoryCollection.doc(currentItem);
+      const returnSnap = await t.get(returnRef);
+      const returnQty = returnSnap.exists && typeof returnSnap.data()?.qty === "number"
+        ? returnSnap.data()?.qty
+        : 0;
+      const newReturnQty = returnQty + 1;
+      t.set(returnRef, { itemId: currentItem, qty: newReturnQty }, { merge: true });
+      inventoryUpdates[currentItem] = newReturnQty;
+    }
+
+    const nextEquipped = { ...equipped, [slotKey]: itemId };
+    t.update(robotRef, {
+      [`equipped.${slotKey}`]: itemId,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    return { equipped: nextEquipped, inventory: inventoryUpdates };
   });
 
   return result;

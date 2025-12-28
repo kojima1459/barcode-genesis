@@ -24,6 +24,15 @@ Open `http://localhost:3000` in a browser.
    - Fast path: edit the material robot in Emulator UI (`http://localhost:4000/firestore`) and set `skills` to `["power_smash"]`.
    - Then select the material + skill and run "Inherit".
 
+## Week5 (Credits/Shop/Equip) emulator check
+1. `firebase emulators:start --only auth,firestore,functions`
+2. `VITE_USE_EMULATORS=1 npm run dev`
+3. Sign in and scan at least one barcode (creates `/users/{uid}` with `credits: 0`).
+4. In Emulator UI (`http://localhost:4000/firestore`), set `/users/{uid}.credits` to a test value (ex: 500).
+5. Open Shop → purchase items → confirm credits/inventory change.
+6. Open Collection → Details on a robot → equip items in slot1/slot2 → unequip and confirm inventory returns.
+7. grantBattleRewards is not implemented yet; it needs a server-side battle record source to avoid client spoofing.
+
 ## Other commands
 - `npm run build`
 - `npm run start`

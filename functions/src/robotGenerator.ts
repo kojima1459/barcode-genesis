@@ -136,6 +136,10 @@ export function generateRobotData(barcode: string, userId: string): RobotData {
     parts,
     colors,
     skills,
+    equipped: {
+      slot1: null,
+      slot2: null
+    },
     
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),

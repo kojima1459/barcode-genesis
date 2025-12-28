@@ -9,6 +9,11 @@ service cloud.firestore {
       match /robots/{robotId} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }
+
+      // インベントリ: 本人のみ読み書き可能
+      match /inventory/{itemId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
     }
     
     // バトルデータ: 参加者のみ読み取り可能、書き込みはCloud Functionsのみ

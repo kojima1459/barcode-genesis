@@ -19,6 +19,8 @@ export const translations = {
     battle_desc: "ロボットを使って対戦",
     leaderboard: "ランキング",
     leaderboard_desc: "トッププレイヤーを確認",
+    shop: "ショップ",
+    shop_desc: "アイテムを購入",
     
     // Scan
     back_to_menu: "メニューに戻る",
@@ -121,6 +123,8 @@ export const translations = {
     battle_desc: "Fight with your robots!",
     leaderboard: "Leaderboard",
     leaderboard_desc: "Check top players",
+    shop: "Shop",
+    shop_desc: "Purchase items",
     
     // Scan
     back_to_menu: "Back to Menu",
