@@ -108,8 +108,8 @@ export const simulateBattle = (robot1: RobotData, robot2: RobotData): BattleResu
 
     logs.push({
       turn,
-      attackerId: attacker.id,
-      defenderId: defender.id,
+      attackerId: attacker.id!,
+      defenderId: defender.id!,
       action,
       skillName,
       damage,
@@ -128,8 +128,8 @@ export const simulateBattle = (robot1: RobotData, robot2: RobotData): BattleResu
     turn++;
   }
 
-  const winnerId = hp1 > 0 ? robot1.id : robot2.id;
-  const loserId = hp1 > 0 ? robot2.id : robot1.id;
+  const winnerId = (hp1 > 0 ? robot1.id : robot2.id)!;
+  const loserId = (hp1 > 0 ? robot2.id : robot1.id)!;
 
   return {
     winnerId,
