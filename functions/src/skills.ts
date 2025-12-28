@@ -102,3 +102,9 @@ export const getRandomSkills = (count: number, seed: number): Skill[] => {
 
   return skills;
 };
+
+// ランダムに1つのスキルを取得する（シードなし、純粋なランダム）
+export const getRandomSkill = (): Skill => {
+  const index = Math.floor(Math.random() * SKILLS.length);
+  return SKILLS[index];
+};

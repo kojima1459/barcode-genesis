@@ -2,7 +2,8 @@ import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import { generateRobotData } from "./robotGenerator";
 import { simulateBattle } from "./battleSystem";
-import { GenerateRobotRequest, GenerateRobotResponse } from "./types";
+import { GenerateRobotRequest, GenerateRobotResponse, Skill } from "./types";
+import { getRandomSkill } from "./skills";
 
 admin.initializeApp();
 
@@ -143,11 +144,45 @@ export const startBattle = functions.https.onCall(async (data: any, context) => 
         
         // Level Up Logic
         if (currentExp >= expToNextLevel) {
-          updates.level = currentLevel + 1;
+          const newLevel = currentLevel + 1;
+          updates.level = newLevel;
           updates.baseHp = Math.floor(robot.baseHp * 1.1);
           updates.baseAttack = Math.floor(robot.baseAttack * 1.1);
           updates.baseDefense = Math.floor(robot.baseDefense * 1.1);
           updates.baseSpeed = Math.floor(robot.baseSpeed * 1.1);
+
+          // Skill Acquisition & Upgrade Logic
+          // New skill at Lv.3, Lv.5, Lv.10
+          if ([3, 5, 10].includes(newLevel)) {
+            const newSkill = getRandomSkill();
+            const currentSkills = (robot.skills || []) as Skill[];
+            const existingSkillIndex = currentSkills.findIndex(s => s.id === newSkill.id);
+
+            if (existingSkillIndex !== -1) {
+              // Upgrade existing skill
+              const skillToUpgrade = currentSkills[existingSkillIndex];
+              skillToUpgrade.power = parseFloat((skillToUpgrade.power * 1.2).toFixed(2)); // +20% power
+              skillToUpgrade.triggerRate = Math.min(1.0, parseFloat((skillToUpgrade.triggerRate + 0.05).toFixed(2))); // +5% trigger rate
+              skillToUpgrade.name = `${skillToUpgrade.name}+`; // Add + mark
+              currentSkills[existingSkillIndex] = skillToUpgrade;
+              
+              // Update result for client
+              result.rewards.upgradedSkill = skillToUpgrade.name;
+            } else {
+              // Learn new skill
+              if (currentSkills.length < 4) {
+                currentSkills.push(newSkill);
+                // Update result for client
+                result.rewards.newSkill = newSkill.name;
+              } else {
+                // Replace random skill if full (simplified) or just ignore
+                // For now, let's just add it up to 5 skills
+                currentSkills.push(newSkill);
+                result.rewards.newSkill = newSkill.name;
+              }
+            }
+            updates.skills = currentSkills;
+          }
         }
         
         t.update(myRobotRef, updates);

@@ -20,6 +20,8 @@ interface BattleResult {
   rewards: {
     exp: number;
     coins: number;
+    newSkill?: string;
+    upgradedSkill?: string;
   };
 }
 

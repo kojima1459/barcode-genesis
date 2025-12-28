@@ -46,6 +46,8 @@ interface BattleResult {
   rewards: {
     exp: number;
     coins: number;
+    newSkill?: string; // Name of new skill
+    upgradedSkill?: string; // Name of upgraded skill
   };
 }
 
@@ -371,6 +373,18 @@ export default function Battle() {
                         {/* レベルアップ判定は簡易的に表示（本来はサーバーからのレスポンスに含めるべきだが、今回はEXP計算で推測） */}
                         {(getLevelInfo(myRobot).exp + battleResult.rewards.exp) >= getLevelInfo(myRobot).nextLevelExp && (
                           <div className="text-green-500 font-bold mt-1">LEVEL UP! Stats Increased!</div>
+                        )}
+                        
+                        {/* スキル習得・強化通知 */}
+                        {battleResult.rewards.newSkill && (
+                          <div className="text-blue-500 font-bold mt-1 animate-pulse">
+                            New Skill Learned: {battleResult.rewards.newSkill}!
+                          </div>
+                        )}
+                        {battleResult.rewards.upgradedSkill && (
+                          <div className="text-purple-500 font-bold mt-1 animate-pulse">
+                            Skill Upgraded: {battleResult.rewards.upgradedSkill}!
+                          </div>
                         )}
                       </div>
                     )}
