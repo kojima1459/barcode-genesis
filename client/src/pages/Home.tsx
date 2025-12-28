@@ -119,12 +119,12 @@ export default function Home() {
       const result = await generateRobot({ barcode });
       const data = result.data as any;
       
-      if (data.success) {
+      if (data?.robot) {
         setRobot(data.robot);
         setMode('result');
         toast.success(t('scan_success'));
       } else {
-        toast.error(data.error || t('scan_failed'));
+        toast.error(t('scan_failed'));
       }
     } catch (error) {
       console.error(error);

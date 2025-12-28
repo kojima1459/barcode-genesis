@@ -67,8 +67,8 @@ export interface RobotData {
   };
   
   // メタデータ
-  createdAt: Date | any;    // Firestore Timestamp
-  updatedAt: Date | any;
+  createdAt?: Date | any;    // Firestore Timestamp
+  updatedAt?: Date | any;
   
   // 統計
   totalBattles: number;
@@ -82,7 +82,6 @@ export interface GenerateRobotRequest {
 }
 
 export interface GenerateRobotResponse {
-  success: boolean;
-  robot?: RobotData;
-  error?: string;
+  robotId: string;
+  robot: RobotData;
 }

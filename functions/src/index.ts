@@ -1,16 +1,11 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
-import { generateRobotData } from "./robotGenerator";
+import { assertRobotNotExists, DuplicateRobotError, generateRobotFromBarcode, InvalidBarcodeError } from "./robotGenerator";
 import { simulateBattle } from "./battleSystem";
 import { GenerateRobotRequest, GenerateRobotResponse } from "./types";
 import { getRandomSkill, normalizeSkillIds } from "./skills";
 
 admin.initializeApp();
-
-const normalizeBarcodeId = (barcode: string): string => {
-  const digits = barcode.replace(/[^0-9]/g, "");
-  return digits.padEnd(13, "0").slice(0, 13);
-};
 
 const ITEM_CATALOG = {
   power_core: { price: 100 },
@@ -66,7 +61,7 @@ export const generateRobot = functions.https.onCall(async (data: GenerateRobotRe
     );
   }
 
-  const { barcode } = data;
+  const { barcode } = data ?? {};
   
   // バリデーション
   if (!barcode || typeof barcode !== 'string') {
@@ -78,55 +73,57 @@ export const generateRobot = functions.https.onCall(async (data: GenerateRobotRe
 
   try {
     const userId = context.auth.uid;
-
-    await admin.firestore()
-      .collection('users')
-      .doc(userId)
-      .set({ credits: 0 }, { merge: true });
-
-    const normalizedBarcode = normalizeBarcodeId(barcode);
-
-    // 既存チェック: 同じバーコードのロボットを既に持っているか？
-    const existingRobots = await admin.firestore()
-      .collection('users')
-      .doc(userId)
-      .collection('robots')
-      .where('sourceBarcode', '==', normalizedBarcode)
-      .get();
-      
-    if (!existingRobots.empty) {
-      return {
-        success: false,
-        error: 'You already have a robot from this barcode.'
-      };
-    }
+    const db = admin.firestore();
+    const userRef = db.collection('users').doc(userId);
+    const robotRef = userRef.collection('robots').doc(barcode);
 
     // ロボットデータ生成
-    const robotData = generateRobotData(normalizedBarcode, userId);
+    const robotData = generateRobotFromBarcode(barcode, userId);
     
-    // Firestoreに保存
-    const robotRef = admin.firestore()
-      .collection('users')
-      .doc(userId)
-      .collection('robots')
-      .doc(normalizedBarcode);
+    await db.runTransaction(async (t) => {
+      const existing = await t.get(robotRef);
+      assertRobotNotExists(existing.exists);
 
-    await robotRef.set(robotData);
-      
-    // IDを追加して返す
-    return {
-      success: true,
-      robot: {
+      const serverTimestamp = admin.firestore.FieldValue.serverTimestamp();
+
+      t.set(robotRef, {
         ...robotData,
         id: robotRef.id,
-        // TimestampをDateに変換して返す（クライアント側での扱いやすさのため）
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        createdAt: serverTimestamp,
+        updatedAt: serverTimestamp
+      });
+
+      t.set(userRef, {
+        totalRobots: admin.firestore.FieldValue.increment(1),
+        credits: admin.firestore.FieldValue.increment(0)
+      }, { merge: true });
+    });
+      
+    return {
+      robotId: robotRef.id,
+      robot: {
+        ...robotData,
+        id: robotRef.id
       }
     };
     
   } catch (error) {
     console.error("Error generating robot:", error);
+    if (error instanceof InvalidBarcodeError) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        'The function must be called with a valid barcode.'
+      );
+    }
+    if (error instanceof DuplicateRobotError) {
+      throw new functions.https.HttpsError(
+        'already-exists',
+        'You already have a robot from this barcode.'
+      );
+    }
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
     throw new functions.https.HttpsError(
       'internal',
       'An error occurred while generating the robot.'

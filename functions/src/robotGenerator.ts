@@ -1,53 +1,76 @@
 import { RobotData, RobotParts, RobotColors } from './types';
-import * as admin from 'firebase-admin';
 
 // 定数定義
 const RARITY_NAMES = ["Common", "Uncommon", "Rare", "Epic", "Legendary"];
 const ELEMENT_NAMES = ["Fire", "Water", "Wind", "Earth", "Light", "Dark", "Machine"];
+const BARCODE_PATTERN = /^\d{13}$/;
+
+export class InvalidBarcodeError extends Error {
+  constructor(message: string = "Barcode must be a 13-digit string.") {
+    super(message);
+    this.name = "InvalidBarcodeError";
+  }
+}
+
+export const assertValidBarcode = (barcode: string): void => {
+  if (!BARCODE_PATTERN.test(barcode)) {
+    throw new InvalidBarcodeError();
+  }
+};
+
+export class DuplicateRobotError extends Error {
+  code = "already-exists";
+
+  constructor(message: string = "You already have a robot from this barcode.") {
+    super(message);
+    this.name = "DuplicateRobotError";
+  }
+}
+
+export const assertRobotNotExists = (exists: boolean): void => {
+  if (exists) {
+    throw new DuplicateRobotError();
+  }
+};
 
 // バーコードを数値配列に分解
 function parseBarcode(barcode: string): number[] {
-  // 数字以外を除去し、足りない場合は0で埋める、長い場合は切り詰める
-  const cleanBarcode = barcode.replace(/[^0-9]/g, '');
-  const paddedBarcode = cleanBarcode.padEnd(13, '0').slice(0, 13);
-  return paddedBarcode.split('').map(Number);
+  assertValidBarcode(barcode);
+  return barcode.split('').map(Number);
 }
 
 // レアリティ決定 (1-5)
 function calculateRarity(digits: number[]): number {
-  // M1(2), M3(4), M5(6) の和の下一桁 * 10 + P2(8), P4(10) の和の下一桁
-  // digitsは0-indexedなので、M1=digits[2], M3=digits[4]...
-  const score = ((digits[2] + digits[4] + digits[6]) % 10) * 10 + ((digits[7] + digits[9]) % 10);
-  
-  if (score >= 99) return 5; // Legendary (1%)
-  if (score >= 95) return 4; // Epic (4%)
-  if (score >= 85) return 3; // Rare (10%)
-  if (score >= 60) return 2; // Uncommon (25%)
-  return 1;                  // Common (60%)
+  // M1(2), M3(4), M5(6) と P2(8), P4(10) を使用
+  const baseScore = ((digits[2] + digits[4] + digits[6]) % 10) * 10 + ((digits[8] + digits[10]) % 10);
+
+  if (baseScore <= 69) return 1;      // Common (70%)
+  if (baseScore <= 89) return 2;      // Uncommon (20%)
+  if (baseScore <= 96) return 3;      // Rare (7%)
+  if (baseScore <= 98) return 4;      // Epic (2%)
+  return 5;                           // Legendary (1%)
 }
 
 // ステータス計算
 function calculateStats(digits: number[], rarity: number) {
-  const totalPoints = 100 + (rarity * 25);
-  
-  // 配分比率を決定 (P1, P2, P3, P4)
-  const p1 = digits[6] + 1;
-  const p2 = digits[7] + 1;
-  const p3 = digits[8] + 1;
-  const p4 = digits[9] + 1;
-  const sum = p1 + p2 + p3 + p4;
-  
-  const hp = Math.floor((p1 / sum) * totalPoints);
-  const attack = Math.floor((p2 / sum) * totalPoints);
-  const defense = Math.floor((p3 / sum) * totalPoints);
-  // 残りをSpeedに
-  const speed = totalPoints - (hp + attack + defense);
-  
+  const totalPoints = 100 + (rarity * 20);
+  const ratioSeed = digits[7] * 100 + digits[8] * 10 + digits[9];
+  const ratioAttack = (ratioSeed % 100) / 100;
+  const ratioDefense = ((ratioSeed * 3) % 100) / 100;
+  const ratioHp = ((ratioSeed * 7) % 100) / 100;
+  const totalRatio = ratioAttack + ratioDefense + ratioHp;
+  const safeTotalRatio = totalRatio === 0 ? 1 : totalRatio;
+
+  const baseAttack = Math.min(300, Math.max(10, Math.round((totalPoints * ratioAttack / safeTotalRatio) * 10)));
+  const baseDefense = Math.min(300, Math.max(10, Math.round((totalPoints * ratioDefense / safeTotalRatio) * 10)));
+  const baseHp = Math.min(3000, Math.max(100, Math.round((totalPoints * ratioHp / safeTotalRatio) * 100)));
+  const baseSpeed = Math.round((baseAttack + baseDefense) / 2);
+
   return {
-    baseHp: hp * 10, // HPは10倍スケール
-    baseAttack: attack,
-    baseDefense: defense,
-    baseSpeed: speed
+    baseHp,
+    baseAttack,
+    baseDefense,
+    baseSpeed
   };
 }
 
@@ -141,11 +164,10 @@ export function generateRobotData(barcode: string, userId: string): RobotData {
       slot2: null
     },
     
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    
     totalBattles: 0,
     totalWins: 0,
     isFavorite: false
   };
 }
+
+export const generateRobotFromBarcode = generateRobotData;
