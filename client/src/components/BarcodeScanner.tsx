@@ -25,7 +25,7 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
     }
   };
 
-  // The "Strongest" Image-based barcode detection using ZXing
+  // The "Strongest" Image-based barcode detection
   const handleImageScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
 
@@ -34,7 +34,27 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
     setErrorMsg(null);
 
     try {
-      // Create tips for ZXing
+      // 1. Try Native BarcodeDetector API (Strongest where supported)
+      if ('BarcodeDetector' in window) {
+        try {
+          // @ts-ignore - BarcodeDetector is a newer API
+          const detector = new BarcodeDetector({
+            formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39']
+          });
+          const bitmap = await createImageBitmap(imageFile);
+          const barcodes = await detector.detect(bitmap);
+          if (barcodes.length > 0) {
+            const code = barcodes[0].rawValue;
+            setManualCode(code);
+            toast.success(`ネイティブ検知: ${code}`);
+            return;
+          }
+        } catch (nativeErr) {
+          console.warn("Native BarcodeDetector failed, falling back to ZXing...", nativeErr);
+        }
+      }
+
+      // 2. Try ZXing with hints
       const hints = new Map();
       const formats = [
         BarcodeFormat.EAN_13,
@@ -52,84 +72,92 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
       const imageUrl = URL.createObjectURL(imageFile);
 
       try {
-        // Try direct decoding from image URL first
+        // Try direct decoding first
         const result = await reader.decodeFromImageUrl(imageUrl);
         setManualCode(result.getText());
         toast.success(`バーコードを検出: ${result.getText()}`);
         URL.revokeObjectURL(imageUrl);
       } catch (err) {
-        console.warn("Direct ZXing scan failed, trying with preprocessing...");
+        console.warn("Direct ZXing scan failed, trying with multiple preprocessing attempts...");
 
-        // Fallback: Preprocess with Canvas if direct scan fails
-        const resultText = await preprocessAndScan(imageFile, reader);
+        // Fallback: Try multiple preprocessing variations
+        const resultText = await multiAttemptScaleAndScan(imageFile, reader);
         if (resultText) {
           setManualCode(resultText);
-          toast.success(`バーコードを検出: ${resultText}`);
+          toast.success(`補正解析で検出: ${resultText}`);
         } else {
-          throw new Error("Could not detect barcode even with preprocessing");
+          throw new Error("Could not detect barcode even with advanced correction");
         }
       }
     } catch (error: any) {
       console.error("Image barcode scan failed:", error);
-      setErrorMsg("バーコードを読み取れませんでした。画像の中央にはっきりバーコードが来るように撮影してみてください。");
+      setErrorMsg("バーコードを読み取れませんでした。\n\n【コツ】\n・ピントを合わせて、バーコードが真っ直ぐになるように撮影してください\n・光の反射が入らないように少し角度を変えてみてください");
     } finally {
       setIsScanning(false);
       e.target.value = '';
     }
   };
 
-  // Preprocess image (resize/grayscale/contrast) and try scanning again
-  async function preprocessAndScan(file: File, reader: BrowserMultiFormatReader): Promise<string | null> {
-    return new Promise((resolve) => {
-      const img = new window.Image();
-      const url = URL.createObjectURL(file);
+  // Try multiple scales and filters to find the barcode
+  async function multiAttemptScaleAndScan(file: File, reader: BrowserMultiFormatReader): Promise<string | null> {
+    const img = new window.Image();
+    const url = URL.createObjectURL(file);
 
-      img.onload = async () => {
-        URL.revokeObjectURL(url);
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return resolve(null);
+    await new Promise((resolve) => {
+      img.onload = resolve;
+      img.onerror = resolve;
+      img.src = url;
+    });
+    URL.revokeObjectURL(url);
 
-        // Normalize size
-        const maxDim = 800;
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx || !img.width) return null;
+
+    // Try these scales in order: Standard, Large, Small
+    const scales = [1000, 1600, 600];
+    const filters = [
+      'contrast(1.4) grayscale(1)',
+      'brightness(1.1) contrast(1.2) grayscale(1)',
+      'none'
+    ];
+
+    for (const maxDim of scales) {
+      for (const filter of filters) {
         let width = img.width;
         let height = img.height;
-        if (width > maxDim || height > maxDim) {
-          const ratio = Math.min(maxDim / width, maxDim / height);
-          width = Math.round(width * ratio);
-          height = Math.round(height * ratio);
-        }
+        const ratio = Math.min(maxDim / width, maxDim / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+
         canvas.width = width;
         canvas.height = height;
-
-        // Apply filters
-        ctx.filter = 'contrast(1.2) b&w';
+        ctx.filter = filter;
         ctx.drawImage(img, 0, 0, width, height);
 
         try {
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
           const result = await reader.decodeFromImageUrl(dataUrl);
-          resolve(result.getText());
+          if (result) return result.getText();
         } catch (e) {
-          // One last try: Rotate 90 degrees (sometimes barcodes are vertical)
-          try {
-            canvas.width = height;
-            canvas.height = width;
-            ctx.translate(canvas.width / 2, canvas.height / 2);
-            ctx.rotate(Math.PI / 2);
-            ctx.drawImage(img, -width / 2, -height / 2, width, height);
-
-            const dataUrlRot = canvas.toDataURL('image/jpeg', 0.9);
-            const resultRot = await reader.decodeFromImageUrl(dataUrlRot);
-            resolve(resultRot.getText());
-          } catch (eRot) {
-            resolve(null);
-          }
+          // Continue to next attempt
         }
-      };
-      img.onerror = () => resolve(null);
-      img.src = url;
-    });
+
+        // Tilt attempt (sometimes needed for distorted images)
+        try {
+          canvas.width = height;
+          canvas.height = width;
+          ctx.translate(canvas.width / 2, canvas.height / 2);
+          ctx.rotate(Math.PI / 2);
+          ctx.drawImage(img, -width / 2, -height / 2, width, height);
+          const resultRot = await reader.decodeFromImageUrl(canvas.toDataURL('image/jpeg', 0.95));
+          if (resultRot) return resultRot.getText();
+        } catch (e) {
+          // Continue
+        }
+      }
+    }
+    return null;
   }
 
   return (
