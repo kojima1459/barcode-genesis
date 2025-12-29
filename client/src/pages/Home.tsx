@@ -320,6 +320,74 @@ export default function Home() {
           </Link>
         </section>
 
+        {/* Mission Center & Login Bonus */}
+        <section className="glass-panel p-4 rounded-lg border-neon-cyan/30 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-1 bg-neon-cyan/10 border-b border-l border-neon-cyan/30 text-[10px] text-neon-cyan font-mono tracking-tighter">MISSION_CENTER</div>
+
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded bg-neon-yellow/10 border border-neon-yellow/30 flex items-center justify-center text-neon-yellow">
+                <Trophy className="w-6 h-6" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold font-orbitron tracking-wide text-white">DAILY BONUS</h2>
+                <div className="text-xs text-muted-foreground font-mono">STREAK: {loginStreak || 0} DAYS</div>
+              </div>
+            </div>
+
+            <Button
+              onClick={handleClaimLoginBonus}
+              disabled={isClaimingLogin}
+              className="bg-neon-yellow text-black hover:bg-neon-yellow/80 font-bold px-8 h-10 shadow-[0_0_15px_rgba(255,215,0,0.3)]"
+            >
+              {isClaimingLogin ? <Loader2 className="w-4 h-4 animate-spin" /> : "CLAIM BONUS"}
+            </Button>
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="text-xs font-bold text-muted-foreground tracking-widest uppercase mb-2">Active Missions</h3>
+            {missionsLoading ? (
+              <div className="py-4 flex items-center justify-center">
+                <Loader2 className="w-6 h-6 animate-spin text-neon-cyan" />
+              </div>
+            ) : missionsError ? (
+              <div className="py-4 text-xs text-red-400 font-mono">{missionsError}</div>
+            ) : missions.length === 0 ? (
+              <div className="py-4 text-xs text-muted-foreground font-mono">No missions available today.</div>
+            ) : (
+              <div className="grid grid-cols-1 gap-2">
+                {missions.map(mission => (
+                  <div key={mission.id} className="flex items-center justify-between p-3 bg-white/5 border border-white/10 rounded group/mission hover:border-neon-cyan/40 transition-all">
+                    <div className="flex-1">
+                      <div className="text-sm font-bold text-white mb-1">{mission.title || "Daily Mission"}</div>
+                      <div className="w-full h-1.5 bg-black/40 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-neon-cyan transition-all duration-1000"
+                          style={{ width: `${Math.min(100, ((mission.progress || 0) / (mission.target || 1)) * 100)}%` }}
+                        />
+                      </div>
+                      <div className="mt-1 text-[10px] text-muted-foreground font-mono flex justify-between">
+                        <span>PROGRESS: {mission.progress || 0}/{mission.target || 1}</span>
+                        <span className="text-neon-yellow">REWARD: {mission.rewardCredits} CR</span>
+                      </div>
+                    </div>
+
+                    <Button
+                      size="sm"
+                      disabled={mission.claimed || (mission.progress || 0) < (mission.target || 1) || claimingMissionId === mission.id}
+                      onClick={() => handleClaimMission(mission.id)}
+                      className={`ml-4 text-[10px] font-black tracking-tighter ${mission.claimed ? 'bg-white/10 text-white/30' : (mission.progress || 0) >= (mission.target || 1) ? 'bg-neon-cyan text-black hover:bg-neon-cyan/80' : 'bg-black/40 text-white/50 border border-white/10 hover:bg-white/10'}`}
+                    >
+                      {claimingMissionId === mission.id ? <Loader2 className="w-3 h-3 animate-spin" /> : mission.claimed ? "CLAIMED" : "CLAIM"}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+
         {/* Robot List Preview */}
         <section>
           <div className="flex justify-between items-end mb-4 border-b border-white/10 pb-2">
