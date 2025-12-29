@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
+import Quagga from "@ericblade/quagga2";
 import { useRef, useState } from "react";
 import { AlertCircle, Keyboard, Image, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -25,7 +25,7 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
     }
   };
 
-  // Image-based barcode detection with preprocessing
+  // Image-based barcode detection using Quagga2
   const handleImageScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
 
@@ -34,65 +34,52 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
     setErrorMsg(null);
 
     try {
-      // Create image element to load the file
-      const img = document.createElement('img');
+      // Create image URL
       const imageUrl = URL.createObjectURL(imageFile);
 
-      await new Promise<void>((resolve, reject) => {
-        img.onload = () => resolve();
-        img.onerror = () => reject(new Error('Image load failed'));
-        img.src = imageUrl;
+      // Use Quagga2's decodeSingle for image-based detection
+      const result = await new Promise<string>((resolve, reject) => {
+        Quagga.decodeSingle(
+          {
+            src: imageUrl,
+            numOfWorkers: 0, // Use main thread for single image
+            inputStream: {
+              size: 1280, // Resize to max 1280px
+              singleChannel: false,
+            },
+            decoder: {
+              readers: [
+                "ean_reader",      // EAN-13, EAN-8
+                "upc_reader",      // UPC-A, UPC-E
+                "code_128_reader", // CODE 128
+                "code_39_reader",  // CODE 39
+              ],
+            },
+            locate: true, // Try to locate barcode in image
+            locator: {
+              patchSize: "medium", // Balance between speed and accuracy
+              halfSample: true,
+            },
+          },
+          (result) => {
+            URL.revokeObjectURL(imageUrl);
+
+            if (result && result.codeResult && result.codeResult.code) {
+              resolve(result.codeResult.code);
+            } else {
+              reject(new Error("Barcode not found"));
+            }
+          }
+        );
       });
-
-      // Create canvas and draw image (helps with detection)
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error('Canvas not supported');
-
-      // Scale down if too large (improves detection)
-      const maxDimension = 1000;
-      let width = img.width;
-      let height = img.height;
-      if (width > maxDimension || height > maxDimension) {
-        const ratio = Math.min(maxDimension / width, maxDimension / height);
-        width = Math.round(width * ratio);
-        height = Math.round(height * ratio);
-      }
-      canvas.width = width;
-      canvas.height = height;
-      ctx.drawImage(img, 0, 0, width, height);
-
-      // Convert canvas to blob for scanning
-      const blob = await new Promise<Blob>((resolve, reject) => {
-        canvas.toBlob((b) => b ? resolve(b) : reject(new Error('Blob conversion failed')), 'image/jpeg', 0.9);
-      });
-      const processedFile = new File([blob], 'processed.jpg', { type: 'image/jpeg' });
-
-      URL.revokeObjectURL(imageUrl);
-
-      // Try scanning with html5-qrcode
-      const html5QrCode = new Html5Qrcode("barcode-scanner-temp", {
-        verbose: false,
-        formatsToSupport: [
-          Html5QrcodeSupportedFormats.EAN_13,
-          Html5QrcodeSupportedFormats.EAN_8,
-          Html5QrcodeSupportedFormats.UPC_A,
-          Html5QrcodeSupportedFormats.UPC_E,
-          Html5QrcodeSupportedFormats.CODE_128,
-          Html5QrcodeSupportedFormats.CODE_39
-        ]
-      });
-
-      const result = await html5QrCode.scanFile(processedFile, true);
 
       // Barcode detected - auto-fill the manual input field
       setManualCode(result);
-      toast.success(`バーコードを検出: ${result}`);
+      toast.success(`バーコードを検出: ${result}\n「生成」をタップしてください！`);
 
-      html5QrCode.clear();
     } catch (error: any) {
       console.error("Image barcode scan failed:", error);
-      setErrorMsg("バーコードを検出できませんでした。\n\n【対処法】\n・バーコードの数字を下の欄に直接入力してください\n・画像は「4903110475118」のような13桁の数字です");
+      setErrorMsg("バーコードを検出できませんでした。\n\n【対処法】\n・バーコード部分を大きく写した画像を使用\n・バーコードに光が反射していないか確認\n・下の番号を直接入力することもできます");
     } finally {
       setIsScanning(false);
       e.target.value = '';
@@ -182,9 +169,6 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
             </Button>
           </div>
         </form>
-
-        {/* Hidden element for html5-qrcode scanFile */}
-        <div id="barcode-scanner-temp" className="hidden" />
 
       </CardContent>
     </Card>
