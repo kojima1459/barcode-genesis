@@ -36,6 +36,19 @@ const getSkillIds = (skills?: RobotData["skills"]) => {
   return Array.from(ids);
 };
 
+// Calculate level info from robot data
+const getLevelInfo = (robot: RobotData) => {
+  const level = robot.level || 1;
+  const xp = robot.xp || 0;
+  // Simple level progression: each level requires level * 100 XP
+  const currentLevelXp = (level - 1) * 100;
+  const nextLevelXp = level * 100;
+  const xpInCurrentLevel = xp - currentLevelXp;
+  const xpNeededForNextLevel = nextLevelXp - currentLevelXp;
+  const progress = Math.min(100, Math.max(0, (xpInCurrentLevel / xpNeededForNextLevel) * 100));
+  return { level, nextLevelExp: nextLevelXp, progress };
+};
+
 export default function RobotDetail({ robotId }: { robotId: string }) {
   const { user } = useAuth();
   const { playSE } = useSound();
