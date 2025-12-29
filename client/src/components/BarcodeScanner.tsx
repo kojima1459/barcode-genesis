@@ -168,7 +168,7 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
         URL.revokeObjectURL(url);
         let width = img.width;
         let height = img.height;
-        const maxDim = 1280; // Standardized for best quality/size balance
+        const maxDim = 1024; // Reduced to prevent payload issues
 
         if (width > maxDim || height > maxDim) {
           const ratio = Math.min(maxDim / width, maxDim / height);
@@ -187,7 +187,7 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
         ctx.drawImage(img, 0, 0, width, height);
 
         // Compress to JPEG 0.7 as requested by user for balance
-        const base64 = canvas.toDataURL('image/jpeg', 0.7);
+        const base64 = canvas.toDataURL('image/jpeg', 0.6);
         const kbSize = Math.round(base64.length / 1024);
 
         if (kbSize > 2500) { // 2.5MB limit

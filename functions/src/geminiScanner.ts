@@ -7,7 +7,10 @@ const API_KEY = process.env.GEMINI_API_KEY || "";
 
 const genAI = new GoogleGenerativeAI(API_KEY);
 
-export const scanBarcodeFromImage = functions.https.onCall(async (data, context) => {
+export const scanBarcodeFromImage = functions.runWith({
+  timeoutSeconds: 60,
+  memory: "1GB"
+}).https.onCall(async (data, context) => {
   // 認証チェック
   if (!context.auth) {
     throw new functions.https.HttpsError(
@@ -24,6 +27,9 @@ export const scanBarcodeFromImage = functions.https.onCall(async (data, context)
       'The function must be called with a valid image base64 string.'
     );
   }
+
+  // デバッグログ: 受け取ったデータの先頭を表示
+  console.log(`Received image data (length: ${imageBase64.length}). Start: ${imageBase64.substring(0, 50)}...`);
 
   try {
     // Geminiモデルの初期化 (Gemini 2.0 Flash は高速で安価)
@@ -46,8 +52,9 @@ export const scanBarcodeFromImage = functions.https.onCall(async (data, context)
       Do not include any markdown formatting (like \`\`\`json). Just the raw JSON string.
     `;
 
-    // 画像データの準備 (Base64ヘッダーを除去)
-    const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, "");
+    // 画像データの準備 (Base64ヘッダーをより堅牢に除去)
+    // data:image/jpeg;base64, などのヘッダーがあれば削除、なければそのまま
+    const base64Data = imageBase64.replace(/^data:image\/[a-zA-Z]+;base64,/, "");
     
     const imagePart = {
       inlineData: {
@@ -76,7 +83,7 @@ export const scanBarcodeFromImage = functions.https.onCall(async (data, context)
       if (digits.length >= 8 && digits.length <= 14) {
         parsedResult = { found: true, barcode: digits, type: "Unknown", confidence: "low" };
       } else {
-        return { success: false, message: "Failed to parse AI response" };
+        return { success: false, message: "Failed to parse AI response", rawResponse: text };
       }
     }
 
@@ -99,11 +106,12 @@ export const scanBarcodeFromImage = functions.https.onCall(async (data, context)
       return { success: false, message: `Invalid barcode length: ${barcode.length}`, raw: barcode };
     }
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Gemini API Error:", error);
+    // エラーの詳細をクライアントに返す（デバッグ用）
     throw new functions.https.HttpsError(
       'internal',
-      'Failed to process image with Gemini API.'
+      `Failed to process image with Gemini API: ${error.message}`
     );
   }
 });
