@@ -27,6 +27,7 @@ interface RobotSVGProps {
   className?: string;
   animate?: boolean;
   decals?: string[];
+  showGlow?: boolean; // Add glow/outline for dark backgrounds
 }
 
 // Decal definitions
@@ -38,7 +39,7 @@ const DECAL_CATALOG: Record<string, { path: string; position: { x: number; y: nu
   heart: { path: "M100,73 C100,70 97,68 94,70 C91,72 91,76 94,80 L100,85 L106,80 C109,76 109,72 106,70 C103,68 100,70 100,73 Z", position: { x: 0, y: 0 } },
 };
 
-export default function RobotSVG({ parts, colors, size = 200, className, animate = true, decals = [] }: RobotSVGProps) {
+export default function RobotSVG({ parts, colors, size = 200, className, animate = true, decals = [], showGlow = true }: RobotSVGProps) {
   // パーツ形状の定義（拡張版: 5種類以上のバリエーション）
   const shapes = useMemo(() => {
     return {
@@ -145,7 +146,30 @@ export default function RobotSVG({ parts, colors, size = 200, className, animate
             animation: ${animate ? 'idleBob 3s ease-in-out infinite' : 'none'};
           }
         `}</style>
+
+        {/* Background gradient for visibility on dark backgrounds */}
+        <radialGradient id={`bg-glow-${instanceId}`} cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor={colors.glow || "#0ff"} stopOpacity="0.15" />
+          <stop offset="60%" stopColor={colors.glow || "#0ff"} stopOpacity="0.05" />
+          <stop offset="100%" stopColor="transparent" stopOpacity="0" />
+        </radialGradient>
+
+        {/* Outer glow for visibility */}
+        <filter id={`outer-glow-${instanceId}`} x="-50%" y="-50%" width="200%" height="200%">
+          <feFlood floodColor={colors.glow || "#0ff"} floodOpacity="0.4" />
+          <feComposite in2="SourceAlpha" operator="in" />
+          <feGaussianBlur stdDeviation="4" />
+          <feMerge>
+            <feMergeNode />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
       </defs>
+
+      {/* Background glow circle for visibility */}
+      {showGlow && (
+        <circle cx="100" cy="100" r="95" fill={`url(#bg-glow-${instanceId})`} />
+      )}
 
       <g className={animate ? `robot-body-${instanceId}` : ''}>
         {/* Backpack (Behind) */}

@@ -750,7 +750,7 @@ export default function Battle() {
                 animate={shaking === selectedRobotId ? { x: [-10, 10, -10, 10, 0], rotate: [-2, 2, -2, 2, 0] } : { scale: 1 }}
                 transition={{ duration: 0.4 }}
               >
-                <div className="absolute -top-3 left-4 bg-black px-3 py-1 text-neon-cyan text-xs font-orbitron border border-neon-cyan tracking-widest shadow-[0_0_10px_rgba(0,243,255,0.5)]">PLAYER</div>
+                <div className="absolute -top-3 left-4 bg-black px-3 py-1 text-neon-cyan text-xs font-orbitron border border-neon-cyan tracking-widest shadow-[0_0_10px_rgba(0,243,255,0.5)]">プレイヤー</div>
                 <div className="flex justify-center my-4 drop-shadow-[0_0_15px_rgba(0,243,255,0.4)]">
                   <RobotSVG parts={myRobot.parts} colors={myRobot.colors} size={160} />
                 </div>
@@ -788,7 +788,7 @@ export default function Battle() {
                         style={{ textShadow: "4px 4px 0px #000" }}
                       >
                         {p.value}
-                        {p.isCritical && <span className="block text-sm text-yellow-400 absolute -top-4 w-full text-center tracking-widest">CRITICAL!</span>}
+                        {p.isCritical && <span className="block text-sm text-yellow-400 absolute -top-4 w-full text-center tracking-widest">クリティカル！</span>}
                       </motion.div>
                     )
                   })}
@@ -861,7 +861,7 @@ export default function Battle() {
                 className={`relative p-6 rounded-xl glass-panel w-full md:w-[45%] ${shaking === enemyRobot.id ? 'border-red-500 shadow-[0_0_20px_rgba(255,0,0,0.5)]' : 'border-neon-pink shadow-[0_0_10px_rgba(255,0,85,0.3)]'}`}
                 animate={shaking === enemyRobot.id ? { x: [-10, 10, -10, 10, 0], rotate: [2, -2, 2, -2, 0] } : {}}
               >
-                <div className="absolute -top-3 right-4 bg-black px-3 py-1 text-neon-pink text-xs font-orbitron border border-neon-pink tracking-widest shadow-[0_0_10px_rgba(255,0,85,0.5)]">ENEMY</div>
+                <div className="absolute -top-3 right-4 bg-black px-3 py-1 text-neon-pink text-xs font-orbitron border border-neon-pink tracking-widest shadow-[0_0_10px_rgba(255,0,85,0.5)]">相手</div>
                 <div className="flex justify-center my-4 drop-shadow-[0_0_15px_rgba(255,0,85,0.4)]">
                   <RobotSVG parts={enemyRobot.parts} colors={enemyRobot.colors} size={160} />
                 </div>
@@ -897,7 +897,7 @@ export default function Battle() {
                         style={{ textShadow: "4px 4px 0px #000" }}
                       >
                         {p.value}
-                        {p.isCritical && <span className="block text-sm text-neon-pink absolute -top-4 w-full text-center tracking-widest">CRITICAL!</span>}
+                        {p.isCritical && <span className="block text-sm text-neon-pink absolute -top-4 w-full text-center tracking-widest">クリティカル！</span>}
                       </motion.div>
                     )
                   })}
@@ -936,9 +936,12 @@ export default function Battle() {
                   >
                     <div className="absolute inset-0 bg-gradient-to-t from-neon-cyan/10 to-transparent opacity-50 pointer-events-none"></div>
 
-                    <h2 className={`text-6xl font-black italic tracking-tighter ${battleResult.winnerId === myRobot.id ? "text-neon-cyan neon-text-cyan" : "text-gray-500"}`}>
-                      {battleResult.winnerId === myRobot.id ? "VICTORY" : "DEFEAT"}
+                    <h2 className={`text-5xl md:text-7xl font-black italic tracking-tighter ${battleResult.winnerId === myRobot.id ? "text-neon-cyan neon-text-cyan" : "text-red-500"}`}>
+                      {battleResult.winnerId === myRobot.id ? "勝利！" : "敗北..."}
                     </h2>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      {battleResult.winnerId === myRobot.id ? "見事な戦いでした！" : "次は勝てる！"}
+                    </p>
 
                     <div className="space-y-4 relative z-10">
                       {battleResult.winnerId === myRobot.id && (
@@ -971,11 +974,11 @@ export default function Battle() {
                         setIsBattling(false);
                         setEnemyRobotId(null);
                       }} className="w-full bg-neon-cyan text-black hover:bg-white font-bold h-12 text-lg shadow-[0_0_15px_rgba(0,243,255,0.4)] hover:shadow-[0_0_25px_rgba(0,243,255,0.7)] transition-all">
-                        NEXT BATTLE
+                        次のバトルへ
                       </Button>
 
                       <div className="flex justify-center">
-                        <ShareButton text={`I just ${battleResult.winnerId === myRobot.id ? 'won' : 'lost'} a battle in #BarcodeGenesis!`} />
+                        <ShareButton text={`${battleResult.winnerId === myRobot.id ? '勝利' : '敗北'}しました！ #BarcodeGenesis #バーコードジェネシス`} />
                       </div>
                     </div>
                   </motion.div>
