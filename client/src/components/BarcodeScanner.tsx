@@ -25,7 +25,7 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
     }
   };
 
-  // Image-based barcode detection
+  // Image-based barcode detection with preprocessing
   const handleImageScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
 
@@ -34,17 +34,56 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
     setErrorMsg(null);
 
     try {
+      // Create image element to load the file
+      const img = document.createElement('img');
+      const imageUrl = URL.createObjectURL(imageFile);
+
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('Image load failed'));
+        img.src = imageUrl;
+      });
+
+      // Create canvas and draw image (helps with detection)
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Canvas not supported');
+
+      // Scale down if too large (improves detection)
+      const maxDimension = 1000;
+      let width = img.width;
+      let height = img.height;
+      if (width > maxDimension || height > maxDimension) {
+        const ratio = Math.min(maxDimension / width, maxDimension / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+      }
+      canvas.width = width;
+      canvas.height = height;
+      ctx.drawImage(img, 0, 0, width, height);
+
+      // Convert canvas to blob for scanning
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((b) => b ? resolve(b) : reject(new Error('Blob conversion failed')), 'image/jpeg', 0.9);
+      });
+      const processedFile = new File([blob], 'processed.jpg', { type: 'image/jpeg' });
+
+      URL.revokeObjectURL(imageUrl);
+
+      // Try scanning with html5-qrcode
       const html5QrCode = new Html5Qrcode("barcode-scanner-temp", {
         verbose: false,
         formatsToSupport: [
           Html5QrcodeSupportedFormats.EAN_13,
           Html5QrcodeSupportedFormats.EAN_8,
           Html5QrcodeSupportedFormats.UPC_A,
-          Html5QrcodeSupportedFormats.UPC_E
+          Html5QrcodeSupportedFormats.UPC_E,
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39
         ]
       });
 
-      const result = await html5QrCode.scanFile(imageFile, false);
+      const result = await html5QrCode.scanFile(processedFile, true);
 
       // Barcode detected - auto-fill the manual input field
       setManualCode(result);
@@ -53,7 +92,7 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
       html5QrCode.clear();
     } catch (error: any) {
       console.error("Image barcode scan failed:", error);
-      setErrorMsg("バーコードを検出できませんでした。\n\n【コツ】\n・バーコード全体がはっきり写っている画像を使用\n・明るい場所で撮影した画像が認識されやすい\n・下のバーコード番号を直接入力も可能です");
+      setErrorMsg("バーコードを検出できませんでした。\n\n【対処法】\n・バーコードの数字を下の欄に直接入力してください\n・画像は「4903110475118」のような13桁の数字です");
     } finally {
       setIsScanning(false);
       e.target.value = '';
