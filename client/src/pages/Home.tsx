@@ -1,11 +1,15 @@
 import { useEffect, useState } from "react";
+import { useTutorial } from "@/contexts/TutorialContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { db, functions } from "@/lib/firebase";
+import { callGenerateRobot } from "@/lib/functions";
 import { httpsCallable } from "firebase/functions";
 import { collection, doc, getDoc, getDocs } from "firebase/firestore";
-import { Loader2, LogOut, Scan, ShoppingCart, Sword, Trophy } from "lucide-react";
+import { Loader2, LogOut, Scan, ShoppingCart, Sword, Trophy, Zap, ScanBarcode, Swords, HelpCircle } from "lucide-react";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import RobotSVG from "@/components/RobotSVG";
 import { toast } from "sonner";
@@ -16,19 +20,11 @@ import ShareButton from "@/components/ShareButton";
 import TutorialModal from "@/components/TutorialModal";
 import SoundSettings from "@/components/SoundSettings";
 import { useSound } from "@/contexts/SoundContext";
+import { RobotData } from "@/types/shared";
+import AdBanner from "@/components/AdBanner";
+import ThemeSwitcher from "@/components/ThemeSwitcher";
 
-// 型定義（本来は共有型を使うべきだが、簡易的に定義）
-interface RobotData {
-  id: string;
-  name: string;
-  rarityName: string;
-  baseHp: number;
-  baseAttack: number;
-  baseDefense: number;
-  baseSpeed: number;
-  parts: any;
-  colors: any;
-}
+
 
 interface Mission {
   id: string;
@@ -41,6 +37,7 @@ interface Mission {
 
 export default function Home() {
   const { t } = useLanguage();
+  const { completeStep } = useTutorial();
   const { playBGM, playSE } = useSound();
   const { user, logout } = useAuth();
   const [mode, setMode] = useState<'menu' | 'scan' | 'result'>('menu');
@@ -60,8 +57,13 @@ export default function Home() {
   const [followError, setFollowError] = useState<string | null>(null);
   const [isFollowing, setIsFollowing] = useState(false);
 
+  const [robots, setRobots] = useState<RobotData[]>([]);
+  const [robotsLoading, setRobotsLoading] = useState(true);
+  const [showLimitModal, setShowLimitModal] = useState(false);
+  const [limitMessage, setLimitMessage] = useState("");
+
   useEffect(() => {
-    playBGM('bgm_menu');
+    // playBGM('bgm_menu'); // ユーザー要望により起動時の英語アナウンス（BGMに含まれる）を停止
   }, [playBGM]);
 
   useEffect(() => {
@@ -83,9 +85,20 @@ export default function Home() {
       setMissionsLoading(true);
       setMissionsError(null);
       try {
-        const getMissions = httpsCallable(functions, "getDailyMissions");
-        const result = await getMissions();
-        const data = result.data as { dateKey: string; missions: Mission[] };
+        const idToken = await auth.currentUser?.getIdToken();
+        const response = await fetch('/api/getDailyMissions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': idToken ? `Bearer ${idToken}` : '',
+          },
+          body: JSON.stringify({ data: {} }), // Callable format
+        });
+
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        const result = await response.json();
+        const data = result.result as { dateKey: string; missions: Mission[] };
         setMissionDateKey(data.dateKey);
         setMissions(Array.isArray(data.missions) ? data.missions : []);
       } catch (error) {
@@ -106,19 +119,35 @@ export default function Home() {
       }
     };
 
+    const loadRobots = async () => {
+      setRobotsLoading(true);
+      try {
+        const q = collection(db, "users", user.uid, "robots");
+        const snapshot = await getDocs(q);
+        // Simple mapping, might want sorting
+        const robotList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as RobotData));
+        // Sort by level desc or createdAt desc if available
+        // robotList.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)); 
+        setRobots(robotList);
+      } catch (e) {
+        console.error("Failed to load robots:", e);
+      } finally {
+        setRobotsLoading(false);
+      }
+    };
+
     loadData();
     loadMissions();
     loadFollowing();
+    loadRobots();
   }, [user]);
 
   const handleScan = async (barcode: string) => {
     playSE('se_scan');
     setIsGenerating(true);
     try {
-      const generateRobot = httpsCallable(functions, 'generateRobot');
-      const result = await generateRobot({ barcode });
-      const data = result.data as any;
-      
+      const data = await callGenerateRobot(barcode);
+
       if (data?.robot) {
         setRobot(data.robot);
         setMode('result');
@@ -126,9 +155,31 @@ export default function Home() {
       } else {
         toast.error(t('scan_failed'));
       }
-    } catch (error) {
-      console.error(error);
-      toast.error(t('error'));
+    } catch (error: any) {
+      console.error('generateRobot error:', error);
+
+      // Improve error handling based on HttpsError code
+      const code = error?.code;
+      const message = error?.message || 'Unknown error';
+
+      if (code === 'resource-exhausted') {
+        setLimitMessage(message);
+        setShowLimitModal(true);
+        return;
+      }
+
+      let userMessage = "Error: " + message;
+      if (code === 'internal') {
+        userMessage = 'サーバーエラーが発生しました。時間を置いて再度お試しください。(internal)';
+      } else if (code === 'invalid-argument') {
+        userMessage = '無効なバーコードです。(invalid-argument)';
+      } else if (code === 'unauthenticated') {
+        userMessage = '認証エラーです。再度ログインしてください。(unauthenticated)';
+      }
+
+      toast.error(userMessage, {
+        duration: 5000,
+      });
     } finally {
       setIsGenerating(false);
     }
@@ -198,323 +249,235 @@ export default function Home() {
     }
   };
 
+  // Assuming 'loading' is a state variable that indicates overall page loading
+  // For example, you might have: const [loading, setLoading] = useState(true);
+  // and set it to false after all initial data (user, missions, following) is loaded.
+  // For this change, we'll assume 'loading' is defined elsewhere or needs to be added.
+  const loading = missionsLoading || robotsLoading; // Placeholder, replace with actual loading state
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-dark-bg p-4 flex flex-col pb-24 relative overflow-hidden text-foreground">
+        <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-20 pointer-events-none" />
+        <main className="flex-1 w-full max-w-4xl mx-auto space-y-8 relative z-10">
+          <div className="flex justify-between items-center py-4">
+            <Skeleton className="h-16 w-40" />
+            <Skeleton className="h-10 w-24" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Skeleton className="h-32 w-full" />
+            <Skeleton className="h-32 w-full" />
+          </div>
+          <div className="space-y-4">
+            <Skeleton className="h-8 w-32" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {[1, 2, 3, 4].map(i => (
+                <Skeleton key={i} className="h-24 w-full" />
+              ))}
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-background p-4 flex flex-col">
-      {/* Header */}
-      <header className="flex justify-between items-center mb-8">
-        <h1 className="text-2xl font-bold text-primary">{t('app_title')}</h1>
-        <div className="flex items-center gap-4">
-          <SoundSettings />
-          <LanguageSwitcher />
-          <Link href="/profile">
-            <Button variant="ghost" className="text-sm text-muted-foreground hidden sm:inline-flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs">
-                👤
-              </span>
-              {user?.email}
+    <div className="min-h-screen bg-dark-bg p-4 flex flex-col pb-24 relative overflow-hidden text-foreground">
+      <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-20 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/80 pointer-events-none" />
+
+      <main className="flex-1 w-full max-w-4xl mx-auto space-y-8 relative z-10">
+
+        {/* Header Section */}
+        <section className="flex justify-between items-center py-4">
+          <div>
+            <h1 className="text-3xl font-black italic tracking-tighter text-neon-cyan neon-text-cyan">
+              BARCODE<br />GENESIS
+            </h1>
+            <p className="text-xs text-muted-foreground tracking-widest font-orbitron">SYSTEM ONLINE</p>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <div className="text-xs text-muted-foreground font-mono">CREDITS</div>
+              <div className="text-xl font-bold font-orbitron text-neon-yellow">{credits.toLocaleString()}</div>
+            </div>
+            {/* User Avatar or something could go here */}
+            <div className="flex gap-2">
+              <ThemeSwitcher />
+              <SoundSettings />
+              <LanguageSwitcher />
+            </div>
+          </div>
+        </section>
+
+        {/* Action Buttons */}
+        <section className="grid grid-cols-2 gap-4">
+
+          <Link href="/scan">
+            <Button
+              id="tutorial-generate-btn"
+              onClick={() => completeStep('HOME_GENERATE')}
+              className="h-32 w-full flex flex-col gap-2 glass-panel border-neon-cyan hover:bg-neon-cyan/10 transition-all group"
+            >
+              <ScanBarcode className="w-12 h-12 text-neon-cyan group-hover:drop-shadow-[0_0_10px_rgba(0,243,255,0.8)] transition-all" />
+              <span className="font-bold text-lg tracking-wider">GENERATE</span>
             </Button>
           </Link>
-          <Button variant="ghost" size="icon" onClick={() => logout()}>
-            <LogOut className="h-5 w-5" />
-          </Button>
-        </div>
-      </header>
-
-      <main className="flex-1 flex flex-col items-center justify-center gap-8 max-w-4xl mx-auto w-full">
-        <TutorialModal />
-        
-        {mode === 'menu' && (
-          <div className="w-full space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full">
-              <Card 
-                className="cursor-pointer hover:border-primary transition-colors"
-                onClick={() => {
-                  playSE('se_click');
-                  setMode('scan');
-                }}
-              >
-                <CardContent className="flex flex-col items-center justify-center h-64 gap-4">
-                  <div className="p-4 rounded-full bg-primary/10 text-primary">
-                    <Scan className="h-12 w-12" />
-                  </div>
-                  <h2 className="text-2xl font-bold">{t('scan_barcode')}</h2>
-                  <p className="text-muted-foreground text-center">
-                    {t('scan_desc')}
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Link href="/collection" className="w-full" onClick={() => playSE('se_click')}>
-                <Card className="cursor-pointer hover:border-primary transition-colors h-full">
-                  <CardContent className="flex flex-col items-center justify-center h-64 gap-4">
-                    <div className="p-4 rounded-full bg-secondary text-secondary-foreground">
-                      <RobotSVG 
-                        parts={{head:1,face:1,body:1,armLeft:1,armRight:1,legLeft:1,legRight:1,backpack:1,weapon:1,accessory:1}} 
-                        colors={{primary:'#3b82f6',secondary:'#1e40af',accent:'#60a5fa',glow:'#93c5fd'}} 
-                        size={48} 
-                      />
-                    </div>
-                    <h2 className="text-2xl font-bold">{t('collection')}</h2>
-                    <p className="text-muted-foreground text-center">
-                      {t('collection_desc')}
-                    </p>
-                  </CardContent>
-                </Card>
-              </Link>
-
-              <Link href="/shop" className="w-full" onClick={() => playSE('se_click')}>
-                <Card className="cursor-pointer hover:border-primary transition-colors h-full">
-                  <CardContent className="flex flex-col items-center justify-center h-64 gap-4">
-                    <div className="p-4 rounded-full bg-emerald-500/10 text-emerald-500">
-                      <ShoppingCart className="h-12 w-12" />
-                    </div>
-                    <h2 className="text-2xl font-bold">{t('shop')}</h2>
-                    <p className="text-muted-foreground text-center">
-                      {t('shop_desc')}
-                    </p>
-                  </CardContent>
-                </Card>
-              </Link>
-
-              <Link href="/battle" className="w-full" onClick={() => playSE('se_click')}>
-                <Card className="cursor-pointer hover:border-primary transition-colors h-full">
-                  <CardContent className="flex flex-col items-center justify-center h-64 gap-4">
-                    <div className="p-4 rounded-full bg-destructive/10 text-destructive">
-                      <Sword className="h-12 w-12" />
-                    </div>
-                    <h2 className="text-2xl font-bold">{t('battle')}</h2>
-                    <p className="text-muted-foreground text-center">
-                      {t('battle_desc')}
-                    </p>
-                  </CardContent>
-                </Card>
-              </Link>
-
-              <Link href="/leaderboard" className="w-full" onClick={() => playSE('se_click')}>
-                <Card className="cursor-pointer hover:border-primary transition-colors h-full">
-                  <CardContent className="flex flex-col items-center justify-center h-64 gap-4">
-                    <div className="p-4 rounded-full bg-yellow-500/10 text-yellow-500">
-                      <Trophy className="h-12 w-12" />
-                    </div>
-                    <h2 className="text-2xl font-bold">{t('leaderboard')}</h2>
-                    <p className="text-muted-foreground text-center">
-                      {t('leaderboard_desc')}
-                    </p>
-                  </CardContent>
-                </Card>
-              </Link>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Login Bonus</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="text-sm text-muted-foreground">Credits: {credits}</div>
-                  <div className="text-sm text-muted-foreground">
-                    Streak: {loginStreak ?? "-"}
-                  </div>
-                  <Button onClick={handleClaimLoginBonus} disabled={isClaimingLogin}>
-                    {isClaimingLogin && <Loader2 className="h-4 w-4 animate-spin" />}
-                    Claim bonus
-                  </Button>
-                  {loginError && <p className="text-sm text-destructive">{loginError}</p>}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Daily Missions</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {missionsLoading && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Loading missions...
-                    </div>
-                  )}
-                  {!missionsLoading && missions.length === 0 && (
-                    <div className="text-sm text-muted-foreground">No missions yet.</div>
-                  )}
-                  {missions.map((mission) => {
-                    const progress = mission.progress ?? 0;
-                    const target = mission.target ?? 0;
-                    const claimed = mission.claimed ?? false;
-                    const canClaim = !claimed && target > 0 && progress >= target;
-                    return (
-                      <div key={mission.id} className="border rounded p-2 text-sm space-y-1">
-                        <div className="font-medium">{mission.title ?? mission.id}</div>
-                        <div className="text-muted-foreground">
-                          Progress: {progress}/{target} • Reward: {mission.rewardCredits ?? 0} credits
-                        </div>
-                        <Button
-                          size="sm"
-                          onClick={() => handleClaimMission(mission.id)}
-                          disabled={!canClaim || claimingMissionId === mission.id}
-                        >
-                          {claimingMissionId === mission.id && <Loader2 className="h-4 w-4 animate-spin" />}
-                          {claimed ? "Claimed" : "Claim"}
-                        </Button>
-                      </div>
-                    );
-                  })}
-                  {missionsError && <p className="text-sm text-destructive">{missionsError}</p>}
-                </CardContent>
-              </Card>
-            </div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Follow</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <input
-                    value={followTarget}
-                    onChange={(event) => setFollowTarget(event.target.value)}
-                    placeholder="Target UID"
-                    className="border rounded px-3 py-2 bg-background text-sm flex-1"
-                  />
-                  <Button onClick={handleFollow} disabled={isFollowing || !followTarget.trim()}>
-                    {isFollowing && <Loader2 className="h-4 w-4 animate-spin" />}
-                    Follow
-                  </Button>
-                </div>
-                {followError && <p className="text-sm text-destructive">{followError}</p>}
-                <div className="text-sm text-muted-foreground">
-                  Following: {following.length > 0 ? following.join(", ") : "None"}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {mode === 'scan' && (
-          <div className="w-full max-w-md space-y-4">
-            <Button variant="ghost" onClick={() => setMode('menu')}>
-              ← {t('back_to_menu')}
+          <Link href="/battle">
+            <Button className="h-32 w-full flex flex-col gap-2 glass-panel border-neon-pink hover:bg-neon-pink/10 transition-all group">
+              <Swords className="w-12 h-12 text-neon-pink group-hover:drop-shadow-[0_0_10px_rgba(255,0,85,0.8)] transition-all" />
+              <span className="font-bold text-lg tracking-wider">BATTLE</span>
             </Button>
-            
-            {isGenerating ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center h-64 gap-4">
-                  <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                  <p>{t('analyzing')}</p>
-                  <p className="text-sm text-muted-foreground">{t('constructing')}</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <BarcodeScanner onScanSuccess={handleScan} />
-            )}
-          </div>
-        )}
+          </Link>
+        </section>
 
-        {mode === 'result' && robot && (
-          <div className="w-full max-w-2xl space-y-4">
-            <Button variant="ghost" onClick={() => setMode('menu')}>
-              ← {t('back_to_menu')}
-            </Button>
+        {/* Mission Center & Login Bonus */}
+        <section className="glass-panel p-4 rounded-lg border-neon-cyan/30 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-1 bg-neon-cyan/10 border-b border-l border-neon-cyan/30 text-[10px] text-neon-cyan font-mono tracking-tighter">MISSION_CENTER</div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {/* Robot Visual */}
-              <Card className="border-primary/50 bg-primary/5">
-                <CardContent className="flex items-center justify-center p-8">
-                  <RobotSVG 
-                    parts={robot.parts} 
-                    colors={robot.colors} 
-                    size={300} 
-                    className="drop-shadow-2xl"
-                  />
-                </CardContent>
-              </Card>
-
-              {/* Robot Stats */}
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-3xl font-bold">{robot.name}</h2>
-                  <div className="flex gap-2 mt-2">
-                    <span className="px-2 py-1 rounded bg-primary/20 text-primary text-sm font-bold">
-                      {robot.rarityName}
-                    </span>
-                    <span className="px-2 py-1 rounded bg-secondary text-secondary-foreground text-sm font-bold">
-                      {t('level')} 1
-                    </span>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-sm">
-                      <span>{t('hp')}</span>
-                      <span>{robot.baseHp}</span>
-                    </div>
-                    <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-green-500" 
-                        style={{ width: `${(robot.baseHp / 2000) * 100}%` }} 
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-sm">
-                      <span>{t('attack')}</span>
-                      <span>{robot.baseAttack}</span>
-                    </div>
-                    <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-red-500" 
-                        style={{ width: `${(robot.baseAttack / 200) * 100}%` }} 
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-sm">
-                      <span>{t('defense')}</span>
-                      <span>{robot.baseDefense}</span>
-                    </div>
-                    <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-blue-500" 
-                        style={{ width: `${(robot.baseDefense / 200) * 100}%` }} 
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-sm">
-                      <span>{t('speed')}</span>
-                      <span>{robot.baseSpeed}</span>
-                    </div>
-                    <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-yellow-500" 
-                        style={{ width: `${(robot.baseSpeed / 200) * 100}%` }} 
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <Button className="flex-1" size="lg" onClick={() => setMode('menu')}>
-                    {t('save_return')}
-                  </Button>
-                  <ShareButton 
-                    text={t('share_robot_text')
-                      .replace('{name}', robot.name)
-                      .replace('{rarity}', robot.rarityName)
-                      .replace('{power}', String(robot.baseAttack + robot.baseDefense + robot.baseSpeed + robot.baseHp))}
-                    variant="secondary"
-                    size="lg"
-                  />
-                </div>
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded bg-neon-yellow/10 border border-neon-yellow/30 flex items-center justify-center text-neon-yellow">
+                <Trophy className="w-6 h-6" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold font-orbitron tracking-wide text-white">DAILY BONUS</h2>
+                <div className="text-xs text-muted-foreground font-mono">STREAK: {loginStreak || 0} DAYS</div>
               </div>
             </div>
+
+            <Button
+              onClick={handleClaimLoginBonus}
+              disabled={isClaimingLogin}
+              className="bg-neon-yellow text-black hover:bg-neon-yellow/80 font-bold px-8 h-10 shadow-[0_0_15px_rgba(255,215,0,0.3)]"
+            >
+              {isClaimingLogin ? <Loader2 className="w-4 h-4 animate-spin" /> : "CLAIM BONUS"}
+            </Button>
           </div>
-        )}
+
+          <div className="space-y-3">
+            <h3 className="text-xs font-bold text-muted-foreground tracking-widest uppercase mb-2">Active Missions</h3>
+            {missionsLoading ? (
+              <div className="py-4 flex items-center justify-center">
+                <Loader2 className="w-6 h-6 animate-spin text-neon-cyan" />
+              </div>
+            ) : missionsError ? (
+              <div className="py-4 text-xs text-red-400 font-mono">{missionsError}</div>
+            ) : missions.length === 0 ? (
+              <div className="py-4 text-xs text-muted-foreground font-mono">No missions available today.</div>
+            ) : (
+              <div className="grid grid-cols-1 gap-2">
+                {missions.map(mission => (
+                  <div key={mission.id} className="flex items-center justify-between p-3 bg-white/5 border border-white/10 rounded group/mission hover:border-neon-cyan/40 transition-all">
+                    <div className="flex-1">
+                      <div className="text-sm font-bold text-white mb-1">{mission.title || "Daily Mission"}</div>
+                      <div className="w-full h-1.5 bg-black/40 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-neon-cyan transition-all duration-1000"
+                          style={{ width: `${Math.min(100, ((mission.progress || 0) / (mission.target || 1)) * 100)}%` }}
+                        />
+                      </div>
+                      <div className="mt-1 text-[10px] text-muted-foreground font-mono flex justify-between">
+                        <span>PROGRESS: {mission.progress || 0}/{mission.target || 1}</span>
+                        <span className="text-neon-yellow">REWARD: {mission.rewardCredits} CR</span>
+                      </div>
+                    </div>
+
+                    <Button
+                      size="sm"
+                      disabled={mission.claimed || (mission.progress || 0) < (mission.target || 1) || claimingMissionId === mission.id}
+                      onClick={() => handleClaimMission(mission.id)}
+                      className={`ml-4 text-[10px] font-black tracking-tighter ${mission.claimed ? 'bg-white/10 text-white/30' : (mission.progress || 0) >= (mission.target || 1) ? 'bg-neon-cyan text-black hover:bg-neon-cyan/80' : 'bg-black/40 text-white/50 border border-white/10 hover:bg-white/10'}`}
+                    >
+                      {claimingMissionId === mission.id ? <Loader2 className="w-3 h-3 animate-spin" /> : mission.claimed ? "CLAIMED" : "CLAIM"}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+
+        {/* Robot List Preview */}
+        <section>
+          <div className="flex justify-between items-end mb-4 border-b border-white/10 pb-2">
+            <h2 className="text-xl font-bold font-orbitron flex items-center gap-2">
+              <Zap className="w-5 h-5 text-neon-yellow" />
+              YOUR UNIT
+            </h2>
+            <Link href="/collection">
+              <Button variant="link" className="text-neon-cyan h-auto p-0 text-xs">VIEW ALL &gt;</Button>
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {loading ? (
+              <div className="col-span-2 py-8 text-center text-muted-foreground animate-pulse">Scanning database...</div>
+            ) : robots.length === 0 ? (
+              <div className="col-span-2 py-12 text-center glass-panel rounded-lg border-dashed border-white/20">
+                <p className="text-muted-foreground mb-4">No Units Found</p>
+                <Link href="/scan"><Button variant="secondary">Generate First Robot</Button></Link>
+              </div>
+            ) : (
+              robots.slice(0, 4).map(robot => (
+                <Link key={robot.id} href={'/robots/' + robot.id}>
+                  <div className="glass-panel p-3 rounded-lg flex items-center gap-4 hover:border-white/50 transition-all cursor-pointer group">
+                    <RobotSVG parts={robot.parts} colors={robot.colors} size={60} />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-bold truncate text-white group-hover:text-neon-cyan transition-colors">{robot.name}</div>
+                      <div className="text-xs text-muted-foreground font-mono">
+                        Lv.{robot.level || 1} • <span style={{ color: robot.rarityName === 'Legendary' ? '#ffd700' : 'inherit' }}>{robot.rarityName}</span>
+                      </div>
+                    </div>
+                    <div className="text-xs font-mono text-white/50">
+                      HP {robot.baseHp}
+                    </div>
+                  </div>
+                </Link>
+              ))
+            )}
+          </div>
+        </section>
+
+        <AdBanner />
+        <TutorialModal />
+
+        <Dialog open={showLimitModal} onOpenChange={setShowLimitModal}>
+          <DialogContent className="bg-card border-neon-cyan text-foreground">
+            <DialogHeader>
+              <DialogTitle className="text-neon-cyan flex items-center gap-2">
+                <Zap className="h-5 w-5" />
+                GENERATION LIMIT REACHED
+              </DialogTitle>
+              <DialogDescription className="text-muted-foreground pt-4">
+                {limitMessage}
+                <br /><br />
+                アップグレードして制限を解除しませんか？
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="flex-col gap-2 sm:flex-row">
+              <Link href="/premium">
+                <Button className="w-full sm:w-auto bg-neon-yellow text-black hover:bg-neon-yellow/80 font-bold" onClick={() => setShowLimitModal(false)}>
+                  プレミアムプランを見る
+                </Button>
+              </Link>
+              <Button variant="ghost" className="w-full sm:w-auto" onClick={() => setShowLimitModal(false)}>
+                閉じる
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        <div className="mt-8 pb-8 text-center">
+          <p className="text-gray-500 text-xs font-mono">
+            v{import.meta.env.VITE_APP_VERSION || '1.0.0-dev'}
+          </p>
+        </div>
       </main>
     </div>
   );
+
+
 }
+
+

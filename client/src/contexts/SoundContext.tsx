@@ -18,7 +18,7 @@ export function SoundProvider({ children }: { children: React.ReactNode }) {
   const [volume, setVolume] = useState(0.5);
   const [isMuted, setIsMuted] = useState(false);
   const [currentBGM, setCurrentBGM] = useState<'bgm_menu' | 'bgm_battle' | null>(null);
-  
+
   const bgmRef = useRef<HTMLAudioElement | null>(null);
   const seRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
 
@@ -62,10 +62,11 @@ export function SoundProvider({ children }: { children: React.ReactNode }) {
     }
 
     const audio = new Audio(soundPaths[type]);
-    audio.loop = true;
+    // メニューBGMはループ、バトルBGMは1回のみ再生
+    audio.loop = type === 'bgm_menu';
     audio.volume = isMuted ? 0 : volume;
     audio.play().catch(e => console.log('Audio play failed:', e));
-    
+
     bgmRef.current = audio;
     setCurrentBGM(type);
   };

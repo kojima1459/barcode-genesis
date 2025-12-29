@@ -9,7 +9,7 @@ export const translations = {
     loading: "読み込み中...",
     error: "エラーが発生しました",
     success: "成功しました",
-    
+
     // Menu
     scan_barcode: "バーコードスキャン",
     scan_desc: "バーコードからロボットを生成",
@@ -21,14 +21,14 @@ export const translations = {
     leaderboard_desc: "トッププレイヤーを確認",
     shop: "ショップ",
     shop_desc: "アイテムを購入",
-    
+
     // Scan
     back_to_menu: "メニューに戻る",
     analyzing: "バーコードDNAを解析中...",
     constructing: "ロボットフレームを構築中...",
     scan_success: "ロボット生成成功！",
     scan_failed: "ロボット生成に失敗しました",
-    
+
     // Robot Stats
     hp: "HP",
     attack: "攻撃力",
@@ -36,7 +36,7 @@ export const translations = {
     speed: "素早さ",
     level: "Lv.",
     save_return: "保存して戻る",
-    
+
     // Battle
     battle_arena: "バトルアリーナ",
     select_robot: "ロボット選択",
@@ -55,25 +55,25 @@ export const translations = {
     skill_upgraded: "スキル強化",
     turn: "ターン",
     critical: "クリティカル！",
-    
+
     // Collection
     my_robots: "マイロボット",
     total: "合計",
     sort_newest: "新しい順",
     sort_rarity: "レアリティ順",
     sort_level: "レベル順",
-    
+
     // Leaderboard
     top_players: "トッププレイヤー",
     rank: "順位",
     player: "プレイヤー",
     wins: "勝利数",
-    
+
     // Auth
     login_title: "バーコードジェネシスへようこそ",
     login_desc: "Googleアカウントでログインして冒険を始めよう",
     login_google: "Googleでログイン",
-    
+
     // Skills
     skill_power_smash: "パワースマッシュ",
     skill_double_strike: "ダブルストライク",
@@ -83,13 +83,13 @@ export const translations = {
     skill_repair: "修理",
     skill_charge: "チャージ",
     skill_jamming: "ジャミング",
-    
+
     // Share
     share_x: "Xでシェア",
     share_robot_text: "{name} ({rarity}) を生成しました！ 戦闘力: {power}",
     share_battle_win: "{name}が勝利しました！ レベル: {level}",
     share_battle_lose: "{name}は敗北しました...",
-    
+
     // Tutorial
     tutorial_welcome_title: "バーコードジェネシスへようこそ！",
     tutorial_welcome_desc: "この世界では、バーコードから強力なロボットを生成し、戦わせることができます。",
@@ -100,10 +100,27 @@ export const translations = {
     tutorial_step3_title: "3. ランキングを目指せ",
     tutorial_step3_desc: "最強のロボット軍団を作り上げ、ランキング上位を目指しましょう！",
     tutorial_start: "冒険を始める",
-    
+
     // Sound
     sound_settings: "サウンド設定",
     volume: "音量",
+
+    // SEO
+    seo_home_title: "バーコードジェネシス | バーコードから生まれる無限のロボットバトル",
+    seo_home_desc: "身の回りのバーコードをスキャンして、自分だけのオリジナルロボットを生成！世界中のプレイヤーと対決して最強のロボット軍団を作り上げよう。Barcode Battlerの進化系、ここに誕生。",
+    seo_home_keywords: "バーコードスキャン, ロボットバトル, バーコードバトラー, カードゲーム, 多言語, 無料ゲーム, PWA, レトロゲーム進化系",
+
+    seo_battle_title: "バトルアリーナ | バーコードジェネシス",
+    seo_battle_desc: "あなたのロボットをバトルへ！トレーニングモードや世界中のプレイヤーとのオンライン対戦に挑戦しよう。",
+
+    seo_collection_title: "コレクション | バーコードジェネシス",
+    seo_collection_desc: "あなたがスキャンして手に入れたロボットたち。強化、合成、カスタマイズで自分だけの最強部隊を編成。",
+
+    seo_leaderboard_title: "ランキング | バーコードジェネシス",
+    seo_leaderboard_desc: "最強のロボットマスターは誰だ？世界ランクを確認してトップを目指そう。",
+
+    seo_shop_title: "ショップ | バーコードジェネシス",
+    seo_shop_desc: "ロボットを強化するためのアイテムやカスタマイズパーツを手に入れよう。",
   },
   en: {
     // Common
@@ -113,7 +130,7 @@ export const translations = {
     loading: "Loading...",
     error: "An error occurred",
     success: "Success",
-    
+
     // Menu
     scan_barcode: "Scan Barcode",
     scan_desc: "Generate a new robot from any barcode",
@@ -125,14 +142,14 @@ export const translations = {
     leaderboard_desc: "Check top players",
     shop: "Shop",
     shop_desc: "Purchase items",
-    
+
     // Scan
     back_to_menu: "Back to Menu",
     analyzing: "Analyzing barcode DNA...",
     constructing: "Constructing robot frame...",
     scan_success: "Robot generated successfully!",
     scan_failed: "Failed to generate robot",
-    
+
     // Robot Stats
     hp: "HP",
     attack: "Attack",
@@ -140,7 +157,7 @@ export const translations = {
     speed: "Speed",
     level: "Lv.",
     save_return: "Save & Return",
-    
+
     // Battle
     battle_arena: "Battle Arena",
     select_robot: "Select Your Robot",
@@ -159,25 +176,25 @@ export const translations = {
     skill_upgraded: "Skill Upgraded",
     turn: "Turn",
     critical: "CRITICAL!",
-    
+
     // Collection
     my_robots: "My Robots",
     total: "Total",
     sort_newest: "Newest",
     sort_rarity: "Rarity",
     sort_level: "Level",
-    
+
     // Leaderboard
     top_players: "Top Players",
     rank: "Rank",
     player: "Player",
     wins: "Wins",
-    
+
     // Auth
     login_title: "Welcome to Barcode Genesis",
     login_desc: "Sign in with Google to start your adventure",
     login_google: "Sign in with Google",
-    
+
     // Skills
     skill_power_smash: "Power Smash",
     skill_double_strike: "Double Strike",
@@ -187,13 +204,13 @@ export const translations = {
     skill_repair: "Repair",
     skill_charge: "Charge",
     skill_jamming: "Jamming",
-    
+
     // Share
     share_x: "Share on X",
     share_robot_text: "Generated {name} ({rarity})! Power: {power}",
     share_battle_win: "{name} won the battle! Level: {level}",
     share_battle_lose: "{name} lost the battle...",
-    
+
     // Tutorial
     tutorial_welcome_title: "Welcome to Barcode Genesis!",
     tutorial_welcome_desc: "In this world, you can generate powerful robots from barcodes and battle with them.",
@@ -204,9 +221,26 @@ export const translations = {
     tutorial_step3_title: "3. Aim for the Top",
     tutorial_step3_desc: "Build the strongest robot army and climb the leaderboard!",
     tutorial_start: "Start Adventure",
-    
+
     // Sound
     sound_settings: "Sound Settings",
     volume: "Volume",
+
+    // SEO
+    seo_home_title: "Barcode Genesis | Infinite Robot Battles Born from Barcodes",
+    seo_home_desc: "Scan barcodes around you to generate your own unique robots! Battle players worldwide and build the ultimate robot army. The evolution of Barcode Battler is here.",
+    seo_home_keywords: "barcode scan, robot battle, barcode battler, card game, multiplayer, free game, PWA, retro game evolution",
+
+    seo_battle_title: "Battle Arena | Barcode Genesis",
+    seo_battle_desc: "Take your robots to battle! Challenge training mode or online matches with players from around the world.",
+
+    seo_collection_title: "Collection | Barcode Genesis",
+    seo_collection_desc: "The robots you've scanned and collected. Enhance, synthesize, and customize to form your strongest unit.",
+
+    seo_leaderboard_title: "Leaderboard | Barcode Genesis",
+    seo_leaderboard_desc: "Who is the ultimate robot master? Check the global rankings and aim for the top.",
+
+    seo_shop_title: "Shop | Barcode Genesis",
+    seo_shop_desc: "Get items and customization parts to strengthen your robots.",
   }
 };

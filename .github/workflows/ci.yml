@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+
+    # Cache dependencies
+    - name: Cache node modules
+      uses: actions/cache@v3
+      id: npm-cache
+      with:
+        path: |
+          **/node_modules
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+
+    # Install Client Dependencies
+    - name: Install Client dependencies
+      run: |
+        cd client
+        npm ci
+
+    # Install Functions Dependencies
+    - name: Install Functions dependencies
+      run: |
+        cd functions
+        npm ci
+
+    # Helper: Check Types matches
+    # (Optional: run custom script to ensure types/shared.ts is consistent)
+
+    # Build Functions (Type Check)
+    - name: Build Functions
+      run: |
+        cd functions
+        npm run build
+
+    # Build Client
+    - name: Build Client
+      run: |
+        cd client
+        npm run build
+
+    # Run Tests (if configured)
+    # - name: Run Tests
+    #   run: |
+    #     cd client
+    #     npm test
+
+    # Lint
+    # - name: Lint
+    #   run: |
+    #     cd client
+    #     npm run lint

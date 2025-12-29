@@ -1,4 +1,4 @@
-import { RobotData, Skill } from "./types";
+import { RobotData, Skill, BattleResult, BattleLog } from "./types";
 import { getSkillById } from "./skills";
 import { SeededRandom } from "./seededRandom";
 
@@ -18,30 +18,7 @@ const resolveSkills = (skills: RobotData["skills"]): Skill[] => {
   return resolved;
 };
 
-interface BattleLog {
-  turn: number;
-  attackerId: string;
-  defenderId: string;
-  action: 'attack' | 'skill';
-  skillName?: string;
-  damage: number;
-  isCritical: boolean;
-  attackerHp: number;
-  defenderHp: number;
-  message: string;
-}
 
-interface BattleResult {
-  winnerId: string;
-  loserId: string;
-  logs: BattleLog[];
-  rewards: {
-    exp: number;
-    coins: number;
-    newSkill?: string;
-    upgradedSkill?: string;
-  };
-}
 
 const MAX_TURNS = 30;
 const toDamage = (value: number): number => Math.max(1, Math.floor(value));
@@ -60,7 +37,12 @@ const getElementMultiplier = (attacker: RobotData, defender: RobotData): number 
   return 1;
 };
 
-export const simulateBattle = (robot1: RobotData, robot2: RobotData, battleId?: string): BattleResult => {
+export const simulateBattle = (
+  robot1: RobotData,
+  robot2: RobotData,
+  battleId?: string,
+  robot1Items: string[] = []
+): BattleResult => {
   let hp1 = robot1.baseHp;
   let hp2 = robot2.baseHp;
   const logs: BattleLog[] = [];
@@ -69,7 +51,20 @@ export const simulateBattle = (robot1: RobotData, robot2: RobotData, battleId?: 
   const robot2Skills = resolveSkills(robot2.skills);
   const rng = new SeededRandom(battleId ?? `${robot1.id ?? "robot1"}-${robot2.id ?? "robot2"}`);
 
-  // 素早さで先攻後攻を決定
+  // アイテム使用フラグ
+  let usedRepairKit = false;
+
+  // ステータス補正関数
+  const getStat = (robot: RobotData, stat: 'baseAttack' | 'baseDefense') => {
+    let val = robot[stat];
+    if (robot.id === robot1.id) {
+      if (stat === 'baseAttack' && robot1Items.includes('attack_boost')) val *= 1.2;
+      if (stat === 'baseDefense' && robot1Items.includes('defense_boost')) val *= 1.2;
+    }
+    return Math.floor(val);
+  };
+
+  // 素早さで先攻後攻を決定（スピードチップ等の永続強化は既にrobot1に反映されている前提）
   let attacker = robot1.baseSpeed >= robot2.baseSpeed ? robot1 : robot2;
   let defender = robot1.baseSpeed >= robot2.baseSpeed ? robot2 : robot1;
   let attackerHp = robot1.baseSpeed >= robot2.baseSpeed ? hp1 : hp2;
@@ -79,12 +74,38 @@ export const simulateBattle = (robot1: RobotData, robot2: RobotData, battleId?: 
 
   // 最大30ターンで決着をつける
   while (hp1 > 0 && hp2 > 0 && turn <= MAX_TURNS) {
+    // Repair Kit チェック (Robot 1 only) - ターン開始時に発動
+    if (robot1Items.includes('repair_kit') && !usedRepairKit && hp1 < robot1.baseHp * 0.5) {
+      const healAmount = Math.floor(robot1.baseHp * 0.3);
+      hp1 = Math.min(robot1.baseHp, hp1 + healAmount);
+      usedRepairKit = true;
+
+      logs.push({
+        turn,
+        attackerId: robot1.id!,
+        defenderId: robot1.id!,
+        action: 'item',
+        damage: 0,
+        isCritical: false,
+        attackerHp: hp1,
+        defenderHp: hp2,
+        message: `${robot1.name} uses Repair Kit! Recovered ${healAmount} HP!`
+      });
+
+      // HP更新
+      if (attacker.id === robot1.id) attackerHp = hp1;
+      else defenderHp = hp1;
+    }
+
     let damage = 0;
     let isCritical = false;
     let action: 'attack' | 'skill' = 'attack';
     let skillName = undefined;
     let message = "";
     const elementMultiplier = getElementMultiplier(attacker, defender);
+
+    const atk = getStat(attacker, 'baseAttack');
+    const def = getStat(defender, 'baseDefense');
 
     // スキル発動判定
     let skill: Skill | null = null;
@@ -100,10 +121,10 @@ export const simulateBattle = (robot1: RobotData, robot2: RobotData, battleId?: 
     if (skill) {
       action = 'skill';
       skillName = skill.name;
-      
+
       switch (skill.type) {
         case 'attack':
-          const baseDamage = Math.max(1, attacker.baseAttack - (defender.baseDefense / 2));
+          const baseDamage = Math.max(1, atk - (def / 2));
           damage = toDamage(baseDamage * skill.power * elementMultiplier);
           message = `${attacker.name} uses ${skill.name}! Dealt ${damage} damage!`;
           break;
@@ -120,17 +141,23 @@ export const simulateBattle = (robot1: RobotData, robot2: RobotData, battleId?: 
           damage = 0;
           break;
         default: // defense, buff, debuff (簡易実装: ダメージボーナス)
-          const bonusDamage = Math.floor(attacker.baseAttack * 0.5);
+          const bonusDamage = Math.floor(atk * 0.5);
           damage = toDamage(bonusDamage * elementMultiplier);
           message = `${attacker.name} uses ${skill.name}! Dealt ${damage} damage!`;
           break;
       }
     } else {
       // 通常攻撃
-      const baseDamage = Math.max(1, attacker.baseAttack - (defender.baseDefense / 2));
+      const baseDamage = Math.max(1, atk - (def / 2));
       const multiplier = 0.8 + rng.next() * 0.4;
-      isCritical = rng.next() < 0.1;
-      
+
+      // クリティカル判定
+      let critChance = 0.1;
+      if (attacker.id === robot1.id && robot1Items.includes('critical_lens')) {
+        critChance = 0.2;
+      }
+      isCritical = rng.next() < critChance;
+
       damage = toDamage(baseDamage * multiplier * elementMultiplier);
       if (isCritical) damage = toDamage(damage * 1.5);
       message = `${attacker.name} attacks ${defender.name} for ${damage} damage!`;

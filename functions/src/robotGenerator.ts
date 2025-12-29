@@ -1,8 +1,23 @@
 import { RobotData, RobotParts, RobotColors } from './types';
 
 // 定数定義
-const RARITY_NAMES = ["Common", "Uncommon", "Rare", "Epic", "Legendary"];
-const ELEMENT_NAMES = ["Fire", "Water", "Wind", "Earth", "Light", "Dark", "Machine"];
+const RARITY_NAMES = ["ノーマル", "レア", "スーパーレア", "ウルトラレア", "レジェンド"];
+const ELEMENT_NAMES = ["ファイア", "アクア", "ウィンド", "アース", "ライト", "ダーク", "メカ"];
+
+// 名前パーツ（小中学生向けのかっこいい名前）
+const NAME_PREFIXES = [
+  "ゴースト", "サンダー", "ブレイズ", "シャドウ", "ストーム",
+  "フレア", "アイス", "ダーク", "ライト", "メタル",
+  "ドラゴン", "ファントム", "サイバー", "ネオ", "アルファ",
+  "オメガ", "ゼロ", "プライム", "マックス", "ギガ"
+];
+const NAME_SUFFIXES = [
+  "ナイト", "マスター", "キング", "エース", "ウォリアー",
+  "ハンター", "ブレイカー", "バスター", "ライダー", "ファイター",
+  "セイバー", "ガーディアン", "ストライカー", "シューター", "ドライバー",
+  "ブレイド", "ウイング", "スター", "クロス", "ビート"
+];
+
 const BARCODE_PATTERN = /^\d{13}$/;
 
 export class InvalidBarcodeError extends Error {
@@ -104,7 +119,7 @@ function selectParts(digits: number[]): RobotParts {
 function generateColors(digits: number[]): RobotColors {
   // ベース色相 (0-360)
   const baseHue = ((digits[10] * 10 + digits[11]) * 3.6) % 360;
-  
+
   // HSL to HEX helper
   const hslToHex = (h: number, s: number, l: number): string => {
     l /= 100;
@@ -116,7 +131,7 @@ function generateColors(digits: number[]): RobotColors {
     };
     return `#${f(0)}${f(8)}${f(4)}`;
   };
-  
+
   return {
     primary: hslToHex(baseHue, 70, 50),
     secondary: hslToHex((baseHue + 180) % 360, 60, 40), // 補色
@@ -128,7 +143,7 @@ function generateColors(digits: number[]): RobotColors {
 // メイン生成関数
 export function generateRobotData(barcode: string, userId: string): RobotData {
   const digits = parseBarcode(barcode);
-  
+
   const rarity = calculateRarity(digits);
   const stats = calculateStats(digits, rarity);
   const element = calculateElement(digits);
@@ -136,26 +151,28 @@ export function generateRobotData(barcode: string, userId: string): RobotData {
   const colors = generateColors(digits);
   // スキルはWeek4で継承に移行するため初期は空
   const skills: string[] = [];
-  
-  // 名前生成 (簡易版: 属性 + レアリティ + IDの一部)
-  const name = `${element.name} ${RARITY_NAMES[rarity-1]} Unit-${barcode.slice(-4)}`;
-  
+
+  // 名前生成（かっこいい日本語名）
+  const prefixIndex = (digits[0] + digits[1]) % NAME_PREFIXES.length;
+  const suffixIndex = (digits[2] + digits[3]) % NAME_SUFFIXES.length;
+  const name = `${NAME_PREFIXES[prefixIndex]}${NAME_SUFFIXES[suffixIndex]}`;
+
   return {
     userId,
     name,
     sourceBarcode: barcode,
-    
+
     rarity,
-    rarityName: RARITY_NAMES[rarity-1],
+    rarityName: RARITY_NAMES[rarity - 1],
     ...stats,
     elementType: element.id,
     elementName: element.name,
-    
+
     level: 1,
     xp: 0,
     experience: 0,
     experienceToNext: 100,
-    
+
     parts,
     colors,
     skills,
@@ -163,7 +180,7 @@ export function generateRobotData(barcode: string, userId: string): RobotData {
       slot1: null,
       slot2: null
     },
-    
+
     totalBattles: 0,
     totalWins: 0,
     isFavorite: false

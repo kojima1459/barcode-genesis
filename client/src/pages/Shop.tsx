@@ -2,12 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import { httpsCallable } from "firebase/functions";
 import { collection, doc, getDoc, getDocs } from "firebase/firestore";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, Zap, Sword, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { db, functions } from "@/lib/firebase";
-import { SHOP_ITEMS } from "@/lib/items";
+import { SHOP_ITEMS, ShopItemCategory, getCategoryLabel } from "@/lib/items";
 import { PRODUCTS } from "../../../shared/products";
 import { toast } from "sonner";
 
@@ -17,7 +18,15 @@ const getErrorMessage = (error: unknown) => {
   if (error && typeof error === "object" && "message" in error) {
     return String((error as { message?: unknown }).message);
   }
-  return "Purchase failed";
+  return "購入に失敗しました";
+};
+
+const CategoryIcon = ({ category }: { category: ShopItemCategory }) => {
+  switch (category) {
+    case 'boost': return <Zap className="w-4 h-4" />;
+    case 'battle': return <Sword className="w-4 h-4" />;
+    case 'cosmetic': return <Sparkles className="w-4 h-4" />;
+  }
 };
 
 export default function Shop() {
@@ -57,7 +66,7 @@ export default function Shop() {
         setInventory(nextInventory);
       } catch (error) {
         console.error("Failed to load shop data:", error);
-        toast.error("Failed to load shop");
+        toast.error("ショップの読み込みに失敗しました");
       } finally {
         setLoading(false);
       }
@@ -101,7 +110,7 @@ export default function Shop() {
         ...prev,
         [data.inventoryDelta.itemId]: data.inventoryDelta.totalQty
       }));
-      toast.success("Purchase complete");
+      toast.success("購入完了！");
     } catch (error) {
       console.error("Purchase failed:", error);
       const message = getErrorMessage(error);
@@ -109,6 +118,59 @@ export default function Shop() {
     } finally {
       setPurchasingItemId(null);
     }
+  };
+
+  const categories: ShopItemCategory[] = ['boost', 'battle', 'cosmetic'];
+
+  const renderItems = (category: ShopItemCategory) => {
+    const items = SHOP_ITEMS.filter(item => item.category === category);
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {items.map((item) => (
+          <Card key={item.id} className="hover:border-primary/50 transition-colors">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <CategoryIcon category={item.category} />
+                {item.nameJa}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">{item.descriptionJa}</p>
+              <div className="flex justify-between items-center text-sm">
+                <span className="font-bold text-primary">{item.price} クレジット</span>
+                <span className="text-muted-foreground">所持: {inventory[item.id] ?? 0}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <select
+                  value={purchaseQty[item.id] ?? 1}
+                  onChange={(event) =>
+                    setPurchaseQty((prev) => ({
+                      ...prev,
+                      [item.id]: Number(event.target.value)
+                    }))
+                  }
+                  className="border rounded px-2 py-1 bg-background text-sm"
+                >
+                  {qtyOptions.map((qty) => (
+                    <option key={qty} value={qty}>
+                      x{qty}
+                    </option>
+                  ))}
+                </select>
+                <Button
+                  onClick={() => handlePurchase(item.id)}
+                  disabled={purchasingItemId === item.id || credits < item.price * (purchaseQty[item.id] ?? 1)}
+                  size="sm"
+                >
+                  {purchasingItemId === item.id && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+                  購入
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
   };
 
   if (loading) {
@@ -120,22 +182,24 @@ export default function Shop() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-4 flex flex-col">
+    <div className="min-h-screen bg-background p-4 flex flex-col pb-24">
       <header className="flex items-center mb-6 max-w-4xl mx-auto w-full">
         <Link href="/">
           <Button variant="ghost" className="mr-4">
             <ArrowLeft className="h-5 w-5 mr-2" />
-            Back
+            戻る
           </Button>
         </Link>
-        <h1 className="text-2xl font-bold text-primary">Shop</h1>
-        <div className="ml-auto text-sm text-muted-foreground">Credits: {credits}</div>
+        <h1 className="text-2xl font-bold text-primary">ショップ</h1>
+        <div className="ml-auto text-sm font-bold bg-primary/10 text-primary px-3 py-1 rounded-full">
+          💰 {credits} クレジット
+        </div>
       </header>
 
       <main className="flex-1 max-w-4xl mx-auto w-full space-y-8">
         {/* Coin Shop Section */}
         <section>
-          <h2 className="text-xl font-bold mb-4 text-primary">Buy Coins</h2>
+          <h2 className="text-xl font-bold mb-4 text-primary">コイン購入</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {PRODUCTS.map((product) => (
               <Card key={product.id} className="border-primary/20">
@@ -164,48 +228,26 @@ export default function Shop() {
           </div>
         </section>
 
-        {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
-        <h2 className="text-xl font-bold text-primary">Item Shop</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {SHOP_ITEMS.map((item) => (
-            <Card key={item.id}>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg">{item.name}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="text-sm text-muted-foreground">Price: {item.price}</div>
-                <div className="text-sm text-muted-foreground">
-                  Owned: {inventory[item.id] ?? 0}
-                </div>
-                <div className="flex items-center gap-2">
-                  <select
-                    value={purchaseQty[item.id] ?? 1}
-                    onChange={(event) =>
-                      setPurchaseQty((prev) => ({
-                        ...prev,
-                        [item.id]: Number(event.target.value)
-                      }))
-                    }
-                    className="border rounded px-2 py-1 bg-background text-sm"
-                  >
-                    {qtyOptions.map((qty) => (
-                      <option key={qty} value={qty}>
-                        x{qty}
-                      </option>
-                    ))}
-                  </select>
-                  <Button
-                    onClick={() => handlePurchase(item.id)}
-                    disabled={purchasingItemId === item.id}
-                  >
-                    {purchasingItemId === item.id && <Loader2 className="h-4 w-4 animate-spin" />}
-                    Buy
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        {errorMessage && <p className="text-sm text-destructive bg-destructive/10 p-2 rounded">{errorMessage}</p>}
+
+        <section>
+          <h2 className="text-xl font-bold mb-4 text-primary">アイテムショップ</h2>
+          <Tabs defaultValue="boost" className="w-full">
+            <TabsList className="w-full grid grid-cols-3">
+              {categories.map(cat => (
+                <TabsTrigger key={cat} value={cat} className="flex items-center gap-2">
+                  <CategoryIcon category={cat} />
+                  {getCategoryLabel(cat)}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+            {categories.map(cat => (
+              <TabsContent key={cat} value={cat} className="mt-4">
+                {renderItems(cat)}
+              </TabsContent>
+            ))}
+          </Tabs>
+        </section>
       </main>
     </div>
   );

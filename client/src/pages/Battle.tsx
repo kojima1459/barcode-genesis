@@ -4,56 +4,25 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
 import { db, functions } from "@/lib/firebase";
-import { collection, collectionGroup, getDocs, query, orderBy, limit, where } from "firebase/firestore";
+import { collection, collectionGroup, getDocs, query, orderBy, limit, where, onSnapshot } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
-import { ArrowLeft, Loader2, Sword, Trophy, Search, Star } from "lucide-react";
+import { ArrowLeft, Loader2, Sword, Trophy, Search, Star, Wifi, Users, X } from "lucide-react";
 import RobotSVG from "@/components/RobotSVG";
+import { ElementalBurst, SkillCutIn } from "@/components/BattleEffects";
 import { Link } from "wouter";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { RobotData, BattleResult } from "@/types/shared";
 import ShareButton from "@/components/ShareButton";
 import { useSound } from "@/contexts/SoundContext";
+import { getItemLabel } from "@/lib/items";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { motion, AnimatePresence } from "framer-motion";
+import { Zap, Shield, Heart } from "lucide-react";
+import SEO from "@/components/SEO";
 
-interface RobotData {
-  id: string;
-  name: string;
-  rarityName: string;
-  baseHp: number;
-  baseAttack: number;
-  baseDefense: number;
-  baseSpeed: number;
-  parts: any;
-  colors: any;
-  level?: number;
-  xp?: number;
-  exp?: number;
-  wins?: number;
-}
 
-interface BattleLog {
-  turn: number;
-  attackerId: string;
-  defenderId: string;
-  action: string;
-  damage: number;
-  isCritical: boolean;
-  attackerHp: number;
-  defenderHp: number;
-  message: string;
-}
-
-interface BattleResult {
-  winnerId: string;
-  loserId: string;
-  logs: BattleLog[];
-  rewards: {
-    exp: number;
-    coins: number;
-    newSkill?: string; // Name of new skill
-    upgradedSkill?: string; // Name of upgraded skill
-  };
-}
 
 export default function Battle() {
   const { t } = useLanguage();
@@ -63,13 +32,79 @@ export default function Battle() {
   const [loading, setLoading] = useState(true);
   const [selectedRobotId, setSelectedRobotId] = useState<string | null>(null);
   const [enemyRobotId, setEnemyRobotId] = useState<string | null>(null);
+  const [inventory, setInventory] = useState<Record<string, number>>({});
+  const [selectedItemId, setSelectedItemId] = useState<string>("");
   const [battleResult, setBattleResult] = useState<BattleResult | null>(null);
   const [currentLogIndex, setCurrentLogIndex] = useState(-1);
   const [isBattling, setIsBattling] = useState(false);
+  const [damagePopups, setDamagePopups] = useState<{ id: string; value: number; isCritical: boolean; x: number; y: number }[]>([]);
+  const [shaking, setShaking] = useState<string | null>(null); // robotId that is shaking (taking damage)
 
   const [enemyRobots, setEnemyRobots] = useState<RobotData[]>([]);
   const [friendId, setFriendId] = useState("");
   const [isSearching, setIsSearching] = useState(false);
+  const [isTrainingMode, setIsTrainingMode] = useState(false);
+
+  // Online Matchmaking state
+  const [battleMode, setBattleMode] = useState<'battle' | 'training' | 'online'>('battle');
+  const [isMatchmaking, setIsMatchmaking] = useState(false);
+  const [queueId, setQueueId] = useState<string | null>(null);
+  const [matchmakingStatus, setMatchmakingStatus] = useState<string>('');
+
+  // Overload (battle intervention) state
+  const [hasUsedOverload, setHasUsedOverload] = useState(false);
+  const [isOverloadActive, setIsOverloadActive] = useState(false);
+  const [overloadFlash, setOverloadFlash] = useState(false);
+
+  // Visual effects state
+  const [activeEffect, setActiveEffect] = useState<{ element: string; x: number; y: number } | null>(null);
+  const [activeCutIn, setActiveCutIn] = useState<{ skillName: string; robotId: string } | null>(null);
+
+  // Resume loop helper for cut-ins
+  const startResumeLoop = (startIndex: number, result: BattleResult) => {
+    let index = startIndex;
+    const interval = setInterval(() => {
+      if (index >= result.logs.length) {
+        clearInterval(interval);
+        setIsBattling(false);
+        return;
+      }
+      setCurrentLogIndex(index);
+      const log = result.logs[index];
+
+      if (log.damage > 0) {
+        playSE('se_attack');
+        setShaking(log.defenderId);
+        setTimeout(() => setShaking(null), 500);
+
+        setDamagePopups(prev => [
+          ...prev,
+          {
+            id: index + "-" + Math.random(),
+            value: log.damage,
+            isCritical: log.isCritical,
+            x: Math.random() * 40 - 20,
+            y: -50
+          }
+        ]);
+        setTimeout(() => {
+          setDamagePopups(prev => prev.slice(1));
+        }, 1000);
+      }
+
+      if (log.skillName) {
+        clearInterval(interval);
+        setActiveCutIn({ skillName: log.skillName, robotId: log.attackerId });
+        setTimeout(() => {
+          setActiveCutIn(null);
+          startResumeLoop(index + 1, result);
+        }, 1500);
+        return;
+      }
+
+      index++;
+    }, 1200);
+  };
 
   // 自分のロボット一覧取得
   useEffect(() => {
@@ -95,6 +130,19 @@ export default function Battle() {
     loadRandomOpponents();
   }, [user]);
 
+  // インベントリ監視
+  useEffect(() => {
+    if (!user) return;
+    const unsub = onSnapshot(collection(db, "users", user.uid, "inventory"), (snapshot) => {
+      const inv: Record<string, number> = {};
+      snapshot.docs.forEach(doc => {
+        inv[doc.id] = doc.data().qty;
+      });
+      setInventory(inv);
+    });
+    return () => unsub();
+  }, [user]);
+
   const loadRandomOpponents = async () => {
     if (!user) return;
     try {
@@ -102,7 +150,7 @@ export default function Battle() {
       // collectionGroupを使って全ユーザーのロボットを取得
       const q = query(collectionGroup(db, "robots"), orderBy("createdAt", "desc"), limit(20));
       const snapshot = await getDocs(q);
-      
+
       const data: RobotData[] = [];
       snapshot.forEach(doc => {
         // 自分のロボットは除外（親のパスに自分のUIDが含まれているかチェック）
@@ -110,7 +158,7 @@ export default function Battle() {
           data.push({ id: doc.id, ...doc.data() } as RobotData);
         }
       });
-      
+
       setEnemyRobots(data);
     } catch (error) {
       console.error("Error fetching enemies:", error);
@@ -121,19 +169,19 @@ export default function Battle() {
     if (!friendId.trim()) return;
     setIsSearching(true);
     setEnemyRobots([]); // Clear current list
-    
+
     try {
       // Search robots by userId
       // Note: collectionGroup queries by field require an index
       const robotsRef = collectionGroup(db, 'robots');
       const q = query(robotsRef, where('userId', '==', friendId.trim()));
       const snapshot = await getDocs(q);
-      
+
       const friendRobots: RobotData[] = [];
       snapshot.forEach(doc => {
         friendRobots.push({ id: doc.id, ...doc.data() } as RobotData);
       });
-      
+
       if (friendRobots.length === 0) {
         toast.error("No robots found for this User ID");
         // Fallback to random opponents
@@ -151,31 +199,211 @@ export default function Battle() {
     }
   };
 
+  // Online matchmaking functions
+  const startMatchmaking = async () => {
+    if (!selectedRobotId) {
+      toast.error('ロボットを選択してください');
+      return;
+    }
+
+    setIsMatchmaking(true);
+    setMatchmakingStatus('対戦相手を探しています...');
+
+    try {
+      const joinMatchmaking = httpsCallable(functions, 'joinMatchmaking');
+      const result = await joinMatchmaking({ robotId: selectedRobotId });
+      const data = result.data as { status: string; queueId?: string; battleId?: string; opponent?: any };
+
+      if (data.status === 'matched') {
+        setMatchmakingStatus('マッチング成功！');
+        toast.success(`対戦相手が見つかりました: ${data.opponent?.name || 'Unknown'}`);
+        // TODO: Navigate to online battle or use existing battle system
+        setIsMatchmaking(false);
+        setBattleMode('battle');
+      } else if (data.status === 'waiting') {
+        setQueueId(data.queueId || null);
+        setMatchmakingStatus('対戦相手を待っています...');
+        // Start polling
+        pollMatchStatus(data.queueId!);
+      }
+    } catch (error) {
+      console.error('Matchmaking failed:', error);
+      toast.error('マッチメイキングに失敗しました');
+      setIsMatchmaking(false);
+    }
+  };
+
+  const pollMatchStatus = async (qId: string) => {
+    const checkMatchStatus = httpsCallable(functions, 'checkMatchStatus');
+
+    const poll = async () => {
+      try {
+        const result = await checkMatchStatus({ queueId: qId });
+        const data = result.data as { status: string; battleId?: string; opponent?: any };
+
+        if (data.status === 'matched') {
+          setMatchmakingStatus('マッチング成功！');
+          toast.success('対戦相手が見つかりました！');
+          setIsMatchmaking(false);
+          setQueueId(null);
+          // TODO: Start battle with opponent
+        } else if (data.status === 'timeout' || data.status === 'expired') {
+          setMatchmakingStatus('タイムアウト');
+          toast.error('マッチング相手が見つかりませんでした');
+          setIsMatchmaking(false);
+          setQueueId(null);
+        } else if (data.status === 'waiting' && isMatchmaking) {
+          // Continue polling
+          setTimeout(poll, 2000);
+        }
+      } catch (error) {
+        console.error('Poll error:', error);
+        setIsMatchmaking(false);
+      }
+    };
+
+    poll();
+  };
+
+  const cancelMatchmaking = async () => {
+    try {
+      const leaveMatchmaking = httpsCallable(functions, 'leaveMatchmaking');
+      await leaveMatchmaking({ queueId });
+    } catch (error) {
+      console.error('Leave matchmaking error:', error);
+    }
+    setIsMatchmaking(false);
+    setQueueId(null);
+    setMatchmakingStatus('');
+    toast('マッチメイキングをキャンセルしました');
+  };
+
+  // ローカルバトルシミュレーション（トレーニングモード用）
+  const simulateLocalBattle = (attacker: RobotData, defender: RobotData): BattleResult => {
+    const logs: BattleLog[] = [];
+    let attackerHp = attacker.baseHp;
+    let defenderHp = defender.baseHp;
+    let turn = 1;
+    const maxTurns = 20;
+
+    // 先攻決定（スピードが高い方が先攻）
+    const attackerFirst = attacker.baseSpeed >= defender.baseSpeed;
+    const [first, second] = attackerFirst ? [attacker, defender] : [defender, attacker];
+    let firstHp = attackerFirst ? attackerHp : defenderHp;
+    let secondHp = attackerFirst ? defenderHp : attackerHp;
+
+    while (firstHp > 0 && secondHp > 0 && turn <= maxTurns) {
+      // 先攻の攻撃
+      const firstDamage = Math.max(1, first.baseAttack - Math.floor(second.baseDefense / 2) + Math.floor(Math.random() * 10));
+      const firstCrit = Math.random() < 0.1;
+      const actualFirstDamage = firstCrit ? firstDamage * 2 : firstDamage;
+      secondHp = Math.max(0, secondHp - actualFirstDamage);
+      logs.push({
+        turn,
+        attackerId: first.id,
+        defenderId: second.id,
+        action: 'attack',
+        damage: actualFirstDamage,
+        isCritical: firstCrit,
+        attackerHp: firstHp,
+        defenderHp: secondHp,
+        message: `${first.name} の攻撃！ ${second.name} に ${actualFirstDamage} ダメージ！`
+      });
+
+      if (secondHp <= 0) break;
+
+      // 後攻の攻撃
+      const secondDamage = Math.max(1, second.baseAttack - Math.floor(first.baseDefense / 2) + Math.floor(Math.random() * 10));
+      const secondCrit = Math.random() < 0.1;
+      const actualSecondDamage = secondCrit ? secondDamage * 2 : secondDamage;
+      firstHp = Math.max(0, firstHp - actualSecondDamage);
+      logs.push({
+        turn,
+        attackerId: second.id,
+        defenderId: first.id,
+        action: 'attack',
+        damage: actualSecondDamage,
+        isCritical: secondCrit,
+        attackerHp: secondHp,
+        defenderHp: firstHp,
+        message: `${second.name} の攻撃！ ${first.name} に ${actualSecondDamage} ダメージ！`
+      });
+
+      turn++;
+    }
+
+    const winnerId = firstHp > 0 ? first.id : second.id;
+    const loserId = firstHp > 0 ? second.id : first.id;
+
+    return {
+      winnerId,
+      loserId,
+      logs,
+      rewards: { exp: 0, coins: 0 } // トレーニングでは報酬なし
+    };
+  };
+
   // バトル開始
   const startBattle = async () => {
     if (!selectedRobotId || !enemyRobotId) return;
-    
+
     playBGM('bgm_battle');
     setIsBattling(true);
     setBattleResult(null);
     setCurrentLogIndex(-1);
 
+    // トレーニングモードの場合はローカルシミュレーション
+    if (isTrainingMode) {
+      const myRobot = robots.find(r => r.id === selectedRobotId);
+      const enemyRobot = robots.find(r => r.id === enemyRobotId);
+      if (!myRobot || !enemyRobot) {
+        toast.error("ロボットが見つかりません");
+        setIsBattling(false);
+        return;
+      }
+
+      const result = simulateLocalBattle(myRobot, enemyRobot);
+      setBattleResult(result);
+      playBattleLogs(result.logs);
+
+      const animationDuration = result.logs.length * 1000 + 500;
+      setTimeout(() => {
+        if (result.winnerId === selectedRobotId) {
+          playSE('se_win');
+        } else {
+          playSE('se_lose');
+        }
+      }, animationDuration);
+      return;
+    }
+
+    // 通常対戦モード
     try {
-      const startBattleFn = httpsCallable(functions, 'startBattle');
-      const result = await startBattleFn({ myRobotId: selectedRobotId, enemyRobotId });
+      const matchBattleFn = httpsCallable(functions, 'matchBattle');
+      const result = await matchBattleFn({
+        playerRobotId: selectedRobotId,
+        useItemId: (!isTrainingMode && selectedItemId) ? selectedItemId : undefined
+      });
       const data = result.data as any;
-      
-      if (data.success) {
-        setBattleResult(data.result);
+
+      if (data.battleId) {
+        // matchBattle returns different structure
+        const battleResult: BattleResult = {
+          winnerId: data.result.winner === 'player' ? selectedRobotId : enemyRobotId!,
+          loserId: data.result.winner === 'player' ? enemyRobotId! : selectedRobotId,
+          logs: data.result.log || [],
+          rewards: data.rewards || { exp: data.experienceGained || 0, coins: 0 }
+        };
+        setBattleResult(battleResult);
         // ログ再生開始
-        playBattleLogs(data.result.logs);
-        
+        playBattleLogs(battleResult.logs);
+
         // 結果SE予約（アニメーション終了後）
-        const animationDuration = data.result.logs.length * 1000 + 500;
+        const animationDuration = battleResult.logs.length * 1000 + 500;
         setTimeout(() => {
-          if (data.result.winnerId === selectedRobotId) {
+          if (battleResult.winnerId === selectedRobotId) {
             playSE('se_win');
-            if (data.result.rewards.newSkill || data.result.rewards.upgradedSkill) {
+            if (battleResult.rewards.newSkill || battleResult.rewards.upgradedSkill) {
               setTimeout(() => playSE('se_levelup'), 1500);
             }
           } else {
@@ -195,23 +423,81 @@ export default function Battle() {
   };
 
   // ログ再生アニメーション
-  const playBattleLogs = (logs: BattleLog[]) => {
+  const playBattleLogs = (result: BattleResult) => {
     let index = 0;
     const interval = setInterval(() => {
+      // Check interval end
+      if (index >= result.logs.length) {
+        clearInterval(interval);
+        const finalWinnerId = result.winnerId;
+        if (finalWinnerId === selectedRobotId) {
+          playSE('se_win');
+          if (result.rewards?.newSkill || result.rewards?.upgradedSkill) {
+            setTimeout(() => playSE('se_levelup'), 1500);
+          }
+        } else {
+          playSE('se_lose');
+        }
+        setIsBattling(false);
+        return;
+      }
+
       setCurrentLogIndex(index);
-      
-      // SE再生
-      const log = logs[index];
-      if (log && log.damage > 0) {
+      const log = result.logs[index];
+
+      // VFX Logic
+      if (log.damage > 0) {
         playSE('se_attack');
+        setShaking(log.defenderId);
+        setTimeout(() => setShaking(null), 500);
+
+        // Visuals
+        const isPlayerDefender = log.defenderId === selectedRobotId;
+        const attacker = log.attackerId === selectedRobotId ? robots.find(r => r.id === selectedRobotId) : enemyRobots.find(r => r.id === enemyRobotId);
+
+        if (attacker) {
+          const w = window.innerWidth;
+          const h = window.innerHeight;
+          const isMobile = w < 768;
+          const targetX = isMobile ? w * 0.5 : (isPlayerDefender ? w * 0.3 : w * 0.7);
+          const targetY = isMobile ? (isPlayerDefender ? h * 0.7 : h * 0.3) : h * 0.5;
+
+          setActiveEffect({
+            element: attacker.elementName || "Neutral",
+            x: targetX,
+            y: targetY
+          });
+          setTimeout(() => setActiveEffect(null), 500);
+        }
+
+        setDamagePopups(prev => [
+          ...prev,
+          {
+            id: index + "-" + Math.random(),
+            value: log.damage,
+            isCritical: log.isCritical,
+            x: Math.random() * 40 - 20,
+            y: -50
+          }
+        ]);
+        setTimeout(() => {
+          setDamagePopups(prev => prev.slice(1));
+        }, 1000);
+      }
+
+      // Cut-In Logic
+      if (log.skillName) {
+        clearInterval(interval);
+        setActiveCutIn({ skillName: log.skillName, robotId: log.attackerId });
+        setTimeout(() => {
+          setActiveCutIn(null);
+          startResumeLoop(index + 1, result);
+        }, 1500);
+        return;
       }
 
       index++;
-      if (index >= logs.length) {
-        clearInterval(interval);
-        setIsBattling(false);
-      }
-    }, 1000); // 1秒ごとにターン進行
+    }, 1200);
   };
 
   const myRobot = robots.find(r => r.id === selectedRobotId);
@@ -237,10 +523,16 @@ export default function Battle() {
     return { level, exp, nextLevelExp, progress };
   };
 
-  if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>;
+  if (loading) return <div className="flex justify-center p-8 min-h-screen items-center bg-dark-bg"><Loader2 className="animate-spin text-neon-cyan h-12 w-12" /></div>;
 
   return (
-    <div className="min-h-screen bg-background p-4 flex flex-col">
+    <div className="min-h-screen bg-dark-bg text-foreground p-4 flex flex-col pb-24 overflow-hidden relative">
+      <SEO
+        title={t("seo_battle_title")}
+        description={t("seo_battle_desc")}
+      />
+      <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-20 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/80 pointer-events-none" />
       <header className="flex items-center mb-8 max-w-4xl mx-auto w-full">
         <Link href="/">
           <Button variant="ghost" className="mr-4">
@@ -265,7 +557,7 @@ export default function Battle() {
                   {robots.map(robot => {
                     const { level } = getLevelInfo(robot);
                     return (
-                      <div 
+                      <div
                         key={robot.id}
                         onClick={() => setSelectedRobotId(robot.id)}
                         className={`p-2 border rounded cursor-pointer hover:bg-secondary/10 ${selectedRobotId === robot.id ? 'border-primary bg-primary/10' : ''}`}
@@ -279,54 +571,163 @@ export default function Battle() {
                     );
                   })}
                 </div>
+
+                <div className="mt-6 pt-4 border-t">
+                  <label className="text-sm font-bold mb-2 block">{t('battle_item') || 'Battle Item'}</label>
+                  <select
+                    value={selectedItemId}
+                    onChange={(e) => setSelectedItemId(e.target.value)}
+                    className="w-full border rounded p-2 text-sm bg-background"
+                    disabled={isTrainingMode || isBattling}
+                  >
+                    <option value="">{t('no_item') || 'No Item'}</option>
+                    {Object.entries(inventory)
+                      .filter(([id, qty]) => qty > 0 && ['repair_kit', 'attack_boost', 'defense_boost', 'critical_lens'].includes(id))
+                      .map(([id, qty]) => (
+                        <option key={id} value={id}>
+                          {getItemLabel(id)} (x{qty})
+                        </option>
+                      ))}
+                  </select>
+                  {isTrainingMode && <p className="text-xs text-muted-foreground mt-1">トレーニングではアイテムを使用できません</p>}
+                </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardContent className="p-6 space-y-4">
-                <h2 className="text-xl font-bold">{t('select_opponent')}</h2>
-                <div className="flex gap-2">
-                  <Input 
-                    placeholder={t('friend_id_placeholder')} 
-                    value={friendId}
-                    onChange={(e) => setFriendId(e.target.value)}
-                    className="font-mono text-xs"
-                  />
-                  <Button onClick={searchFriend} disabled={isSearching} size="sm" variant="secondary">
-                    {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                  </Button>
-                </div>
-                <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto">
-                  {enemyRobots.length > 0 ? (
-                    enemyRobots.map(robot => {
-                      const { level } = getLevelInfo(robot);
-                      return (
-                        <div 
-                          key={robot.id}
-                          onClick={() => setEnemyRobotId(robot.id)}
-                          className={`p-2 border rounded cursor-pointer hover:bg-secondary/10 ${enemyRobotId === robot.id ? 'border-destructive bg-destructive/10' : ''}`}
-                        >
-                          <div className="text-sm font-bold truncate">{robot.name}</div>
-                          <div className="flex justify-between items-center text-xs text-muted-foreground">
-                            <span>Lv.{level}</span>
-                            <span>HP: {robot.baseHp}</span>
-                          </div>
-                          <div className="text-[10px] text-muted-foreground truncate">User: {robot.id.substring(0, 4)}...</div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className="col-span-2 text-center text-muted-foreground py-4">
-                      {t('no_opponents')}
+                <Tabs value={battleMode} onValueChange={(v) => {
+                  setBattleMode(v as 'battle' | 'training' | 'online');
+                  setIsTrainingMode(v === 'training');
+                  setEnemyRobotId(null);
+                }}>
+                  <TabsList className="w-full">
+                    <TabsTrigger value="battle" className="flex-1">🆚 対戦</TabsTrigger>
+                    <TabsTrigger value="online" className="flex-1"><Wifi className="w-3 h-3 mr-1" />オンライン</TabsTrigger>
+                    <TabsTrigger value="training" className="flex-1">🏋️ 練習</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+
+                {!isTrainingMode && (
+                  <>
+                    <h2 className="text-xl font-bold">{t('select_opponent')}</h2>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder={t('friend_id_placeholder')}
+                        value={friendId}
+                        onChange={(e) => setFriendId(e.target.value)}
+                        className="font-mono text-xs"
+                      />
+                      <Button onClick={searchFriend} disabled={isSearching} size="sm" variant="secondary">
+                        {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                      </Button>
                     </div>
-                  )}
-                </div>
+                    <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto">
+                      {enemyRobots.length > 0 ? (
+                        enemyRobots.map(robot => {
+                          const { level } = getLevelInfo(robot);
+                          return (
+                            <div
+                              key={robot.id}
+                              onClick={() => setEnemyRobotId(robot.id)}
+                              className={`p-2 border rounded cursor-pointer hover:bg-secondary/10 ${enemyRobotId === robot.id ? 'border-destructive bg-destructive/10' : ''}`}
+                            >
+                              <div className="text-sm font-bold truncate">{robot.name}</div>
+                              <div className="flex justify-between items-center text-xs text-muted-foreground">
+                                <span>Lv.{level}</span>
+                                <span>HP: {robot.baseHp}</span>
+                              </div>
+                              <div className="text-[10px] text-muted-foreground truncate">User: {robot.id.substring(0, 4)}...</div>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div className="col-span-2 text-center text-muted-foreground py-4">
+                          {t('no_opponents')}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {isTrainingMode && (
+                  <>
+                    <h2 className="text-xl font-bold">対戦相手（自分のロボット）</h2>
+                    <p className="text-xs text-muted-foreground">自分のロボット同士で練習試合ができます（経験値は獲得できません）</p>
+                    <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto">
+                      {robots.filter(r => r.id !== selectedRobotId).length > 0 ? (
+                        robots.filter(r => r.id !== selectedRobotId).map(robot => {
+                          const { level } = getLevelInfo(robot);
+                          return (
+                            <div
+                              key={robot.id}
+                              onClick={() => setEnemyRobotId(robot.id)}
+                              className={`p-2 border rounded cursor-pointer hover:bg-secondary/10 ${enemyRobotId === robot.id ? 'border-amber-500 bg-amber-500/10' : ''}`}
+                            >
+                              <div className="text-sm font-bold truncate">{robot.name}</div>
+                              <div className="flex justify-between items-center text-xs text-muted-foreground">
+                                <span>Lv.{level}</span>
+                                <span>HP: {robot.baseHp}</span>
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div className="col-span-2 text-center text-muted-foreground py-4">
+                          2体以上のロボットが必要です
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {battleMode === 'online' && (
+                  <div className="space-y-4">
+                    <h2 className="text-xl font-bold flex items-center gap-2">
+                      <Users className="w-5 h-5" />
+                      オンライン対戦
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      世界中のプレイヤーとリアルタイムでマッチング！近いレーティングの相手と対戦します。
+                    </p>
+
+                    {!isMatchmaking ? (
+                      <Button
+                        onClick={startMatchmaking}
+                        disabled={!selectedRobotId}
+                        className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
+                        size="lg"
+                      >
+                        <Wifi className="w-4 h-4 mr-2" />
+                        対戦相手を探す
+                      </Button>
+                    ) : (
+                      <div className="text-center space-y-4">
+                        <div className="flex items-center justify-center gap-2">
+                          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                          <span className="text-lg">{matchmakingStatus}</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          30秒以内に相手が見つからない場合はタイムアウトします
+                        </div>
+                        <Button
+                          onClick={cancelMatchmaking}
+                          variant="outline"
+                          className="w-full"
+                        >
+                          <X className="w-4 h-4 mr-2" />
+                          キャンセル
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
 
             <div className="md:col-span-2 flex justify-center">
-              <Button 
-                size="lg" 
+              <Button
+                size="lg"
                 disabled={!selectedRobotId || !enemyRobotId}
                 onClick={startBattle}
                 className="w-full md:w-auto px-12"
@@ -340,119 +741,264 @@ export default function Battle() {
 
         {/* バトル画面 */}
         {(battleResult || isBattling) && myRobot && enemyRobot && (
-          <div className="space-y-8">
-            <div className="flex justify-between items-center">
-              {/* Player */}
-              <div className="text-center space-y-2 w-1/3">
-                <div className="relative">
-                  <RobotSVG parts={myRobot.parts} colors={myRobot.colors} size={150} />
+          <div className="space-y-8 relative py-8">
+            <div className="flex flex-col md:flex-row justify-between items-center gap-8 relative z-10">
+
+              {/* Player Robot */}
+              <motion.div
+                className={`relative p-6 rounded-xl glass-panel w-full md:w-[45%] ${shaking === selectedRobotId ? 'border-red-500 shadow-[0_0_20px_rgba(255,0,0,0.5)]' : 'border-neon-cyan shadow-[0_0_10px_rgba(0,243,255,0.3)]'}`}
+                animate={shaking === selectedRobotId ? { x: [-10, 10, -10, 10, 0], rotate: [-2, 2, -2, 2, 0] } : { scale: 1 }}
+                transition={{ duration: 0.4 }}
+              >
+                <div className="absolute -top-3 left-4 bg-black px-3 py-1 text-neon-cyan text-xs font-orbitron border border-neon-cyan tracking-widest shadow-[0_0_10px_rgba(0,243,255,0.5)]">PLAYER</div>
+                <div className="flex justify-center my-4 drop-shadow-[0_0_15px_rgba(0,243,255,0.4)]">
+                  <RobotSVG parts={myRobot.parts} colors={myRobot.colors} size={160} />
                 </div>
-                <div className="font-bold">{myRobot.name}</div>
-                <div className="text-xs text-muted-foreground mb-1">Lv.{getLevelInfo(myRobot).level}</div>
-                <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-green-500 transition-all duration-500"
-                    style={{ width: `${(getCurrentHp(myRobot.id) / myRobot.baseHp) * 100}%` }}
+                <div className="mt-2 text-center font-bold text-lg text-white text-shadow-sm tracking-wide">{myRobot.name}</div>
+
+                {/* HP Bar */}
+                <div className="w-full mt-4 bg-black/80 h-4 rounded-full overflow-hidden border border-white/20 relative">
+                  <motion.div
+                    className="h-full bg-gradient-to-r from-neon-cyan to-blue-600 box-shadow-[0_0_10px_rgba(0,243,255,0.5)]"
+                    initial={{ width: "100%" }}
+                    animate={{ width: `${(getCurrentHp(myRobot.id) / myRobot.baseHp) * 100}%` }}
+                    transition={{ type: "spring", stiffness: 100, damping: 20 }}
                   />
+                  <div className="absolute inset-0 bg-[url('/scanline.png')] opacity-20 pointer-events-none mix-blend-overlay"></div>
                 </div>
-                <div className="text-sm">{getCurrentHp(myRobot.id)} / {myRobot.baseHp}</div>
+                <div className="text-right text-xs font-mono mt-1 text-neon-cyan font-bold">
+                  HP: <span className="text-white text-lg font-orbitron">{getCurrentHp(myRobot.id)}</span> / {myRobot.baseHp}
+                </div>
+
+                {/* Damage Popups for Player */}
+                <AnimatePresence>
+                  {damagePopups.map(p => {
+                    const log = battleResult?.logs[currentLogIndex];
+                    if (log?.defenderId !== myRobot.id) return null;
+                    if (p.id.split('-')[0] !== String(currentLogIndex) && Math.abs(currentLogIndex - Number(p.id.split('-')[0])) > 1) return null;
+
+                    return (
+                      <motion.div
+                        key={p.id}
+                        initial={{ opacity: 0, y: 0, scale: 0.5, rotate: Math.random() * 20 - 10 }}
+                        animate={{ opacity: 1, y: -80, scale: p.isCritical ? 2.5 : 1.5, rotate: 0 }}
+                        exit={{ opacity: 0, scale: 0 }}
+                        transition={{ duration: 0.8, ease: "easeOut" }}
+                        className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 z-50 font-black italic stroke-black pointer-events-none select-none flex items-center justify-center w-full text-center ${p.isCritical ? 'text-neon-pink neon-text-purple text-6xl' : 'text-white text-4xl'}`}
+                        style={{ textShadow: "4px 4px 0px #000" }}
+                      >
+                        {p.value}
+                        {p.isCritical && <span className="block text-sm text-yellow-400 absolute -top-4 w-full text-center tracking-widest">CRITICAL!</span>}
+                      </motion.div>
+                    )
+                  })}
+                </AnimatePresence>
+              </motion.div>
+
+              <div className="text-5xl font-black text-white/10 italic relative z-0 md:absolute md:left-1/2 md:-translate-x-1/2">
+                <span className="absolute -top-10 left-1/2 -translate-x-1/2 text-9xl opacity-10 blur-sm pointer-events-none">VS</span>
+                VS
               </div>
 
-              <div className="text-2xl font-bold text-muted-foreground">VS</div>
+              {/* Overload Button - Battle Intervention */}
+              {isBattling && !hasUsedOverload && (
+                <motion.div
+                  className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 2 }}
+                >
+                  <Button
+                    onClick={() => {
+                      setHasUsedOverload(true);
+                      setIsOverloadActive(true);
+                      setOverloadFlash(true);
+                      playSE('se_levelup');
+                      toast.success('オーバーロード発動！次の攻撃が強化！');
+                      setTimeout(() => setOverloadFlash(false), 500);
+                      setTimeout(() => setIsOverloadActive(false), 3000);
+                    }}
+                    className="bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 hover:from-orange-600 hover:via-red-600 hover:to-pink-600 text-white font-bold px-6 py-3 rounded-full shadow-[0_0_20px_rgba(255,100,50,0.5)] animate-pulse"
+                  >
+                    <Zap className="w-5 h-5 mr-2" />
+                    オーバーロード
+                  </Button>
+                  <div className="text-xs text-center mt-1 text-muted-foreground">
+                    1回のみ使用可能
+                  </div>
+                </motion.div>
+              )}
 
-              {/* Enemy */}
-              <div className="text-center space-y-2 w-1/3">
-                <div className="relative">
-                  <RobotSVG parts={enemyRobot.parts} colors={enemyRobot.colors} size={150} className="scale-x-[-1]" />
+              {/* Overload Flash Effect */}
+              <AnimatePresence>
+                {overloadFlash && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 bg-orange-500/40 z-50 pointer-events-none"
+                  />
+                )}
+              </AnimatePresence>
+
+              {/* Overload Active Indicator */}
+              <AnimatePresence>
+                {isOverloadActive && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    className="absolute top-4 left-1/2 -translate-x-1/2 z-30 bg-gradient-to-r from-orange-500 to-red-500 text-white px-4 py-2 rounded-full text-sm font-bold shadow-lg"
+                  >
+                    <Zap className="w-4 h-4 inline mr-1" />
+                    OVERLOAD ACTIVE - ダメージ1.5倍
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Enemy Robot */}
+              <motion.div
+                className={`relative p-6 rounded-xl glass-panel w-full md:w-[45%] ${shaking === enemyRobot.id ? 'border-red-500 shadow-[0_0_20px_rgba(255,0,0,0.5)]' : 'border-neon-pink shadow-[0_0_10px_rgba(255,0,85,0.3)]'}`}
+                animate={shaking === enemyRobot.id ? { x: [-10, 10, -10, 10, 0], rotate: [2, -2, 2, -2, 0] } : {}}
+              >
+                <div className="absolute -top-3 right-4 bg-black px-3 py-1 text-neon-pink text-xs font-orbitron border border-neon-pink tracking-widest shadow-[0_0_10px_rgba(255,0,85,0.5)]">ENEMY</div>
+                <div className="flex justify-center my-4 drop-shadow-[0_0_15px_rgba(255,0,85,0.4)]">
+                  <RobotSVG parts={enemyRobot.parts} colors={enemyRobot.colors} size={160} />
                 </div>
-                <div className="font-bold">{enemyRobot.name}</div>
-                <div className="text-xs text-muted-foreground mb-1">Lv.{getLevelInfo(enemyRobot).level}</div>
-                <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-red-500 transition-all duration-500"
-                    style={{ width: `${(getCurrentHp(enemyRobot.id) / enemyRobot.baseHp) * 100}%` }}
+                <div className="mt-2 text-center font-bold text-lg text-white text-shadow-sm tracking-wide">{enemyRobot.name}</div>
+
+                {/* HP Bar */}
+                <div className="w-full mt-4 bg-black/50 h-4 rounded-full overflow-hidden border border-white/20 relative">
+                  <motion.div
+                    className="h-full bg-gradient-to-r from-neon-pink to-red-600 box-shadow-[0_0_10px_rgba(255,0,85,0.5)]"
+                    initial={{ width: "100%" }}
+                    animate={{ width: `${(getCurrentHp(enemyRobot.id) / enemyRobot.baseHp) * 100}%` }}
+                    transition={{ type: "spring", stiffness: 100, damping: 20 }}
                   />
                 </div>
-                <div className="text-sm">{getCurrentHp(enemyRobot.id)} / {enemyRobot.baseHp}</div>
-              </div>
+                <div className="text-right text-xs font-mono mt-1 text-neon-pink font-bold">
+                  HP: <span className="text-white text-lg font-orbitron">{getCurrentHp(enemyRobot.id)}</span> / {enemyRobot.baseHp}
+                </div>
+
+                {/* Damage Popups for Enemy */}
+                <AnimatePresence>
+                  {damagePopups.map(p => {
+                    const log = battleResult?.logs[currentLogIndex];
+                    if (log?.defenderId !== enemyRobot.id) return null;
+
+                    return (
+                      <motion.div
+                        key={p.id}
+                        initial={{ opacity: 0, scale: 0.5, y: 0 }}
+                        animate={{ opacity: 1, y: -80, scale: p.isCritical ? 2.5 : 1.5 }}
+                        exit={{ opacity: 0, scale: 0 }}
+                        transition={{ duration: 0.8, ease: "easeOut" }}
+                        className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 z-50 font-black italic select-none pointer-events-none text-center w-full ${p.isCritical ? 'text-neon-yellow neon-text-yellow text-6xl' : 'text-white text-4xl'}`}
+                        style={{ textShadow: "4px 4px 0px #000" }}
+                      >
+                        {p.value}
+                        {p.isCritical && <span className="block text-sm text-neon-pink absolute -top-4 w-full text-center tracking-widest">CRITICAL!</span>}
+                      </motion.div>
+                    )
+                  })}
+                </AnimatePresence>
+              </motion.div>
+
             </div>
 
-            {/* バトルログ */}
-            <Card className="h-48 overflow-y-auto">
-              <CardContent className="p-4 space-y-2">
-                {battleResult?.logs.slice(0, currentLogIndex + 1).map((log, i) => (
-                  <div key={i} className="text-sm border-b pb-1 last:border-0">
-                    <span className="font-bold text-primary">{t('turn')} {log.turn}:</span> {log.message}
-                    {log.isCritical && <span className="text-destructive font-bold ml-2">{t('critical')}</span>}
-                  </div>
-                ))}
-                {!isBattling && battleResult && (
-                  <div className="text-center py-4 space-y-2">
-                    <div className="font-bold text-xl text-primary animate-bounce">
-                      {battleResult.winnerId === myRobot.id ? t('win') : t('lose')}
-                    </div>
-                    {battleResult.winnerId === myRobot.id && (
-                      <div className="text-sm text-muted-foreground bg-secondary/20 p-2 rounded inline-block">
-                        <div className="flex items-center justify-center gap-2">
-                          <Star className="w-4 h-4 text-yellow-500" />
-                          <span>{t('exp_gained')}: +{battleResult.rewards.exp}</span>
-                        </div>
-                        {/* レベルアップ判定は簡易的に表示（本来はサーバーからのレスポンスに含めるべきだが、今回はEXP計算で推測） */}
-                        {(getLevelInfo(myRobot).exp + battleResult.rewards.exp) >= getLevelInfo(myRobot).nextLevelExp && (
-                          <div className="text-green-500 font-bold mt-1">{t('level_up')}</div>
-                        )}
-                        
-                        {/* スキル習得・強化通知 */}
-                        {battleResult.rewards.newSkill && (
-                          <div className="text-blue-500 font-bold mt-1 animate-pulse">
-                            {t('new_skill')}: {battleResult.rewards.newSkill}!
-                          </div>
-                        )}
-                        {battleResult.rewards.upgradedSkill && (
-                          <div className="text-purple-500 font-bold mt-1 animate-pulse">
-                            {t('skill_upgraded')}: {battleResult.rewards.upgradedSkill}!
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            {/* Battle Logs */}
+            <div className="mt-8 h-48 overflow-y-auto glass-panel p-4 rounded-xl text-sm font-mono space-y-2 border border-white/5 scrollbar-thin scrollbar-thumb-neon-cyan/20 scrollbar-track-transparent">
+              {battleResult?.logs.slice(0, currentLogIndex + 1).reverse().map((log, i) => (
+                <motion.div
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  key={i}
+                  className={`p-2 border-l-2 pl-3 rounded bg-black/20 backdrop-blur-sm ${log.damage > 0 ? "border-neon-pink text-pink-200" : "border-neon-cyan text-cyan-200"}`}
+                >
+                  <span className="opacity-50 text-[10px] mr-2 text-white/60">TURN {String(log.turn).padStart(2, '0')}</span>
+                  {log.message}
+                </motion.div>
+              ))}
+            </div>
 
-            {!isBattling && battleResult && (
-              <div className="flex justify-center gap-4">
-                <Button onClick={() => { 
-                  setBattleResult(null); 
-                  setIsBattling(false); 
-                  window.location.reload();
-                }}>
-                  {t('play_again')}
-                </Button>
-                
-                {(() => {
-                  const myRobot = robots.find(r => r.id === selectedRobotId);
-                  if (!myRobot) return null;
-                  
-                  const isWin = battleResult.winnerId === myRobot.id;
-                  const shareText = isWin 
-                    ? t('share_battle_win')
-                        .replace('{name}', myRobot.name)
-                        .replace('{level}', String(getLevelInfo(myRobot).level))
-                    : t('share_battle_lose')
-                        .replace('{name}', myRobot.name);
-                  
-                  return (
-                    <ShareButton 
-                      text={shareText}
-                      variant="secondary"
-                    />
-                  );
-                })()}
-              </div>
-            )}
+            {/* Result Screen Overlay */}
+            <AnimatePresence>
+              {currentLogIndex >= (battleResult?.logs.length || 0) - 1 && battleResult && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="absolute inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md rounded-lg p-4"
+                >
+                  <motion.div
+                    initial={{ scale: 0.5, y: 50 }}
+                    animate={{ scale: 1, y: 0 }}
+                    className="text-center space-y-8 p-10 glass-panel border-neon-cyan shadow-[0_0_50px_rgba(0,243,255,0.2)] max-w-md w-full relative overflow-hidden"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-t from-neon-cyan/10 to-transparent opacity-50 pointer-events-none"></div>
+
+                    <h2 className={`text-6xl font-black italic tracking-tighter ${battleResult.winnerId === myRobot.id ? "text-neon-cyan neon-text-cyan" : "text-gray-500"}`}>
+                      {battleResult.winnerId === myRobot.id ? "VICTORY" : "DEFEAT"}
+                    </h2>
+
+                    <div className="space-y-4 relative z-10">
+                      {battleResult.winnerId === myRobot.id && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.5 }}
+                          className="text-yellow-400 font-bold text-xl flex flex-col items-center gap-2 bg-black/40 p-4 rounded border border-yellow-500/30"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Zap className="w-5 h-5 text-yellow-400" />
+                            <span>EXP +{battleResult.rewards.exp}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-5 h-5 rounded-full bg-yellow-500 border border-yellow-300" />
+                            <span>Gold +{battleResult.rewards.coins}</span>
+                          </div>
+                          {battleResult.rewards.newSkill && (
+                            <div className="text-neon-pink animate-pulse mt-2 text-sm border-t border-white/10 pt-2 w-full">
+                              NEW SKILL: {battleResult.rewards.newSkill}
+                            </div>
+                          )}
+                        </motion.div>
+                      )}
+                    </div>
+
+                    <div className="space-y-3 pt-4 relative z-10">
+                      <Button size="lg" onClick={() => {
+                        setBattleResult(null);
+                        setIsBattling(false);
+                        setEnemyRobotId(null);
+                      }} className="w-full bg-neon-cyan text-black hover:bg-white font-bold h-12 text-lg shadow-[0_0_15px_rgba(0,243,255,0.4)] hover:shadow-[0_0_25px_rgba(0,243,255,0.7)] transition-all">
+                        NEXT BATTLE
+                      </Button>
+
+                      <div className="flex justify-center">
+                        <ShareButton text={`I just ${battleResult.winnerId === myRobot.id ? 'won' : 'lost'} a battle in #BarcodeGenesis!`} />
+                      </div>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         )}
+        {/* Effects Layer */}
+        {activeEffect && (
+          <ElementalBurst element={activeEffect.element} x={activeEffect.x} y={activeEffect.y} />
+        )}
+
+        <AnimatePresence>
+          {activeCutIn && (
+            <SkillCutIn
+              skillName={activeCutIn.skillName}
+              robot={activeCutIn.robotId === myRobot.id ? myRobot : enemyRobot}
+              onComplete={() => { }} // Controlled by parent timeout, empty callback fine
+            />
+          )}
+        </AnimatePresence>
+
       </main>
     </div>
   );

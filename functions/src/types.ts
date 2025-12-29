@@ -36,7 +36,7 @@ export interface RobotData {
   userId: string;
   name: string;
   sourceBarcode: string;
-  
+
   // ステータス
   rarity: number;           // 1-5
   rarityName: string;       // "Common" | "Uncommon" | "Rare" | "Epic" | "Legendary"
@@ -46,18 +46,18 @@ export interface RobotData {
   baseSpeed: number;
   elementType: number;      // 1-7
   elementName: string;
-  
+
   // レベル
   level?: number;
   xp?: number;
   exp?: number; // legacy field
   experience?: number; // legacy field
   experienceToNext?: number; // legacy field
-  
+
   // 外観
   parts: RobotParts;
   colors: RobotColors;
-  
+
   // スキル
   skills?: Array<string | Skill>; // skill IDs (string) or legacy skill objects
 
@@ -65,11 +65,11 @@ export interface RobotData {
     slot1?: string | null;
     slot2?: string | null;
   };
-  
+
   // メタデータ
   createdAt?: Date | any;    // Firestore Timestamp
   updatedAt?: Date | any;
-  
+
   // 統計
   totalBattles: number;
   totalWins: number;
@@ -84,4 +84,30 @@ export interface GenerateRobotRequest {
 export interface GenerateRobotResponse {
   robotId: string;
   robot: RobotData;
+  version?: string;
+}
+
+export interface BattleLog {
+  turn: number;
+  attackerId: string;
+  defenderId: string;
+  action: string;
+  skillName?: string;
+  damage: number;
+  isCritical: boolean;
+  attackerHp: number;
+  defenderHp: number;
+  message: string;
+}
+
+export interface BattleResult {
+  winnerId: string;
+  loserId: string;
+  logs: BattleLog[];
+  rewards: {
+    exp: number;
+    coins: number;
+    newSkill?: string;
+    upgradedSkill?: string;
+  };
 }
