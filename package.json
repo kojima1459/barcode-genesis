@@ -9,6 +9,7 @@
     "start": "NODE_ENV=production node dist/index.js",
     "preview": "vite preview --host",
     "test": "vitest run && npm --prefix functions run build && node --test functions/tests/*.test.js",
+    "test:all": "vitest run && npm --prefix functions test && npm run build",
     "check": "tsc --noEmit",
     "format": "prettier --write ."
   },

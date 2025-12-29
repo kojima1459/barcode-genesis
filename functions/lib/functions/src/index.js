@@ -422,7 +422,7 @@ exports.matchBattle = functions.https.onCall(async (data, context) => {
     if (!context.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'Auth required');
     }
-    const { playerRobotId, useItemId } = data;
+    const { playerRobotId, useItemId, cheer } = data;
     const userId = context.auth.uid;
     const db = admin.firestore();
     // アイテムID検証
@@ -458,7 +458,9 @@ exports.matchBattle = functions.https.onCall(async (data, context) => {
         // 4. バトル実行
         const battleId = db.collection('battles').doc().id;
         const playerItems = useItemId ? [useItemId] : [];
-        const battleResult = (0, battleSystem_1.simulateBattle)(playerRobot, opponentRobot, battleId, playerItems);
+        // Pass cheer input: p1 = player, p2 = opponent
+        const cheerInput = cheer ? { p1: !!cheer.p1, p2: !!cheer.p2 } : undefined;
+        const battleResult = (0, battleSystem_1.simulateBattle)(playerRobot, opponentRobot, battleId, playerItems, cheerInput);
         // 勝敗判定
         const winnerIsPlayer = battleResult.winnerId === playerRobot.id;
         const winnerIsOpponent = battleResult.winnerId === opponentRobot.id;
