@@ -196,9 +196,17 @@ export default function Home() {
       setLoginStreak(data.streak);
       setCredits(data.credits);
       toast.success("Login bonus claimed");
-    } catch (error) {
+    } catch (error: any) {
+      const message = error.message || "Login bonus failed";
+
+      // すでに受け取り済みの場合はエラーログを出さずにスキップ
+      if (message.includes("Already claimed today")) {
+        console.log("Login bonus already claimed today.");
+        toast("Login bonus already claimed", { icon: "✅" }); // 通知はするが成功風に
+        return;
+      }
+
       console.error("Login bonus failed:", error);
-      const message = error instanceof Error ? error.message : "Login bonus failed";
       setLoginError(message);
     } finally {
       setIsClaimingLogin(false);
