@@ -185,9 +185,23 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
       } else {
         setErrorMsg("高精度スキャンでもバーコードを検出できませんでした。\n画像がはっきり写っているか確認してください。");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Vision API scan failed:", error);
-      setErrorMsg("高精度スキャンに失敗しました。\nネットワーク接続を確認してください。");
+
+      const code = error?.code;
+      let userMsg = "高精度スキャンに失敗しました。\n";
+
+      if (code === 'unauthenticated') {
+        userMsg += "ログインが必要です。再度ログインしてください。";
+      } else if (code === 'not-found') {
+        userMsg += "機能が見つかりません(404)。管理者に連絡してください。";
+      } else if (code === 'internal') {
+        userMsg += "サーバー側でエラーが発生しました。";
+      } else {
+        userMsg += "ネットワーク接続を確認してください。";
+      }
+
+      setErrorMsg(userMsg);
     } finally {
       setIsVisionScanning(false);
       // Reset file input
