@@ -138,6 +138,11 @@ export interface BattleLog {
 
   // BattleEngine v2: Passive
   passiveTriggered?: PassiveTrigger;
+
+  // Cheer System (応援)
+  cheerApplied?: boolean;
+  cheerSide?: 'P1' | 'P2';
+  cheerMultiplier?: number;  // 1.2
 }
 
 export interface BattleResult {

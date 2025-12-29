@@ -58,12 +58,9 @@ export default function Battle() {
   const [isOverloadActive, setIsOverloadActive] = useState(false);
   const [overloadFlash, setOverloadFlash] = useState(false);
 
-  // Cheer (応援) state - P1 = player (blue/left), P2 = opponent (red/right)
-  const [p1CheerUsed, setP1CheerUsed] = useState(false);
-  const [p1CheerReady, setP1CheerReady] = useState(false);
-  const [p2CheerUsed, setP2CheerUsed] = useState(false);
-  const [p2CheerReady, setP2CheerReady] = useState(false);
-  const [cheerLogs, setCheerLogs] = useState<Array<{ type: string; side: 'P1' | 'P2'; message: string; timestamp: number }>>([]);
+  // Cheer (応援) state - Pre-battle reservation (server-side)
+  const [cheerP1, setCheerP1] = useState(false);  // Reserve cheer for P1 (player)
+  const [cheerP2, setCheerP2] = useState(false);  // Reserve cheer for P2 (opponent)
 
   // Visual effects state
   const [activeEffect, setActiveEffect] = useState<{ element: string; x: number; y: number } | null>(null);
@@ -362,11 +359,8 @@ export default function Battle() {
     setBattleResult(null);
     setCurrentLogIndex(-1);
     // Reset cheer state for new battle
-    setP1CheerUsed(false);
-    setP1CheerReady(false);
-    setP2CheerUsed(false);
-    setP2CheerReady(false);
-    setCheerLogs([]);
+    setCheerP1(false);
+    setCheerP2(false);
 
     // トレーニングモードの場合はローカルシミュレーション
     if (isTrainingMode) {
@@ -380,7 +374,7 @@ export default function Battle() {
 
       const result = simulateLocalBattle(myRobot, enemyRobot);
       setBattleResult(result);
-      playBattleLogs(result.logs);
+      playBattleLogs(result); // Pass the full result object
 
       const animationDuration = result.logs.length * 1000 + 500;
       setTimeout(() => {
@@ -398,7 +392,8 @@ export default function Battle() {
       const matchBattleFn = httpsCallable(functions, 'matchBattle');
       const result = await matchBattleFn({
         playerRobotId: selectedRobotId,
-        useItemId: (!isTrainingMode && selectedItemId) ? selectedItemId : undefined
+        useItemId: (!isTrainingMode && selectedItemId) ? selectedItemId : undefined,
+        cheer: { p1: cheerP1, p2: cheerP2 }  // Pass cheer reservation
       });
       const data = result.data as any;
 
@@ -412,7 +407,7 @@ export default function Battle() {
         };
         setBattleResult(battleResult);
         // ログ再生開始
-        playBattleLogs(battleResult.logs);
+        playBattleLogs(battleResult); // Pass the full result object
 
         // 結果SE予約（アニメーション終了後）
         const animationDuration = battleResult.logs.length * 1000 + 500;
@@ -462,37 +457,13 @@ export default function Battle() {
       const log = result.logs[index];
 
       // ============================================
-      // CHEER SYSTEM: Apply 1.2x multiplier if ready
+      // CHEER SYSTEM: Display based on server log.cheerApplied
       // ============================================
-      let displayDamage = log.damage;
-      let cheerApplied = false;
+      const displayDamage = log.damage; // Server already applied 1.2x
+      const cheerApplied = !!log.cheerApplied;
 
-      // Determine attacker side: P1 = player (selectedRobotId), P2 = opponent
-      const isP1Attack = log.attackerId === selectedRobotId;
-      const isP2Attack = log.attackerId !== selectedRobotId;
-
-      if (isP1Attack && p1CheerReady && log.damage > 0) {
-        displayDamage = Math.floor(log.damage * 1.2);
-        cheerApplied = true;
-        setP1CheerReady(false);
-        setCheerLogs(prev => [...prev, {
-          type: 'CHEER_APPLIED',
-          side: 'P1',
-          message: '声援が刃になった（×1.2）',
-          timestamp: Date.now()
-        }]);
-        toast('🔥 声援が刃になった（×1.2）', { duration: 1500 });
-      } else if (isP2Attack && p2CheerReady && log.damage > 0) {
-        displayDamage = Math.floor(log.damage * 1.2);
-        cheerApplied = true;
-        setP2CheerReady(false);
-        setCheerLogs(prev => [...prev, {
-          type: 'CHEER_APPLIED',
-          side: 'P2',
-          message: '声援が刃になった（×1.2）',
-          timestamp: Date.now()
-        }]);
-        toast('🔥 声援が刃になった（×1.2）', { duration: 1500 });
+      if (cheerApplied) {
+        toast(`🎉 声援が刃になった（×${log.cheerMultiplier || 1.2}）`, { duration: 1500 });
       }
 
       // VFX Logic
@@ -775,7 +746,32 @@ export default function Battle() {
               </CardContent>
             </Card>
 
-            <div className="md:col-span-2 flex justify-center">
+            <div className="md:col-span-2 flex flex-col items-center gap-4">
+              {/* Pre-Battle Cheer Reservation */}
+              {!isTrainingMode && (
+                <div className="flex gap-6 items-center glass-panel px-6 py-3 rounded-lg">
+                  <span className="text-sm text-muted-foreground">応援予約:</span>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={cheerP1}
+                      onChange={(e) => setCheerP1(e.target.checked)}
+                      className="w-4 h-4 accent-cyan-500"
+                    />
+                    <span className="text-cyan-400 font-bold text-sm">青を焚きつける(P1)</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={cheerP2}
+                      onChange={(e) => setCheerP2(e.target.checked)}
+                      className="w-4 h-4 accent-red-500"
+                    />
+                    <span className="text-red-400 font-bold text-sm">赤を焚きつける(P2)</span>
+                  </label>
+                </div>
+              )}
+
               <Button
                 size="lg"
                 disabled={!selectedRobotId || !enemyRobotId}
@@ -879,63 +875,7 @@ export default function Battle() {
                 </motion.div>
               )}
 
-              {/* Cheer Buttons - 応援ボタン */}
-              {isBattling && (
-                <motion.div
-                  className="absolute bottom-20 left-1/2 -translate-x-1/2 z-30 flex gap-4"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 1.5 }}
-                >
-                  {/* P1 Cheer Button (Blue/Player) */}
-                  <Button
-                    onClick={() => {
-                      if (p1CheerUsed) return;
-                      setP1CheerUsed(true);
-                      setP1CheerReady(true);
-                      playSE('se_levelup');
-                      setCheerLogs(prev => [...prev, {
-                        type: 'CHEER_USED',
-                        side: 'P1',
-                        message: '観客が青側に肩入れした！',
-                        timestamp: Date.now()
-                      }]);
-                      toast.success('観客が青側に肩入れした！');
-                    }}
-                    disabled={p1CheerUsed}
-                    className={`px-4 py-2 rounded-full font-bold transition-all ${p1CheerUsed
-                      ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                      : 'bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white shadow-[0_0_15px_rgba(0,200,255,0.5)] animate-pulse'
-                      }`}
-                  >
-                    {p1CheerUsed ? '使用済み' : '青を焚きつける(P1)'}
-                  </Button>
-
-                  {/* P2 Cheer Button (Red/Opponent) */}
-                  <Button
-                    onClick={() => {
-                      if (p2CheerUsed) return;
-                      setP2CheerUsed(true);
-                      setP2CheerReady(true);
-                      playSE('se_levelup');
-                      setCheerLogs(prev => [...prev, {
-                        type: 'CHEER_USED',
-                        side: 'P2',
-                        message: '観客が赤側を焚きつけた！',
-                        timestamp: Date.now()
-                      }]);
-                      toast.success('観客が赤側を焚きつけた！');
-                    }}
-                    disabled={p2CheerUsed}
-                    className={`px-4 py-2 rounded-full font-bold transition-all ${p2CheerUsed
-                      ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                      : 'bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white shadow-[0_0_15px_rgba(255,100,100,0.5)] animate-pulse'
-                      }`}
-                  >
-                    {p2CheerUsed ? '使用済み' : '赤を焚きつける(P2)'}
-                  </Button>
-                </motion.div>
-              )}
+              {/* Cheer is now pre-battle reservation - buttons removed */}
 
               {/* Overload Flash Effect */}
               <AnimatePresence>

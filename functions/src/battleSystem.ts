@@ -43,11 +43,17 @@ const getElementMultiplier = (attacker: RobotData, defender: RobotData): number 
   return 1;
 };
 
+export interface CheerInput {
+  p1: boolean;  // P1 (robot1) has cheer reserved
+  p2: boolean;  // P2 (robot2) has cheer reserved
+}
+
 export const simulateBattle = (
   robot1: RobotData,
   robot2: RobotData,
   battleId?: string,
-  robot1Items: string[] = []
+  robot1Items: string[] = [],
+  cheer?: CheerInput
 ): BattleResult => {
   let hp1 = robot1.baseHp;
   let hp2 = robot2.baseHp;
@@ -67,6 +73,12 @@ export const simulateBattle = (
 
   // アイテム使用フラグ
   let usedRepairKit = false;
+
+  // Cheer System: Initialize state
+  let p1CheerReady = !!cheer?.p1;
+  let p1CheerUsed = false;
+  let p2CheerReady = !!cheer?.p2;
+  let p2CheerUsed = false;
 
   // ステータス補正関数
   const getStat = (robot: RobotData, stat: 'baseAttack' | 'baseDefense') => {
@@ -262,6 +274,30 @@ export const simulateBattle = (
       }
     }
 
+    // ============================================
+    // CHEER SYSTEM: Apply 1.2x multiplier (AFTER all other calculations)
+    // ============================================
+    let cheerApplied = false;
+    let cheerSide: 'P1' | 'P2' | undefined;
+    const cheerMultiplier = 1.2;
+
+    // P1 = robot1, P2 = robot2
+    if (attacker.id === robot1.id && p1CheerReady && !p1CheerUsed && damage > 0) {
+      damage = toDamage(damage * cheerMultiplier);
+      p1CheerReady = false;
+      p1CheerUsed = true;
+      cheerApplied = true;
+      cheerSide = 'P1';
+      message += ` 🎉声援が刃になった（×${cheerMultiplier}）`;
+    } else if (attacker.id === robot2.id && p2CheerReady && !p2CheerUsed && damage > 0) {
+      damage = toDamage(damage * cheerMultiplier);
+      p2CheerReady = false;
+      p2CheerUsed = true;
+      cheerApplied = true;
+      cheerSide = 'P2';
+      message += ` 🎉声援が刃になった（×${cheerMultiplier}）`;
+    }
+
     // HP減少（回復以外）
     let followUpDamage = 0;
     if (damage > 0) {
@@ -351,6 +387,10 @@ export const simulateBattle = (
       attackerOverdriveGauge: Math.floor(getOverdrive(attacker.id).gauge),
       defenderOverdriveGauge: Math.floor(getOverdrive(defender.id).gauge),
       passiveTriggered,
+      // Cheer System
+      cheerApplied: cheerApplied || undefined,
+      cheerSide: cheerSide,
+      cheerMultiplier: cheerApplied ? cheerMultiplier : undefined,
     });
 
     if (hp1 <= 0 || hp2 <= 0) break;
