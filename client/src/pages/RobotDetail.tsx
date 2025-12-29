@@ -17,6 +17,7 @@ import { useSound } from "@/contexts/SoundContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import SEO from "@/components/SEO";
 import ShareCardModal from "@/components/ShareCardModal";
+import EvolutionModal from "@/components/EvolutionModal";
 
 
 type InventoryMap = Record<string, number>;
@@ -51,6 +52,7 @@ const getLevelInfo = (robot: RobotData) => {
 
 export default function RobotDetail({ robotId }: { robotId: string }) {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const { playSE } = useSound();
   const [baseRobot, setBaseRobot] = useState<RobotData | null>(null);
   const [robots, setRobots] = useState<RobotData[]>([]);
@@ -75,6 +77,7 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
   const [cosmeticItemId, setCosmeticItemId] = useState("");
   const [isApplyingCosmetic, setIsApplyingCosmetic] = useState(false);
   const [cosmeticError, setCosmeticError] = useState<string | null>(null);
+  const [isEvolutionModalOpen, setIsEvolutionModalOpen] = useState(false);
 
   // Battle history state
   const [battleHistory, setBattleHistory] = useState<Array<{
@@ -609,6 +612,31 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
             ))}
           </div>
           {equipError && <p className="text-sm text-destructive">{equipError}</p>}
+        </section>
+
+        {/* Evolution Section */}
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <Zap className="w-5 h-5 text-yellow-500" />
+            進化
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            同じカテゴリのロボットを2体消費して、このロボットを強化します。
+          </p>
+          <Button onClick={() => setIsEvolutionModalOpen(true)}>
+            <Zap className="w-4 h-4 mr-2" />
+            進化する
+          </Button>
+          <EvolutionModal
+            isOpen={isEvolutionModalOpen}
+            onClose={() => setIsEvolutionModalOpen(false)}
+            target={baseRobot}
+            allRobots={robots}
+            onSuccess={() => {
+              // Reload data
+              window.location.reload();
+            }}
+          />
         </section>
 
         <section className="space-y-3">

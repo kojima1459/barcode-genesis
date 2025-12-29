@@ -67,18 +67,23 @@ export default function SEO({
             <script type="application/ld+json">
                 {JSON.stringify({
                     "@context": "https://schema.org",
-                    "@type": "WebApplication",
+                    "@type": "SoftwareApplication",
                     "name": "Barcode Genesis",
                     "url": "https://barcodegame-42858.web.app/",
                     "description": pageDesc,
                     "applicationCategory": "GameApplication",
-                    "genre": "Barcode Battle RPG",
-                    "operatingSystem": "Web, Android, iOS",
-                    "inLanguage": ["ja", "en"],
+                    "genre": "RPG",
+                    "operatingSystem": "Web",
                     "offers": {
                         "@type": "Offer",
                         "price": "0",
                         "priceCurrency": "JPY"
+                    },
+                    "screenshot": image,
+                    "featureList": "Barcode scanning, Robot collection, PvP Battle",
+                    "author": {
+                        "@type": "Person",
+                        "name": "Kojima"
                     }
                 })}
             </script>

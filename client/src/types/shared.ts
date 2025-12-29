@@ -68,6 +68,12 @@ export interface RobotData {
     createdAt?: any;
     updatedAt?: any;
 
+    // 図鑑・進化用
+    family?: number;           // 1-5 (DRINK, SNACK, DAILY, BEAUTY, OTHER)
+    familyName?: string;
+    slot?: number;             // 0-19
+    evolutionLevel?: number;   // 0+
+
     // 統計
     totalBattles?: number;
     totalWins?: number;

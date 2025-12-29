@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.scanBarcodeFromImage = exports.checkMatchStatus = exports.leaveMatchmaking = exports.joinMatchmaking = exports.stripeWebhook = exports.createPortalSession = exports.createSubscriptionSession = exports.createCheckoutSession = exports.applyCosmeticItem = exports.useUpgradeItem = exports.checkAchievements = exports.updateRanking = exports.followUser = exports.claimMissionReward = exports.getDailyMissions = exports.claimLoginBonus = exports.equipItem = exports.purchaseItem = exports.inheritSkill = exports.synthesizeRobots = exports.matchBattle = exports.batchDisassemble = exports.generateRobot = exports.ping = exports.debugPing = exports.testFunctionHealth = void 0;
+exports.scanBarcodeFromImage = exports.checkMatchStatus = exports.leaveMatchmaking = exports.joinMatchmaking = exports.stripeWebhook = exports.createPortalSession = exports.createSubscriptionSession = exports.createCheckoutSession = exports.applyCosmeticItem = exports.useUpgradeItem = exports.checkAchievements = exports.updateRanking = exports.followUser = exports.claimMissionReward = exports.getDailyMissions = exports.claimLoginBonus = exports.equipItem = exports.purchaseItem = exports.inheritSkill = exports.synthesizeRobots = exports.matchBattle = exports.evolveRobot = exports.batchDisassemble = exports.generateRobot = exports.ping = exports.debugPing = exports.testFunctionHealth = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
@@ -208,6 +208,128 @@ exports.batchDisassemble = functions.https.onCall(async (data, context) => {
     catch (error) {
         console.error('batchDisassemble error:', error);
         throw new functions.https.HttpsError('internal', 'Failed to disassemble robots');
+    }
+});
+// ============================================
+// 進化API (Evolution)
+// ============================================
+const EVOLUTION_STAT_MULTIPLIER = 1.1; // 10% boost per evolution level
+// Helper to get family from barcode (client-side backward compat)
+const getFamilyFromBarcode = (barcode) => {
+    const d0 = parseInt(barcode[0], 10) || 0;
+    const d1 = parseInt(barcode[1], 10) || 0;
+    return ((d0 + d1) % 5) + 1;
+};
+exports.evolveRobot = functions.https.onCall(async (data, context) => {
+    // 1. Auth check
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'ログインしてください');
+    }
+    const { targetBarcode, materialBarcodes } = data !== null && data !== void 0 ? data : {};
+    // 2. Validate input types
+    if (typeof targetBarcode !== 'string' || !Array.isArray(materialBarcodes)) {
+        throw new functions.https.HttpsError('invalid-argument', '入力が不正です');
+    }
+    // 3. Validate 13-digit barcodes
+    const barcodePattern = /^\d{13}$/;
+    if (!barcodePattern.test(targetBarcode)) {
+        throw new functions.https.HttpsError('invalid-argument', '入力が不正です');
+    }
+    // 4. Validate materialBarcodes: exactly 2, unique, not target
+    if (materialBarcodes.length !== 2) {
+        throw new functions.https.HttpsError('invalid-argument', '素材は2体必要です');
+    }
+    for (const mb of materialBarcodes) {
+        if (typeof mb !== 'string' || !barcodePattern.test(mb)) {
+            throw new functions.https.HttpsError('invalid-argument', '入力が不正です');
+        }
+    }
+    if (materialBarcodes[0] === materialBarcodes[1]) {
+        throw new functions.https.HttpsError('invalid-argument', '同じロボットを2回選択できません');
+    }
+    if (materialBarcodes.includes(targetBarcode)) {
+        throw new functions.https.HttpsError('invalid-argument', 'ターゲットを素材にはできません');
+    }
+    const userId = context.auth.uid;
+    const db = admin.firestore();
+    const robotsRef = db.collection('users').doc(userId).collection('robots');
+    try {
+        const result = await db.runTransaction(async (transaction) => {
+            var _a, _b, _c;
+            // 5. Get all 3 robots
+            const targetRef = robotsRef.doc(targetBarcode);
+            const material1Ref = robotsRef.doc(materialBarcodes[0]);
+            const material2Ref = robotsRef.doc(materialBarcodes[1]);
+            const [targetSnap, mat1Snap, mat2Snap] = await Promise.all([
+                transaction.get(targetRef),
+                transaction.get(material1Ref),
+                transaction.get(material2Ref)
+            ]);
+            // 6. Check existence
+            if (!targetSnap.exists) {
+                throw new functions.https.HttpsError('not-found', '対象ロボが見つかりません');
+            }
+            if (!mat1Snap.exists || !mat2Snap.exists) {
+                throw new functions.https.HttpsError('not-found', '素材ロボが見つかりません');
+            }
+            const targetData = targetSnap.data();
+            const mat1Data = mat1Snap.data();
+            const mat2Data = mat2Snap.data();
+            // 7. Check ownership (all should belong to user)
+            if (targetData.userId !== userId || mat1Data.userId !== userId || mat2Data.userId !== userId) {
+                throw new functions.https.HttpsError('permission-denied', '権限がありません');
+            }
+            // 8. Check family match (use stored family or compute from barcode)
+            const targetFamily = (_a = targetData.family) !== null && _a !== void 0 ? _a : getFamilyFromBarcode(targetBarcode);
+            const mat1Family = (_b = mat1Data.family) !== null && _b !== void 0 ? _b : getFamilyFromBarcode(materialBarcodes[0]);
+            const mat2Family = (_c = mat2Data.family) !== null && _c !== void 0 ? _c : getFamilyFromBarcode(materialBarcodes[1]);
+            if (mat1Family !== targetFamily || mat2Family !== targetFamily) {
+                throw new functions.https.HttpsError('failed-precondition', '同じカテゴリの素材を選んでください');
+            }
+            // 9. Calculate new stats
+            const currentEvolutionLevel = typeof targetData.evolutionLevel === 'number' ? targetData.evolutionLevel : 0;
+            const newEvolutionLevel = currentEvolutionLevel + 1;
+            const newBaseHp = Math.floor((targetData.baseHp || 100) * EVOLUTION_STAT_MULTIPLIER);
+            const newBaseAttack = Math.floor((targetData.baseAttack || 10) * EVOLUTION_STAT_MULTIPLIER);
+            const newBaseDefense = Math.floor((targetData.baseDefense || 10) * EVOLUTION_STAT_MULTIPLIER);
+            const newBaseSpeed = Math.floor((targetData.baseSpeed || 10) * EVOLUTION_STAT_MULTIPLIER);
+            // 10. Update target
+            transaction.update(targetRef, {
+                evolutionLevel: newEvolutionLevel,
+                baseHp: newBaseHp,
+                baseAttack: newBaseAttack,
+                baseDefense: newBaseDefense,
+                baseSpeed: newBaseSpeed,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+            // 11. Delete materials
+            transaction.delete(material1Ref);
+            transaction.delete(material2Ref);
+            // 12. Decrement user's totalRobots
+            const userRef = db.collection('users').doc(userId);
+            transaction.update(userRef, {
+                totalRobots: admin.firestore.FieldValue.increment(-2),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+            return {
+                success: true,
+                evolutionLevel: newEvolutionLevel,
+                newStats: {
+                    baseHp: newBaseHp,
+                    baseAttack: newBaseAttack,
+                    baseDefense: newBaseDefense,
+                    baseSpeed: newBaseSpeed
+                }
+            };
+        });
+        return result;
+    }
+    catch (error) {
+        console.error('evolveRobot error:', error);
+        if (error instanceof functions.https.HttpsError) {
+            throw error;
+        }
+        throw new functions.https.HttpsError('internal', 'サーバーエラー');
     }
 });
 // ============================================
@@ -1294,6 +1416,34 @@ exports.stripeWebhook = functions
 // ====================
 const MATCHMAKING_RATING_RANGE = 200; // ±200のレーティング差まで許容
 const MATCHMAKING_TIMEOUT_MS = 30000; // 30秒でタイムアウト
+const sendBattleNotification = async (userId, title, body) => {
+    const db = admin.firestore();
+    const tokensSnap = await db.collection('users').doc(userId).collection('fcmTokens').get();
+    if (tokensSnap.empty)
+        return;
+    const tokens = tokensSnap.docs.map(doc => doc.id);
+    const message = {
+        notification: { title, body },
+        tokens: tokens
+    };
+    try {
+        const response = await admin.messaging().sendMulticast(message);
+        console.log('Notifications sent:', response.successCount);
+        // Cleanup invalid tokens if any
+        if (response.failureCount > 0) {
+            const failedTokens = [];
+            response.responses.forEach((resp, idx) => {
+                if (!resp.success) {
+                    failedTokens.push(tokens[idx]);
+                }
+            });
+            // Optionally delete invalid tokens here
+        }
+    }
+    catch (error) {
+        console.error('Error sending notification:', error);
+    }
+};
 exports.joinMatchmaking = functions.https.onCall(async (data, context) => {
     if (!context.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'Auth required');
@@ -1363,6 +1513,8 @@ exports.joinMatchmaking = functions.https.onCall(async (data, context) => {
                     createdAt: admin.firestore.FieldValue.serverTimestamp(),
                 });
             });
+            // Notify opponent
+            await sendBattleNotification(opponentData.userId, "Battle Start!", `A battle against ${userData.displayName || 'Player'} has started!`);
             return {
                 status: 'matched',
                 battleId,
@@ -1372,6 +1524,10 @@ exports.joinMatchmaking = functions.https.onCall(async (data, context) => {
                     rating: opponentData.rating,
                 }
             };
+            // Notify opponent (fire and forget)
+            // Note: We return first for speed, but Cloud Functions might terminate.
+            // Better to await or use background trigger, but for now we put it before return or use background promise if keeping alive.
+            // Since it's onCall, we must await to ensure execution.
         }
         else {
             // マッチング相手がいない → キューに追加

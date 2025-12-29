@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { Link } from "wouter";
 import { useLanguage } from "@/contexts/LanguageContext";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import { useNotification } from "@/hooks/useNotification";
 import ShareButton from "@/components/ShareButton";
 import TutorialModal from "@/components/TutorialModal";
 import SoundSettings from "@/components/SoundSettings";
@@ -40,6 +41,7 @@ export default function Home() {
   const { completeStep } = useTutorial();
   const { playBGM, playSE } = useSound();
   const { user, logout } = useAuth();
+  const { permission, requestPermission } = useNotification();
   const [mode, setMode] = useState<'menu' | 'scan' | 'result'>('menu');
   const [isGenerating, setIsGenerating] = useState(false);
   const [robot, setRobot] = useState<RobotData | null>(null);
@@ -449,6 +451,20 @@ export default function Home() {
         </section>
 
         <AdBanner />
+
+        {permission === 'default' && (
+          <div className="flex justify-center mt-4">
+            <Button
+              variant="outline"
+              onClick={requestPermission}
+              className="border-neon-cyan text-neon-cyan hover:bg-neon-cyan/20"
+            >
+              <Zap className="mr-2 h-4 w-4" />
+              通知を有効にする
+            </Button>
+          </div>
+        )}
+
         <TutorialModal />
 
         <Dialog open={showLimitModal} onOpenChange={setShowLimitModal}>

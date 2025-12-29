@@ -70,6 +70,12 @@ export interface RobotData {
   createdAt?: Date | any;    // Firestore Timestamp
   updatedAt?: Date | any;
 
+  // 図鑑・進化用
+  family?: number;           // 1-5 (DRINK, SNACK, DAILY, BEAUTY, OTHER)
+  familyName?: string;
+  slot?: number;             // 0-19
+  evolutionLevel?: number;   // 0+
+
   // 統計
   totalBattles: number;
   totalWins: number;

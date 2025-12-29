@@ -8,7 +8,6 @@ import { AlertCircle, Keyboard, Image, Loader2, Sparkles, Camera, Upload } from 
 import { toast } from "sonner";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/lib/firebase";
-import Quagga from "@ericblade/quagga2";
 
 interface BarcodeScannerProps {
   onScanSuccess: (decodedText: string) => void;
@@ -20,7 +19,7 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [debugLog, setDebugLog] = useState<string[]>([]);
   const [isScanning, setIsScanning] = useState(false);
-  
+
   // 2つのinput要素のためのref
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -279,8 +278,11 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
     return null;
   }
 
-  // Quagga2 Wrapper for Phase 4
+  // Quagga2 Wrapper for Phase 4 (Lazy loaded)
   async function scanWithQuagga(imageUrl: string): Promise<string | null> {
+    // Dynamically import Quagga2 only when needed
+    const { default: Quagga } = await import("@ericblade/quagga2");
+
     return new Promise((resolve) => {
       Quagga.decodeSingle({
         src: imageUrl,
@@ -323,7 +325,7 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
               ref={cameraInputRef}
               disabled={isScanning}
             />
-            
+
             {/* アルバム用Input (captureなし) */}
             <input
               type="file"
@@ -362,7 +364,7 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
                     <span className="font-bold text-sm">アルバムから</span>
                   </label>
                 </div>
-                
+
                 <div className="text-xs text-muted-foreground">
                   <Sparkles className="w-3 h-3 inline mr-1 text-yellow-500" />
                   AIがバーコードの数字を自動で読み取ります

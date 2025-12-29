@@ -4,10 +4,11 @@
     <meta charset="UTF-8" />
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover"
+      content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover"
     />
     <meta name="theme-color" content="#0f172a" />
     <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta
       name="apple-mobile-web-app-status-bar-style"
       content="black-translucent"
@@ -19,16 +20,21 @@
     <title>Barcode Genesis | バーコードバトルRPG</title>
     <meta name="description" content="バーコードをスキャンしてロボットを生成し、バトルで戦わせよう！無料で遊べるバーコードバトルRPGゲーム。" />
     <meta name="keywords" content="バーコード,ロボット,バトル,RPG,ゲーム,スキャン,無料" />
+    <meta property="og:image" content="https://barcodegame-42858.web.app/ogp.jpg" />
+    <meta property="og:site_name" content="Barcode Genesis" />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="https://barcodegame-42858.web.app/ogp.jpg" />
     
     <!-- PWA Manifest -->
-    <link rel="manifest" href="/manifest.webmanifest" />
+    <!-- PWA Manifest (Injected by VitePWA) -->
     
     <!-- Icons -->
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/icon-192.png" />
     
     <!-- Preload critical assets -->
-    <link rel="preload" href="/icon-192.png" as="image" type="image/png" />
+    <link rel="preload" href="/noise.svg" as="image" type="image/svg+xml" />
     
     <!-- Font optimization with display=swap and preconnect -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />

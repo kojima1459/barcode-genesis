@@ -280,6 +280,151 @@ export const batchDisassemble = functions.https.onCall(async (data: { robotIds: 
 });
 
 // ============================================
+// 進化API (Evolution)
+// ============================================
+const EVOLUTION_STAT_MULTIPLIER = 1.1; // 10% boost per evolution level
+
+// Helper to get family from barcode (client-side backward compat)
+const getFamilyFromBarcode = (barcode: string): number => {
+  const d0 = parseInt(barcode[0], 10) || 0;
+  const d1 = parseInt(barcode[1], 10) || 0;
+  return ((d0 + d1) % 5) + 1;
+};
+
+export const evolveRobot = functions.https.onCall(async (data: { targetBarcode: string, materialBarcodes: string[] }, context) => {
+  // 1. Auth check
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'ログインしてください');
+  }
+
+  const { targetBarcode, materialBarcodes } = data ?? {};
+
+  // 2. Validate input types
+  if (typeof targetBarcode !== 'string' || !Array.isArray(materialBarcodes)) {
+    throw new functions.https.HttpsError('invalid-argument', '入力が不正です');
+  }
+
+  // 3. Validate 13-digit barcodes
+  const barcodePattern = /^\d{13}$/;
+  if (!barcodePattern.test(targetBarcode)) {
+    throw new functions.https.HttpsError('invalid-argument', '入力が不正です');
+  }
+
+  // 4. Validate materialBarcodes: exactly 2, unique, not target
+  if (materialBarcodes.length !== 2) {
+    throw new functions.https.HttpsError('invalid-argument', '素材は2体必要です');
+  }
+
+  for (const mb of materialBarcodes) {
+    if (typeof mb !== 'string' || !barcodePattern.test(mb)) {
+      throw new functions.https.HttpsError('invalid-argument', '入力が不正です');
+    }
+  }
+
+  if (materialBarcodes[0] === materialBarcodes[1]) {
+    throw new functions.https.HttpsError('invalid-argument', '同じロボットを2回選択できません');
+  }
+
+  if (materialBarcodes.includes(targetBarcode)) {
+    throw new functions.https.HttpsError('invalid-argument', 'ターゲットを素材にはできません');
+  }
+
+  const userId = context.auth.uid;
+  const db = admin.firestore();
+  const robotsRef = db.collection('users').doc(userId).collection('robots');
+
+  try {
+    const result = await db.runTransaction(async (transaction) => {
+      // 5. Get all 3 robots
+      const targetRef = robotsRef.doc(targetBarcode);
+      const material1Ref = robotsRef.doc(materialBarcodes[0]);
+      const material2Ref = robotsRef.doc(materialBarcodes[1]);
+
+      const [targetSnap, mat1Snap, mat2Snap] = await Promise.all([
+        transaction.get(targetRef),
+        transaction.get(material1Ref),
+        transaction.get(material2Ref)
+      ]);
+
+      // 6. Check existence
+      if (!targetSnap.exists) {
+        throw new functions.https.HttpsError('not-found', '対象ロボが見つかりません');
+      }
+      if (!mat1Snap.exists || !mat2Snap.exists) {
+        throw new functions.https.HttpsError('not-found', '素材ロボが見つかりません');
+      }
+
+      const targetData = targetSnap.data()!;
+      const mat1Data = mat1Snap.data()!;
+      const mat2Data = mat2Snap.data()!;
+
+      // 7. Check ownership (all should belong to user)
+      if (targetData.userId !== userId || mat1Data.userId !== userId || mat2Data.userId !== userId) {
+        throw new functions.https.HttpsError('permission-denied', '権限がありません');
+      }
+
+      // 8. Check family match (use stored family or compute from barcode)
+      const targetFamily = targetData.family ?? getFamilyFromBarcode(targetBarcode);
+      const mat1Family = mat1Data.family ?? getFamilyFromBarcode(materialBarcodes[0]);
+      const mat2Family = mat2Data.family ?? getFamilyFromBarcode(materialBarcodes[1]);
+
+      if (mat1Family !== targetFamily || mat2Family !== targetFamily) {
+        throw new functions.https.HttpsError('failed-precondition', '同じカテゴリの素材を選んでください');
+      }
+
+      // 9. Calculate new stats
+      const currentEvolutionLevel = typeof targetData.evolutionLevel === 'number' ? targetData.evolutionLevel : 0;
+      const newEvolutionLevel = currentEvolutionLevel + 1;
+
+      const newBaseHp = Math.floor((targetData.baseHp || 100) * EVOLUTION_STAT_MULTIPLIER);
+      const newBaseAttack = Math.floor((targetData.baseAttack || 10) * EVOLUTION_STAT_MULTIPLIER);
+      const newBaseDefense = Math.floor((targetData.baseDefense || 10) * EVOLUTION_STAT_MULTIPLIER);
+      const newBaseSpeed = Math.floor((targetData.baseSpeed || 10) * EVOLUTION_STAT_MULTIPLIER);
+
+      // 10. Update target
+      transaction.update(targetRef, {
+        evolutionLevel: newEvolutionLevel,
+        baseHp: newBaseHp,
+        baseAttack: newBaseAttack,
+        baseDefense: newBaseDefense,
+        baseSpeed: newBaseSpeed,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      // 11. Delete materials
+      transaction.delete(material1Ref);
+      transaction.delete(material2Ref);
+
+      // 12. Decrement user's totalRobots
+      const userRef = db.collection('users').doc(userId);
+      transaction.update(userRef, {
+        totalRobots: admin.firestore.FieldValue.increment(-2),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      return {
+        success: true,
+        evolutionLevel: newEvolutionLevel,
+        newStats: {
+          baseHp: newBaseHp,
+          baseAttack: newBaseAttack,
+          baseDefense: newBaseDefense,
+          baseSpeed: newBaseSpeed
+        }
+      };
+    });
+
+    return result;
+  } catch (error) {
+    console.error('evolveRobot error:', error);
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    throw new functions.https.HttpsError('internal', 'サーバーエラー');
+  }
+});
+
+// ============================================
 // Vision API REST Implementation (No SDK)
 // ============================================
 // SDK was causing load-time crashes, so we use REST API directly.
@@ -1601,6 +1746,37 @@ export const stripeWebhook = functions
 const MATCHMAKING_RATING_RANGE = 200; // ±200のレーティング差まで許容
 const MATCHMAKING_TIMEOUT_MS = 30000; // 30秒でタイムアウト
 
+const sendBattleNotification = async (userId: string, title: string, body: string) => {
+  const db = admin.firestore();
+  const tokensSnap = await db.collection('users').doc(userId).collection('fcmTokens').get();
+
+  if (tokensSnap.empty) return;
+
+  const tokens = tokensSnap.docs.map(doc => doc.id);
+  const message = {
+    notification: { title, body },
+    tokens: tokens
+  };
+
+  try {
+    const response = await admin.messaging().sendMulticast(message);
+    console.log('Notifications sent:', response.successCount);
+
+    // Cleanup invalid tokens if any
+    if (response.failureCount > 0) {
+      const failedTokens: string[] = [];
+      response.responses.forEach((resp, idx) => {
+        if (!resp.success) {
+          failedTokens.push(tokens[idx]);
+        }
+      });
+      // Optionally delete invalid tokens here
+    }
+  } catch (error) {
+    console.error('Error sending notification:', error);
+  }
+};
+
 export const joinMatchmaking = functions.https.onCall(async (data: { robotId: string }, context) => {
   if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'Auth required');
@@ -1684,6 +1860,13 @@ export const joinMatchmaking = functions.https.onCall(async (data: { robotId: st
         });
       });
 
+      // Notify opponent
+      await sendBattleNotification(
+        opponentData.userId,
+        "Battle Start!",
+        `A battle against ${userData.displayName || 'Player'} has started!`
+      );
+
       return {
         status: 'matched',
         battleId,
@@ -1693,6 +1876,11 @@ export const joinMatchmaking = functions.https.onCall(async (data: { robotId: st
           rating: opponentData.rating,
         }
       };
+
+      // Notify opponent (fire and forget)
+      // Note: We return first for speed, but Cloud Functions might terminate.
+      // Better to await or use background trigger, but for now we put it before return or use background promise if keeping alive.
+      // Since it's onCall, we must await to ensure execution.
     } else {
       // マッチング相手がいない → キューに追加
       const queueRef = await db.collection('matchmaking_queue').add({

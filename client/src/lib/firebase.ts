@@ -3,6 +3,7 @@ import { getAuth, GoogleAuthProvider, connectAuthEmulator } from "firebase/auth"
 import { getFirestore, connectFirestoreEmulator, enableIndexedDbPersistence } from "firebase/firestore";
 import { getStorage, connectStorageEmulator } from "firebase/storage";
 import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
+import { getMessaging } from "firebase/messaging";
 
 // Firebase Console から取得した正しい設定
 const firebaseConfig = {
@@ -21,6 +22,7 @@ export const db = getFirestore(app);
 // Cloud Functions は us-central1 にデプロイされているため、リージョンを明示的に指定
 export const functions = getFunctions(app, 'us-central1');
 export const storage = getStorage(app);
+export const messaging = getMessaging(app);
 export const googleProvider = new GoogleAuthProvider();
 
 // Connect to emulators BEFORE enabling persistence or other operations

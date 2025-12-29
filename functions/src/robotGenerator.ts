@@ -3,6 +3,7 @@ import { RobotData, RobotParts, RobotColors } from './types';
 // 定数定義
 const RARITY_NAMES = ["ノーマル", "レア", "スーパーレア", "ウルトラレア", "レジェンド"];
 const ELEMENT_NAMES = ["ファイア", "アクア", "ウィンド", "アース", "ライト", "ダーク", "メカ"];
+const FAMILY_NAMES = ["DRINK", "SNACK", "DAILY", "BEAUTY", "OTHER"];
 
 // 名前パーツ（小中学生向けのかっこいい名前）
 const NAME_PREFIXES = [
@@ -99,6 +100,23 @@ function calculateElement(digits: number[]): { id: number, name: string } {
   };
 }
 
+// ファミリー決定 (1-5: DRINK, SNACK, DAILY, BEAUTY, OTHER)
+function calculateFamily(digits: number[]): { id: number, name: string } {
+  // Use digits[0] + digits[1] to determine family
+  const familyId = ((digits[0] + digits[1]) % 5) + 1;
+  return {
+    id: familyId,
+    name: FAMILY_NAMES[familyId - 1]
+  };
+}
+
+// スロット決定 (0-19)
+function calculateSlot(digits: number[]): number {
+  // Use last 4 digits to get a slot within 0-19
+  const seed = digits[9] * 1000 + digits[10] * 100 + digits[11] * 10 + digits[12];
+  return seed % 20;
+}
+
 // パーツ選択
 function selectParts(digits: number[]): RobotParts {
   return {
@@ -147,6 +165,8 @@ export function generateRobotData(barcode: string, userId: string): RobotData {
   const rarity = calculateRarity(digits);
   const stats = calculateStats(digits, rarity);
   const element = calculateElement(digits);
+  const family = calculateFamily(digits);
+  const slot = calculateSlot(digits);
   const parts = selectParts(digits);
   const colors = generateColors(digits);
   // スキルはWeek4で継承に移行するため初期は空
@@ -167,6 +187,11 @@ export function generateRobotData(barcode: string, userId: string): RobotData {
     ...stats,
     elementType: element.id,
     elementName: element.name,
+
+    family: family.id,
+    familyName: family.name,
+    slot,
+    evolutionLevel: 0,
 
     level: 1,
     xp: 0,

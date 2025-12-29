@@ -14,7 +14,7 @@ const plugins = [
   vitePluginManusRuntime(),
   VitePWA({
     registerType: 'autoUpdate',
-    includeAssets: ['favicon.png', 'icon-192.png', 'icon-512.png', 'ogp.png'],
+    includeAssets: ['favicon.png', 'icon-192.png', 'icon-512.png', 'ogp.jpg'],
     manifest: {
       name: 'Barcode Genesis',
       short_name: 'BarcodeGen',
@@ -46,9 +46,9 @@ const plugins = [
       ],
       screenshots: [
         {
-          src: '/ogp.png',
+          src: '/ogp.jpg',
           sizes: '1200x630',
-          type: 'image/png',
+          type: 'image/jpeg',
           form_factor: 'wide',
           label: 'Barcode Genesis - バーコードバトルRPG'
         }
@@ -115,9 +115,8 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          vendor: ['react', 'react-dom', 'framer-motion', 'lucide-react'],
+          vendor: ['react', 'react-dom'],
           firebase: ['firebase/app', 'firebase/firestore', 'firebase/auth', 'firebase/functions'],
-          recharts: ['recharts'],
         }
       }
     },
