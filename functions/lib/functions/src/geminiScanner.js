@@ -7,7 +7,10 @@ const generative_ai_1 = require("@google/generative-ai");
 // 注意: Firebase Functionsの環境設定で GEMINI_API_KEY を設定する必要があります
 const API_KEY = process.env.GEMINI_API_KEY || "";
 const genAI = new generative_ai_1.GoogleGenerativeAI(API_KEY);
-exports.scanBarcodeFromImage = functions.https.onCall(async (data, context) => {
+exports.scanBarcodeFromImage = functions.runWith({
+    timeoutSeconds: 60,
+    memory: "1GB"
+}).https.onCall(async (data, context) => {
     // 認証チェック
     if (!context.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
@@ -16,46 +19,80 @@ exports.scanBarcodeFromImage = functions.https.onCall(async (data, context) => {
     if (!imageBase64 || typeof imageBase64 !== 'string') {
         throw new functions.https.HttpsError('invalid-argument', 'The function must be called with a valid image base64 string.');
     }
+    // デバッグログ: 受け取ったデータの先頭を表示
+    console.log(`Received image data (length: ${imageBase64.length}). Start: ${imageBase64.substring(0, 50)}...`);
     try {
-        // Geminiモデルの初期化 (Gemini 1.5 Flash は高速で安価)
+        // Geminiモデルの初期化 (Gemini 2.0 Flash は高速で安価)
         const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-        // プロンプトの作成
-        const prompt = "この画像に含まれているバーコード（JANコード/EANコード）の数字（通常13桁または8桁）を読み取って、数字のみを出力してください。バーコードが見つからない場合や読み取れない場合は 'null' と出力してください。余計な説明は不要です。";
-        // 画像データの準備 (Base64ヘッダーを除去)
-        const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, "");
+        // プロンプトの作成 (JSON出力を強制)
+        const prompt = `
+      Analyze the provided image and identify any barcode (EAN-13, JAN, UPC-A, UPC-E, etc.).
+      
+      Return the result in the following JSON format ONLY:
+      {
+        "found": boolean,
+        "barcode": "string" (digits only),
+        "type": "string" (e.g., "EAN-13", "UPC", "Unknown"),
+        "confidence": "high" | "medium" | "low"
+      }
+
+      If multiple barcodes are found, return the most prominent/center one.
+      If no barcode is found, set "found" to false and "barcode" to null.
+      Do not include any markdown formatting (like \`\`\`json). Just the raw JSON string.
+    `;
+        // 画像データの準備 (Base64ヘッダーをより堅牢に除去)
+        // data:image/jpeg;base64, などのヘッダーがあれば削除、なければそのまま
+        const base64Data = imageBase64.replace(/^data:image\/[a-zA-Z]+;base64,/, "");
         const imagePart = {
             inlineData: {
                 data: base64Data,
-                mimeType: "image/jpeg", // 一般的な画像形式としてJPEGを指定（PNGでも動作します）
+                mimeType: "image/jpeg", // 一般的な画像形式としてJPEGを指定
             },
         };
         // 生成実行
         const result = await model.generateContent([prompt, imagePart]);
         const response = await result.response;
-        const text = response.text().trim();
-        console.log("Gemini Scan Result:", text);
-        // 結果の解析
-        if (text === 'null' || !text) {
+        let text = response.text().trim();
+        // Markdownのコードブロックを除去 (念のため)
+        text = text.replace(/```json/g, "").replace(/```/g, "").trim();
+        console.log("Gemini Scan Result (Raw):", text);
+        let parsedResult;
+        try {
+            parsedResult = JSON.parse(text);
+        }
+        catch (e) {
+            console.warn("Failed to parse JSON from Gemini:", e);
+            // JSONパースに失敗した場合のフォールバック（数字のみ抽出）
+            const digits = text.replace(/\D/g, "");
+            if (digits.length >= 8 && digits.length <= 14) {
+                parsedResult = { found: true, barcode: digits, type: "Unknown", confidence: "low" };
+            }
+            else {
+                return { success: false, message: "Failed to parse AI response", rawResponse: text };
+            }
+        }
+        if (!parsedResult.found || !parsedResult.barcode) {
             return { success: false, message: "Barcode not found in image" };
         }
-        // 数字のみを抽出（改行やスペースを除去）
-        const barcode = text.replace(/\D/g, "");
+        const barcode = parsedResult.barcode;
         // JANコードのバリデーション (簡易: 8桁または13桁)
-        if (barcode.length === 13 || barcode.length === 8) {
-            return { success: true, barcode };
+        // UPC (12桁) も許容
+        if (barcode.length >= 8 && barcode.length <= 14) {
+            return {
+                success: true,
+                barcode,
+                type: parsedResult.type,
+                confidence: parsedResult.confidence
+            };
         }
         else {
-            // 桁数が合わない場合でも、数字が取れていれば返す（フロントで判断させる）
-            // ただし、あまりに短い/長い場合はエラー扱い
-            if (barcode.length >= 8 && barcode.length <= 14) {
-                return { success: true, barcode };
-            }
-            return { success: false, message: "Invalid barcode length detected", raw: text };
+            return { success: false, message: `Invalid barcode length: ${barcode.length}`, raw: barcode };
         }
     }
     catch (error) {
         console.error("Gemini API Error:", error);
-        throw new functions.https.HttpsError('internal', 'Failed to process image with Gemini API.');
+        // エラーの詳細をクライアントに返す（デバッグ用）
+        throw new functions.https.HttpsError('internal', `Failed to process image with Gemini API: ${error.message}`);
     }
 });
 //# sourceMappingURL=geminiScanner.js.map
