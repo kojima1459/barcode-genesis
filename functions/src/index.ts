@@ -247,40 +247,24 @@ export const scanBarcodeWithVision = functions.https.onCall(async (data: { image
     // Remove data URL prefix if present
     const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
 
+    // Use TEXT_DETECTION to find barcode numbers in the image
     const [result] = await client.annotateImage({
       image: { content: base64Data },
-      features: [{ type: 'PRODUCT_SEARCH' }, { type: 'TEXT_DETECTION' }],
+      features: [{ type: 'TEXT_DETECTION' }],
     });
 
-    // Try to find barcode from product search or text
     let barcode: string | null = null;
 
-    // Check for barcode in product search results
-    if (result.productSearchResults?.productGroupedResults) {
-      for (const group of result.productSearchResults.productGroupedResults) {
-        if (group.results) {
-          for (const r of group.results) {
-            // Extract barcode-like patterns from product info
-            const productLabels = r.product?.productLabels || [];
-            for (const label of productLabels) {
-              if (label.key === 'barcode' || label.key === 'gtin') {
-                barcode = label.value || null;
-                break;
-              }
-            }
-          }
-        }
-      }
-    }
-
-    // Fallback: Try to detect barcode from text (EAN-13 pattern)
-    if (!barcode && result.textAnnotations && result.textAnnotations.length > 0) {
+    // Try to detect barcode from text (EAN-13 pattern)
+    if (result.textAnnotations && result.textAnnotations.length > 0) {
       const fullText = result.textAnnotations[0].description || '';
-      // Find 13-digit number (EAN-13)
+
+      // Find 13-digit number (EAN-13) - most common barcode format
       const ean13Match = fullText.match(/\b\d{13}\b/);
       if (ean13Match) {
         barcode = ean13Match[0];
       }
+
       // Also try 12-digit (UPC-A)
       if (!barcode) {
         const upcMatch = fullText.match(/\b\d{12}\b/);
@@ -288,8 +272,17 @@ export const scanBarcodeWithVision = functions.https.onCall(async (data: { image
           barcode = upcMatch[0];
         }
       }
+
+      // Try 8-digit (EAN-8)
+      if (!barcode) {
+        const ean8Match = fullText.match(/\b\d{8}\b/);
+        if (ean8Match) {
+          barcode = ean8Match[0];
+        }
+      }
     }
 
+    console.log('Vision API scan result:', { barcodeFound: !!barcode, barcode });
     return { barcode, success: !!barcode };
   } catch (error) {
     console.error('Vision API error:', error);
