@@ -1,35 +1,38 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useSound } from "@/contexts/SoundContext";
-import { db } from "@/lib/firebase";
+import { db, storage } from "@/lib/firebase";
 import { doc, getDoc, updateDoc, collection, getDocs, query, orderBy } from "firebase/firestore";
-import { ArrowLeft, Copy, Edit2, Save, User, Trophy, Sword, Shield } from "lucide-react";
-import { Link } from "wouter";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { ArrowLeft, Copy, Edit2, Save, User, Trophy, Sword, Shield, LogOut, Camera, Loader2 } from "lucide-react";
+import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
 import RobotSVG from "@/components/RobotSVG";
 import { RobotData } from "@/types/shared";
 
 interface UserProfile {
   displayName?: string;
+  photoURL?: string;
   wins?: number;
   battles?: number;
 }
 
-
-
 export default function Profile() {
   const { t } = useLanguage();
   const { playSE } = useSound();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const [, setLocation] = useLocation();
   const [profile, setProfile] = useState<UserProfile>({});
   const [robots, setRobots] = useState<RobotData[]>([]);
   const [isEditing, setIsEditing] = useState(false);
   const [newName, setNewName] = useState("");
   const [loading, setLoading] = useState(true);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -74,6 +77,52 @@ export default function Profile() {
     }
   };
 
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!user || !e.target.files || e.target.files.length === 0) return;
+
+    const file = e.target.files[0];
+    if (file.size > 5 * 1024 * 1024) { // 5MB limit
+      toast.error("Image too large (max 5MB)");
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const storageRef = ref(storage, `users/${user.uid}/avatar`);
+      await uploadBytes(storageRef, file);
+      const downloadURL = await getDownloadURL(storageRef);
+
+      await updateDoc(doc(db, "users", user.uid), {
+        photoURL: downloadURL
+      });
+
+      setProfile(prev => ({ ...prev, photoURL: downloadURL }));
+      toast.success("Profile photo updated");
+      playSE('se_click');
+    } catch (error) {
+      console.error("Avatar upload failed:", error);
+      toast.error("Failed to upload photo");
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      toast.success("Logged out successfully");
+      setLocation("/");
+    } catch (error) {
+      console.error("Logout failed:", error);
+      toast.error("Failed to logout");
+    }
+  };
+
   const copyId = () => {
     if (user) {
       navigator.clipboard.writeText(user.uid);
@@ -83,9 +132,7 @@ export default function Profile() {
   };
 
   // Calculate total stats
-  const totalWins = robots.reduce((acc, r) => acc + (r.level ? Math.floor(r.level * 1.5) : 0), 0); // Mock calculation as wins are not stored on robot yet
-  // Note: Real win count should be stored in user profile or aggregated from battle logs
-  // For now, we use the profile.wins if available, otherwise 0
+  const totalWins = robots.reduce((acc, r) => acc + (r.level ? Math.floor(r.level * 1.5) : 0), 0);
   const displayWins = profile.wins || 0;
   const displayBattles = profile.battles || 0;
   const winRate = displayBattles > 0 ? Math.round((displayWins / displayBattles) * 100) : 0;
@@ -115,9 +162,38 @@ export default function Profile() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="flex flex-col md:flex-row gap-8 items-center md:items-start">
-              {/* Avatar Placeholder */}
-              <div className="w-32 h-32 rounded-full bg-secondary flex items-center justify-center text-4xl">
-                👤
+              {/* Avatar Upload */}
+              <div
+                className="relative group cursor-pointer"
+                onClick={handleAvatarClick}
+              >
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  className="hidden"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                />
+
+                <div className="w-32 h-32 rounded-full bg-secondary flex items-center justify-center text-4xl overflow-hidden border-2 border-secondary group-hover:border-primary transition-colors relative">
+                  {profile.photoURL ? (
+                    <img src={profile.photoURL} alt="Profile" className="w-full h-full object-cover" />
+                  ) : (
+                    "👤"
+                  )}
+
+                  {/* Overlay for hover/uploading */}
+                  <div className={`absolute inset-0 bg-black/50 flex items-center justify-center transition-opacity ${isUploading ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                    {isUploading ? (
+                      <Loader2 className="w-8 h-8 text-white animate-spin" />
+                    ) : (
+                      <Camera className="w-8 h-8 text-white" />
+                    )}
+                  </div>
+                </div>
+                <div className="absolute bottom-0 right-0 bg-primary text-primary-foreground p-1.5 rounded-full shadow-lg">
+                  <Edit2 className="w-3 h-3" />
+                </div>
               </div>
 
               <div className="flex-1 space-y-4 w-full">
@@ -248,6 +324,15 @@ export default function Profile() {
                 特定商取引法に基づく表記
               </Button>
             </Link>
+            <div className="border-t my-2" />
+            <Button
+              variant="outline"
+              className="w-full justify-start gap-3 text-red-400 hover:text-red-500 hover:bg-red-950/20 border-red-900/30"
+              onClick={handleLogout}
+            >
+              <LogOut className="w-4 h-4" />
+              ログアウト
+            </Button>
           </CardContent>
         </Card>
       </main>

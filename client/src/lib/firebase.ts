@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, connectAuthEmulator } from "firebase/auth";
 import { getFirestore, connectFirestoreEmulator, enableIndexedDbPersistence } from "firebase/firestore";
+import { getStorage, connectStorageEmulator } from "firebase/storage";
 import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
 
 // Firebase Console から取得した正しい設定
@@ -19,6 +20,7 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 // Cloud Functions は us-central1 にデプロイされているため、リージョンを明示的に指定
 export const functions = getFunctions(app, 'us-central1');
+export const storage = getStorage(app);
 export const googleProvider = new GoogleAuthProvider();
 
 // Enable offline persistence for Firestore (for PWA offline support)
@@ -36,5 +38,6 @@ if (import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === "1") {
   connectAuthEmulator(auth, "http://localhost:9099");
   connectFirestoreEmulator(db, "localhost", 8084);
   connectFunctionsEmulator(functions, "localhost", 5001);
+  connectStorageEmulator(storage, "localhost", 9199);
 }
 

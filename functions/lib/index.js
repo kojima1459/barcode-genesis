@@ -212,7 +212,9 @@ exports.scanBarcodeWithVision = functions.https.onCall(async (data, context) => 
     }
     catch (error) {
         console.error('Vision API error:', error);
-        throw new functions.https.HttpsError('internal', 'Failed to process image');
+        // Throw detailed error for debugging (using 'aborted' to avoid 'internal' masking)
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        throw new functions.https.HttpsError('aborted', `Vision Scan Failed: ${message}`);
     }
 });
 // バトル開始API

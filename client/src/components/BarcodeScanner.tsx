@@ -188,20 +188,21 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
     } catch (error: any) {
       console.error("Vision API scan failed:", error);
 
-      const code = error?.code;
-      let userMsg = "高精度スキャンに失敗しました。\n";
+      // DEBUG: エラーの詳細を表示
+      const code = error?.code || 'UNKNOWN';
+      const message = error?.message || 'No message';
+      const name = error?.name || 'Unknown Error';
+      const details = error?.details || '';
 
-      if (code === 'unauthenticated') {
-        userMsg += "ログインが必要です。再度ログインしてください。";
-      } else if (code === 'not-found') {
-        userMsg += "機能が見つかりません(404)。管理者に連絡してください。";
-      } else if (code === 'internal') {
-        userMsg += "サーバー側でエラーが発生しました。";
-      } else {
-        userMsg += "ネットワーク接続を確認してください。";
+      let debugInfo = `【デバッグ情報】\n`;
+      debugInfo += `エラーコード: ${code}\n`;
+      debugInfo += `エラー名: ${name}\n`;
+      debugInfo += `メッセージ: ${message}\n`;
+      if (details) {
+        debugInfo += `詳細: ${JSON.stringify(details)}\n`;
       }
 
-      setErrorMsg(userMsg);
+      setErrorMsg(debugInfo);
     } finally {
       setIsVisionScanning(false);
       // Reset file input
