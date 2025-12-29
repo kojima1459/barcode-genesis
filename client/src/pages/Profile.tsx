@@ -213,6 +213,43 @@ export default function Profile() {
             </CardContent>
           </Card>
         )}
+
+        {/* Settings & Links */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              ⚙️ Settings & Info
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <Link href="/guide">
+              <Button variant="ghost" className="w-full justify-start gap-3">
+                📖 How to Play / 使い方ガイド
+              </Button>
+            </Link>
+            <Link href="/premium">
+              <Button variant="ghost" className="w-full justify-start gap-3">
+                💎 Premium Subscription / プレミアム
+              </Button>
+            </Link>
+            <div className="border-t my-2" />
+            <Link href="/privacy">
+              <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground text-sm">
+                プライバシーポリシー
+              </Button>
+            </Link>
+            <Link href="/terms">
+              <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground text-sm">
+                利用規約
+              </Button>
+            </Link>
+            <Link href="/law">
+              <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground text-sm">
+                特定商取引法に基づく表記
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
       </main>
     </div>
   );
