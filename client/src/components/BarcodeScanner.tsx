@@ -9,7 +9,6 @@ import { toast } from "sonner";
 import { httpsCallable } from "firebase/functions";
 import { functions, auth } from "@/lib/firebase";
 import Quagga from "@ericblade/quagga2";
-import Tesseract from "tesseract.js";
 
 interface BarcodeScannerProps {
   onScanSuccess: (decodedText: string) => void;
@@ -45,53 +44,29 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
     setDebugLog([]);
 
     try {
-      // PHASE 1: Try Cloud Vision API (Industrial Grade)
+      // PHASE 1: Try Gemini API (AI OCR)
       try {
         const resizedBase64 = await resizeAndCompressForCloud(imageFile);
-        addLog(`Sending to Vision API (size: ${Math.round(resizedBase64.length / 1024)}KB)`);
+        addLog(`Sending to Gemini API (size: ${Math.round(resizedBase64.length / 1024)}KB)`);
 
-        // Use the Hosting rewrite endpoint to bypass CORS and 401 issues
-        const idToken = await auth.currentUser?.getIdToken();
-        const response = await fetch('/api/scanBarcodeWithVision', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': idToken ? `Bearer ${idToken}` : '',
-          },
-          body: JSON.stringify({ data: { imageBase64: resizedBase64 } }),
-        });
+        const scanBarcodeFromImage = httpsCallable(functions, 'scanBarcodeFromImage');
+        const result = await scanBarcodeFromImage({ imageBase64: resizedBase64 });
+        const data = result.data as any;
 
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error?.message || `HTTP ${response.status}`);
-        }
-
-        const result = await response.json();
-        const visionData = result.result;
-
-        if (visionData && visionData.success && visionData.barcode) {
-          const code = visionData.barcode;
+        if (data && data.success && data.barcode) {
+          const code = data.barcode;
           setManualCode(code);
-          toast.success(`高精度スキャン成功: ${code}`);
+          toast.success(`AIスキャン成功: ${code}`);
           setIsScanning(false);
           if (fileInputRef.current) fileInputRef.current.value = '';
           onScanSuccess(code);
           return;
-        }
-      } catch (visionErr: any) {
-        // Handle specific error codes or generic failures
-        const errorCode = visionErr?.code || 'unknown';
-        const errorMessage = visionErr?.message || visionErr.toString();
-
-        if (errorCode === 'not-found') {
-          addLog("Vision: バーコードが見つかりませんでした。");
-        } else if (errorCode === 'invalid-argument') {
-          toast.error(`画像エラー: ${errorMessage}`);
-          setIsScanning(false);
-          return; // Stop here if it's a client error (size etc)
         } else {
-          addLog(`Vision Error [${errorCode}]: ${errorMessage}`);
+          addLog(`Gemini: ${data.message || 'Not found'}`);
         }
+      } catch (geminiErr: any) {
+        console.warn("Gemini API failed:", geminiErr);
+        addLog(`Gemini Error: ${geminiErr.message}`);
       }
 
       // PHASE 2: Native BarcodeDetector API (OS Level)
@@ -225,8 +200,6 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
     });
     URL.revokeObjectURL(url);
 
-    // Simplified duplicate helper removed - uses top-level resizeAndCompressForCloud
-
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     if (!ctx || !img.width) return null;
@@ -279,186 +252,136 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
       }
 
       try {
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.90);
-        const result = await reader.decodeFromImageUrl(dataUrl);
-        if (result && result.getText()) return result.getText();
+        const result = await reader.decodeFromCanvas(canvas);
+        if (result) return result.getText();
       } catch (e) {
-        // Next attempt
+        // Continue to next attempt
       }
     }
     return null;
   }
 
-  // Quagga2 single image scan logic
-  async function scanWithQuagga(source: File | string): Promise<string | null> {
+  // Quagga2 Wrapper for Phase 4
+  async function scanWithQuagga(imageUrl: string): Promise<string | null> {
     return new Promise((resolve) => {
-      const runQuagga = (src: string) => {
-        Quagga.decodeSingle({
-          src: src,
-          numOfWorkers: 0,
-          locate: true,
-          decoder: {
-            readers: ["ean_reader", "ean_8_reader", "upc_reader", "upc_e_reader", "code_128_reader", "code_39_reader"]
-          },
-          inputStream: { size: 1200 } // Higher resolution for better detection
-        }, (result) => {
-          if (result && result.codeResult && result.codeResult.code) {
-            resolve(result.codeResult.code);
-          } else {
-            resolve(null);
-          }
-        });
-      };
-
-      if (source instanceof File) {
-        const reader = new FileReader();
-        reader.onload = (e) => runQuagga(e.target?.result as string);
-        reader.readAsDataURL(source);
-      } else {
-        runQuagga(source);
-      }
+      Quagga.decodeSingle({
+        src: imageUrl,
+        numOfWorkers: 0, // Main thread only for simplicity
+        inputStream: {
+          size: 800 // Standard size
+        },
+        decoder: {
+          readers: ["ean_reader", "ean_8_reader"] // Focus on JAN/EAN
+        },
+      }, (result) => {
+        if (result && result.codeResult && result.codeResult.code) {
+          resolve(result.codeResult.code);
+        } else {
+          resolve(null);
+        }
+      });
     });
   }
 
-  // Tesseract.js OCR to read numbers directly from barcode image
-  async function scanWithTesseract(file: File): Promise<string | null> {
-    try {
-      const { data: { text } } = await Tesseract.recognize(
-        file,
-        'eng',
-        {
-          logger: info => console.log(info) // Log progress
-        }
-      );
-
-      console.log('OCR Raw Text:', text);
-
-      // Remove all spaces and non-digit characters, then look for barcode patterns
-      const digitsOnly = text.replace(/[^0-9]/g, '');
-      console.log('OCR Digits Only:', digitsOnly);
-
-      // Check for 13-digit (EAN-13) - most common
-      if (digitsOnly.length >= 13) {
-        // Try to find a valid 13-digit sequence
-        const ean13Match = digitsOnly.match(/\d{13}/);
-        if (ean13Match) {
-          return ean13Match[0];
-        }
-      }
-
-      // Check for 12-digit (UPC-A)
-      if (digitsOnly.length >= 12) {
-        const upcMatch = digitsOnly.match(/\d{12}/);
-        if (upcMatch) {
-          return upcMatch[0];
-        }
-      }
-
-      // Check for 8-digit (EAN-8)
-      if (digitsOnly.length >= 8) {
-        const ean8Match = digitsOnly.match(/\d{8}/);
-        if (ean8Match) {
-          return ean8Match[0];
-        }
-      }
-
-      return null;
-    } catch (error) {
-      console.error('Tesseract error:', error);
-      return null;
-    }
-  }
-
   return (
-    <Card className="w-full max-w-md mx-auto">
-      <CardHeader>
-        <CardTitle className="text-center">バーコード読み取り</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-
-        {/* エラー表示 */}
-        {errorMsg && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription className="text-xs whitespace-pre-wrap">
-              {errorMsg}
-              {/* DEBUG INFO */}
-              <div className="mt-2 p-2 bg-black/10 rounded text-[10px] font-mono whitespace-pre-wrap">
-                <div className="font-bold mb-1">解析ログ (タップでコピー):</div>
-                {debugLog.join("\n")}
-              </div>
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {/* 画像からスキャン */}
-        <div className="relative">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleImageScan}
-            disabled={isScanning}
-            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
-            aria-label="画像からスキャン"
-          />
-          <Button
-            variant="default"
-            size="lg"
-            className="w-full gap-2 py-8 text-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-lg"
-            disabled={isScanning}
-          >
-            {isScanning ? (
-              <>
-                <Loader2 className="w-6 h-6 animate-spin" />
-                高度解析中...
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-6 h-6" />
-                写真からスキャン
-              </>
-            )}
-          </Button>
-          <p className="text-xs text-muted-foreground text-center mt-2">
-            もっとも強力な解析エンジンを使用しています
-          </p>
-        </div>
-
-        <div className="relative py-4">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-background px-2 text-muted-foreground">
-              または
-            </span>
-          </div>
-        </div>
-
-        {/* 手動入力フォーム */}
-        <form onSubmit={handleManualSubmit} className="space-y-3">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-            <Keyboard className="w-4 h-4" />
-            <span>バーコード番号を手動入力</span>
-          </div>
-          <div className="flex gap-2">
-            <Input
-              type="text"
-              placeholder="13桁の数字を入力"
-              value={manualCode}
-              onChange={(e) => setManualCode(e.target.value)}
-              pattern="[0-9]*"
-              inputMode="numeric"
-              className="font-mono text-lg"
+    <div className="space-y-6">
+      <Card className="border-primary/20 shadow-lg">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-xl">
+            <Image className="w-6 h-6 text-primary" />
+            画像からスキャン (推奨)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="bg-secondary/20 p-4 rounded-lg border border-dashed border-primary/30 text-center">
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={handleImageScan}
+              className="hidden"
+              id="camera-input"
+              ref={fileInputRef}
+              disabled={isScanning}
             />
-            <Button type="submit" disabled={!manualCode} className="px-6">
-              生成
-            </Button>
+            <label
+              htmlFor="camera-input"
+              className={`
+                flex flex-col items-center justify-center gap-2 cursor-pointer py-8
+                ${isScanning ? 'opacity-50 cursor-not-allowed' : 'hover:bg-primary/5 transition-colors'}
+              `}
+            >
+              {isScanning ? (
+                <>
+                  <Loader2 className="w-12 h-12 text-primary animate-spin" />
+                  <span className="font-bold text-lg animate-pulse">AI解析中...</span>
+                  <span className="text-xs text-muted-foreground">Gemini AIが画像を読み取っています</span>
+                </>
+              ) : (
+                <>
+                  <div className="relative">
+                    <Image className="w-12 h-12 text-primary mb-2" />
+                    <Sparkles className="w-5 h-5 text-yellow-500 absolute -top-1 -right-1 animate-pulse" />
+                  </div>
+                  <span className="font-bold text-lg text-primary">カメラを起動 / 画像を選択</span>
+                  <span className="text-xs text-muted-foreground">
+                    バーコードの写真を撮るだけでOK<br/>
+                    (AIが数字も読み取ります)
+                  </span>
+                </>
+              )}
+            </label>
           </div>
-        </form>
 
-      </CardContent>
-    </Card>
+          {errorMsg && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="whitespace-pre-wrap text-xs">
+                {errorMsg}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {debugLog.length > 0 && (
+            <div className="text-[10px] text-muted-foreground bg-black/5 p-2 rounded max-h-20 overflow-y-auto font-mono">
+              {debugLog.map((log, i) => <div key={i}>{log}</div>)}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center">
+          <span className="w-full border-t" />
+        </div>
+        <div className="relative flex justify-center text-xs uppercase">
+          <span className="bg-background px-2 text-muted-foreground">または</span>
+        </div>
+      </div>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Keyboard className="w-4 h-4" />
+            バーコード番号を直接入力
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleManualSubmit} className="flex gap-2">
+            <Input
+              type="tel"
+              placeholder="例: 4901234567890"
+              value={manualCode}
+              onChange={(e) => setManualCode(e.target.value.replace(/[^0-9]/g, ''))}
+              className="font-mono text-lg tracking-widest"
+              maxLength={13}
+            />
+            <Button type="submit" disabled={manualCode.length < 8}>
+              決定
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

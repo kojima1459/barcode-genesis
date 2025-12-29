@@ -118,7 +118,7 @@ export default function Scan() {
                                 商品のバーコードをカメラに映してください
                             </p>
                         </div>
-                        <BarcodeScanner onScan={handleScan} />
+                        <BarcodeScanner onScanSuccess={handleScan} />
                     </div>
                 )}
 

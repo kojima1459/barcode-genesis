@@ -2019,3 +2019,7 @@ export const checkMatchStatus = functions.https.onCall(async (data: { queueId: s
     throw new functions.https.HttpsError('internal', 'Failed to check match status');
   }
 });
+
+// Gemini APIを使用したバーコードスキャン機能
+import { scanBarcodeFromImage } from "./geminiScanner";
+export { scanBarcodeFromImage };
