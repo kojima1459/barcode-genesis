@@ -137,18 +137,18 @@ function App() {
             <GlobalSoundManager />
             <ThemeProvider defaultTheme="dark" switchable>
               <HapticProvider>
-                <TutorialProvider>
-                  <div className="min-h-screen bg-background text-foreground font-sans selection:bg-neon-cyan/30">
-                    <OfflineBanner />
-                    <TutorialOverlay />
-                    <TooltipProvider delayDuration={0}>
-                      <AuthProvider>
+                <TooltipProvider delayDuration={0}>
+                  <AuthProvider>
+                    <TutorialProvider>
+                      <div className="min-h-screen bg-background text-foreground font-sans selection:bg-neon-cyan/30">
+                        <OfflineBanner />
+                        <TutorialOverlay />
                         <Toaster />
                         <Router />
-                      </AuthProvider>
-                    </TooltipProvider>
-                  </div>
-                </TutorialProvider>
+                      </div>
+                    </TutorialProvider>
+                  </AuthProvider>
+                </TooltipProvider>
               </HapticProvider>
             </ThemeProvider>
           </SoundProvider>
