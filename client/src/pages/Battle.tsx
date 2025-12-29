@@ -21,12 +21,14 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion, AnimatePresence } from "framer-motion";
 import { Zap, Shield, Heart } from "lucide-react";
 import SEO from "@/components/SEO";
+import { useRobotFx } from "@/hooks/useRobotFx";
 
 
 
 export default function Battle() {
   const { t } = useLanguage();
   const { playBGM, playSE } = useSound();
+  const { fx, trigger } = useRobotFx();
   const { user } = useAuth();
   const [robots, setRobots] = useState<RobotData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -347,6 +349,7 @@ export default function Battle() {
   const startBattle = async () => {
     if (!selectedRobotId || !enemyRobotId) return;
 
+    trigger("battle");
     playBGM('bgm_battle');
     setIsBattling(true);
     setBattleResult(null);
@@ -752,7 +755,7 @@ export default function Battle() {
               >
                 <div className="absolute -top-3 left-4 bg-black px-3 py-1 text-neon-cyan text-xs font-orbitron border border-neon-cyan tracking-widest shadow-[0_0_10px_rgba(0,243,255,0.5)]">プレイヤー</div>
                 <div className="flex justify-center my-4 drop-shadow-[0_0_15px_rgba(0,243,255,0.4)]">
-                  <RobotSVG parts={myRobot.parts} colors={myRobot.colors} size={160} />
+                  <RobotSVG parts={myRobot.parts} colors={myRobot.colors} size={160} fx={fx} />
                 </div>
                 <div className="mt-2 text-center font-bold text-lg text-white text-shadow-sm tracking-wide">{myRobot.name}</div>
 

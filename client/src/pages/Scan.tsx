@@ -14,6 +14,7 @@ import { RobotData } from "@/types/shared";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import GenerationAnimation from "@/components/GenerationAnimation";
 import ShareCardModal from "@/components/ShareCardModal";
+import { useRobotFx } from "@/hooks/useRobotFx";
 
 export default function Scan() {
     const { t } = useLanguage();
@@ -26,7 +27,9 @@ export default function Scan() {
     const [limitMessage, setLimitMessage] = useState("");
 
     const { triggerHaptic } = useHaptic();
+
     const { completeStep } = useTutorial();
+    const { fx, trigger } = useRobotFx();
 
     const handleScan = async (barcode: string) => {
         triggerHaptic('medium');
@@ -50,6 +53,7 @@ export default function Scan() {
             if (data?.robot) {
                 setRobot(data.robot);
                 setMode('result');
+                trigger("scan");
                 // Success haptic handled in context or here? 
                 // GenerationAnimation handles 'heavy' reveal, so we might duplicate if we do success here.
                 // Let's rely on GenerationAnimation's final sound/haptic.
@@ -131,7 +135,7 @@ export default function Scan() {
                 {mode === 'result' && robot && (
                     <div className="flex flex-col items-center gap-8 py-8 w-full" id="tutorial-scan-result">
                         <div className="glass-panel p-8 rounded-2xl border-neon-cyan shadow-[0_0_20px_rgba(0,243,255,0.3)]">
-                            <RobotSVG parts={robot.parts} colors={robot.colors} size={200} animate={true} />
+                            <RobotSVG parts={robot.parts} colors={robot.colors} size={200} animate={true} fx={fx} />
                         </div>
 
                         <div className="text-center space-y-4">

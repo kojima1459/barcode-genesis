@@ -22,6 +22,11 @@ interface RobotColors {
 
 export type RobotVariant = "idle" | "scan" | "evolve" | "battle";
 
+interface RobotFx {
+  variant: RobotVariant;
+  nonce: number;
+}
+
 interface RobotSVGProps {
   parts: RobotParts;
   colors: RobotColors;
@@ -31,6 +36,7 @@ interface RobotSVGProps {
   decals?: string[];
   showGlow?: boolean;
   variant?: RobotVariant;
+  fx?: RobotFx;
 }
 
 // Deterministic random generator based on parts
@@ -47,8 +53,13 @@ export default function RobotSVG({
   animate = true,
   decals = [],
   showGlow = false,
-  variant = "idle"
+  variant = "idle",
+  fx
 }: RobotSVGProps) {
+
+  // Use fx.variant/nonce if available
+  const activeVariant = fx ? fx.variant : variant;
+  const activeNonce = fx ? fx.nonce : 0;
 
   // Generate a deterministic seed from parts for style consistencies
   const seed = useMemo(() => {
@@ -174,13 +185,13 @@ export default function RobotSVG({
       fill={activeGlow}
       stroke="none"
       filter={`url(#${instanceId}-glow)`}
-      className={`glow-sensor variant-${variant}`}
+      className={`glow-sensor variant-${activeVariant}`}
     />
   );
 
   // B. Thruster (Backpack) - 2 nozzles
   const Thrusters = () => (
-    <g className={`glow-thruster variant-${variant}`}>
+    <g className={`glow-thruster variant-${activeVariant}`}>
       {/* Left Nozzle */}
       <g transform="translate(45, 80)">
         <path d="M0 0 L15 0 L10 25 L5 25 Z" fill={`url(#${instanceId}-thruster)`} stroke="none" style={{ transformOrigin: "top center" }} className="thruster-anim" />
@@ -199,7 +210,7 @@ export default function RobotSVG({
       fill={activeGlow}
       stroke="none"
       transform={`rotate(${rotate} ${x + width / 2} ${y})`}
-      className={`glow-slit variant-${variant}`}
+      className={`glow-slit variant-${activeVariant}`}
     />
   );
 
@@ -228,7 +239,7 @@ export default function RobotSVG({
         <MechPart d="M85 28 L115 28 L118 58 L82 58 Z" fillColor={colors.secondary}>
           {/* Visor Area */}
         </MechPart>
-        <rect x="85" y="42" width="30" height="4" fill={activeGlow} fillOpacity="0.5" filter={`url(#${instanceId}-glow)`} className={`glow-sensor variant-${variant}`} />
+        <rect x="85" y="42" width="30" height="4" fill={activeGlow} fillOpacity="0.5" filter={`url(#${instanceId}-glow)`} className={`glow-sensor variant-${activeVariant}`} />
       </g>,
       // H4: Support + Eye
       <g key="h4">
@@ -265,7 +276,7 @@ export default function RobotSVG({
       <g key="b3">
         <MechPart d="M70 90 L130 90 L120 120 L80 120 Z" fillColor={colors.primary} stroke="none" />
         <circle cx="100" cy="90" r="16" fill="#111" />
-        <circle cx="100" cy="90" r="8" fill={activeGlow} className={`glow-sensor variant-${variant}`} filter={`url(#${instanceId}-glow)`} />
+        <circle cx="100" cy="90" r="8" fill={activeGlow} className={`glow-sensor variant-${activeVariant}`} filter={`url(#${instanceId}-glow)`} />
         <MechPart d="M70 65 L130 65 L130 75 L70 75 Z" fillColor={colors.primary} />
       </g>
     ];
@@ -329,7 +340,7 @@ export default function RobotSVG({
       return ( // Hover
         <MechPart d="M0 0 L20 0 L15 70 L5 70 Z" fillColor={colors.primary}>
           {/* Hover Glow */}
-          <ellipse cx="10" cy="80" rx="15" ry="4" fill={activeGlow} stroke="none" filter={`url(#${instanceId}-glow)`} className={`variant-${variant}`} />
+          <ellipse cx="10" cy="80" rx="15" ry="4" fill={activeGlow} stroke="none" filter={`url(#${instanceId}-glow)`} className={`variant-${activeVariant}`} />
         </MechPart>
       );
     })();
@@ -378,7 +389,7 @@ export default function RobotSVG({
       return (
         <g transform="translate(175, 80) rotate(-15)">
           <MechPart d="M0 0 L10 0 L10 20 L0 20 Z" fillColor="#333" />
-          <path d="M2 20 L8 20 L5 80 Z" fill={activeGlow} stroke={colors.accent} strokeWidth="1" filter={`url(#${instanceId}-glow)`} className={`variant-${variant}`} />
+          <path d="M2 20 L8 20 L5 80 Z" fill={activeGlow} stroke={colors.accent} strokeWidth="1" filter={`url(#${instanceId}-glow)`} className={`variant-${activeVariant}`} />
         </g>
       );
     }
@@ -387,6 +398,7 @@ export default function RobotSVG({
 
   return (
     <svg
+      key={`${activeVariant}-${activeNonce}`}
       width={size}
       height={size}
       viewBox="0 0 200 200"
@@ -409,11 +421,16 @@ export default function RobotSVG({
             50% { transform: scaleY(1.05); opacity: 0.9; }
           }
           
-          /* Active Variants (Pulse) */
+          /* Active Variants (Pulse/Boost) */
           @keyframes high-alert-pulse-${instanceId} {
              0% { opacity: 0.4; }
              50% { opacity: 1; }
              100% { opacity: 0.4; }
+          }
+          @keyframes thruster-boost-${instanceId} {
+             0% { transform: scaleY(1.0); opacity: 0.8; }
+             50% { transform: scaleY(1.3); opacity: 1; }
+             100% { transform: scaleY(1.0); opacity: 0.8; }
           }
 
           /* Classes */
@@ -430,14 +447,14 @@ export default function RobotSVG({
           .glow-slit { opacity: 0.22; transition: opacity 0.3s; }
           
           /* Variant Overrides */
-          .variant-scan .glow-sensor { opacity: 1; animation: high-alert-pulse-${instanceId} 0.5s infinite; }
+          .variant-scan .glow-sensor { opacity: 1; animation: high-alert-pulse-${instanceId} 0.2s infinite; }
           .variant-scan .glow-slit { opacity: 0.6; }
           
           .variant-battle .glow-sensor { opacity: 0.9; }
           .variant-battle .glow-thruster { opacity: 1; filter: brightness(1.3); }
-          .variant-battle .thruster-anim { animation-duration: 0.8s; }
+          .variant-battle .thruster-anim { animation: ${animate ? `thruster-boost-${instanceId} 0.6s ease-out` : 'none'}; }
           
-          .variant-evolve .glow-sensor { opacity: 0; animation: high-alert-pulse-${instanceId} 2s infinite; }
+          .variant-evolve .glow-sensor { opacity: 0; animation: high-alert-pulse-${instanceId} 0.3s infinite; }
           .variant-evolve .glow-thruster { opacity: 0.2; }
       `}</style>
 

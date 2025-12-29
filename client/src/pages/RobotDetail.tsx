@@ -18,6 +18,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import SEO from "@/components/SEO";
 import ShareCardModal from "@/components/ShareCardModal";
 import EvolutionModal from "@/components/EvolutionModal";
+import { useRobotFx } from "@/hooks/useRobotFx";
 
 
 type InventoryMap = Record<string, number>;
@@ -54,6 +55,7 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
   const { user } = useAuth();
   const { t } = useLanguage();
   const { playSE } = useSound();
+  const { fx, trigger } = useRobotFx();
   const [baseRobot, setBaseRobot] = useState<RobotData | null>(null);
   const [robots, setRobots] = useState<RobotData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -416,7 +418,7 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
           </div>
 
           <div className="flex justify-center mb-6 drop-shadow-[0_0_30px_rgba(0,243,255,0.3)]">
-            <RobotSVG parts={baseRobot.parts} colors={baseRobot.colors} size={240} />
+            <RobotSVG parts={baseRobot.parts} colors={baseRobot.colors} size={240} fx={fx} />
           </div>
 
           <h1 className="text-3xl font-black italic tracking-wider text-white mb-1">{baseRobot.name}</h1>
@@ -634,7 +636,8 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
             allRobots={robots}
             onSuccess={() => {
               // Reload data
-              window.location.reload();
+              trigger("evolve");
+              setTimeout(() => window.location.reload(), 2000);
             }}
           />
         </section>
