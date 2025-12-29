@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.checkMatchStatus = exports.leaveMatchmaking = exports.joinMatchmaking = exports.stripeWebhook = exports.createPortalSession = exports.createSubscriptionSession = exports.createCheckoutSession = exports.applyCosmeticItem = exports.useUpgradeItem = exports.checkAchievements = exports.updateRanking = exports.followUser = exports.claimMissionReward = exports.getDailyMissions = exports.claimLoginBonus = exports.equipItem = exports.purchaseItem = exports.inheritSkill = exports.synthesizeRobots = exports.matchBattle = exports.scanBarcodeWithVision = exports.batchDisassemble = exports.generateRobot = void 0;
+exports.scanBarcodeFromImage = exports.checkMatchStatus = exports.leaveMatchmaking = exports.joinMatchmaking = exports.stripeWebhook = exports.createPortalSession = exports.createSubscriptionSession = exports.createCheckoutSession = exports.applyCosmeticItem = exports.useUpgradeItem = exports.checkAchievements = exports.updateRanking = exports.followUser = exports.claimMissionReward = exports.getDailyMissions = exports.claimLoginBonus = exports.equipItem = exports.purchaseItem = exports.inheritSkill = exports.synthesizeRobots = exports.matchBattle = exports.batchDisassemble = exports.generateRobot = exports.ping = exports.debugPing = exports.testFunctionHealth = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
@@ -10,6 +10,51 @@ const robotGenerator_1 = require("./robotGenerator");
 const battleSystem_1 = require("./battleSystem");
 const skills_1 = require("./skills");
 const seededRandom_1 = require("./seededRandom");
+// Node.js 20 has native fetch - no need for node-fetch
+// Use a version constant to help track deployments and identify cache issues
+const VERSION = "2.1.0-fixed-cors-v3";
+// Simple test function to verify Cloud Functions are working
+exports.testFunctionHealth = functions
+    .runWith({ memory: '128MB', timeoutSeconds: 10 })
+    .https.onCall(async (_data, context) => {
+    console.log(`[${VERSION}] testFunctionHealth called`, { hasAuth: !!context.auth });
+    return {
+        status: 'ok',
+        version: VERSION,
+        timestamp: new Date().toISOString(),
+        hasAuth: !!context.auth,
+        nodeVersion: process.version,
+    };
+});
+// New debug function to test basic connectivity without complex logic
+exports.debugPing = functions
+    .runWith({ memory: '128MB', timeoutSeconds: 5 })
+    .https.onCall(async (data, context) => {
+    console.log(`[${VERSION}] debugPing (Callable) called`, { data });
+    return {
+        message: "pong",
+        version: VERSION,
+        timestamp: new Date().toISOString(),
+        echo: data
+    };
+});
+// HTTP version of debugPing for easy browser testing (preflight check)
+exports.ping = functions
+    .runWith({ memory: '128MB', timeoutSeconds: 5 })
+    .https.onRequest((req, res) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    if (req.method === 'OPTIONS') {
+        res.status(204).send('');
+        return;
+    }
+    res.status(200).send({
+        status: 'ok',
+        message: 'pong',
+        version: VERSION,
+        timestamp: new Date().toISOString()
+    });
+});
 // Force rebuild: 2025-12-29T03:18:00
 admin.initializeApp();
 const ITEM_CATALOG = {
@@ -91,7 +136,8 @@ exports.generateRobot = functions.https.onCall(async (data, context) => {
         });
         return {
             robotId: robotRef.id,
-            robot: Object.assign(Object.assign({}, robotData), { id: robotRef.id })
+            robot: Object.assign(Object.assign({}, robotData), { id: robotRef.id }),
+            version: VERSION
         };
     }
     catch (error) {
@@ -164,59 +210,12 @@ exports.batchDisassemble = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError('internal', 'Failed to disassemble robots');
     }
 });
-// Google Cloud Vision API for high-precision barcode scanning
-const vision_1 = require("@google-cloud/vision");
-exports.scanBarcodeWithVision = functions.https.onCall(async (data, context) => {
-    if (!context.auth) {
-        throw new functions.https.HttpsError('unauthenticated', 'Auth required');
-    }
-    const { imageBase64 } = data;
-    if (!imageBase64 || typeof imageBase64 !== 'string') {
-        throw new functions.https.HttpsError('invalid-argument', 'imageBase64 is required');
-    }
-    try {
-        const client = new vision_1.default.ImageAnnotatorClient();
-        // Remove data URL prefix if present
-        const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
-        // Use TEXT_DETECTION to find barcode numbers in the image
-        const [result] = await client.annotateImage({
-            image: { content: base64Data },
-            features: [{ type: 'TEXT_DETECTION' }],
-        });
-        let barcode = null;
-        // Try to detect barcode from text (EAN-13 pattern)
-        if (result.textAnnotations && result.textAnnotations.length > 0) {
-            const fullText = result.textAnnotations[0].description || '';
-            // Find 13-digit number (EAN-13) - most common barcode format
-            const ean13Match = fullText.match(/\b\d{13}\b/);
-            if (ean13Match) {
-                barcode = ean13Match[0];
-            }
-            // Also try 12-digit (UPC-A)
-            if (!barcode) {
-                const upcMatch = fullText.match(/\b\d{12}\b/);
-                if (upcMatch) {
-                    barcode = upcMatch[0];
-                }
-            }
-            // Try 8-digit (EAN-8)
-            if (!barcode) {
-                const ean8Match = fullText.match(/\b\d{8}\b/);
-                if (ean8Match) {
-                    barcode = ean8Match[0];
-                }
-            }
-        }
-        console.log('Vision API scan result:', { barcodeFound: !!barcode, barcode });
-        return { barcode, success: !!barcode };
-    }
-    catch (error) {
-        console.error('Vision API error:', error);
-        // Throw detailed error for debugging (using 'aborted' to avoid 'internal' masking)
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        throw new functions.https.HttpsError('aborted', `Vision Scan Failed: ${message}`);
-    }
-});
+// ============================================
+// Vision API REST Implementation (No SDK)
+// ============================================
+// SDK was causing load-time crashes, so we use REST API directly.
+// Vision API helpers removed
+// Vision API implementation removed in favor of Gemini API
 // バトル開始API
 const MATERIAL_MAX_COUNT = 5;
 const MATERIAL_LEVEL_XP = 25;
@@ -813,6 +812,7 @@ exports.claimMissionReward = functions.https.onCall(async (data, context) => {
     });
     return result;
 });
+// Stripe functions are exported later
 // フォローAPI
 exports.followUser = functions.https.onCall(async (data, context) => {
     if (!context.auth) {
@@ -1479,4 +1479,7 @@ exports.checkMatchStatus = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError('internal', 'Failed to check match status');
     }
 });
+// Gemini API Barcode Scanner
+var geminiScanner_1 = require("./geminiScanner");
+Object.defineProperty(exports, "scanBarcodeFromImage", { enumerable: true, get: function () { return geminiScanner_1.scanBarcodeFromImage; } });
 //# sourceMappingURL=index.js.map

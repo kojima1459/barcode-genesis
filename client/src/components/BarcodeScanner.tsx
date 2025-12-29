@@ -47,7 +47,7 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
       // PHASE 1: Try Gemini API (AI OCR)
       try {
         const resizedBase64 = await resizeAndCompressForCloud(imageFile);
-        addLog(`Sending to Gemini API (size: ${Math.round(resizedBase64.length / 1024)}KB)`);
+        addLog(`Sending to AI Engine (Gemini 2.0) (size: ${Math.round(resizedBase64.length / 1024)}KB)`);
 
         const scanBarcodeFromImage = httpsCallable(functions, 'scanBarcodeFromImage');
         const result = await scanBarcodeFromImage({ imageBase64: resizedBase64 });
@@ -62,11 +62,11 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
           onScanSuccess(code);
           return;
         } else {
-          addLog(`Gemini: ${data.message || 'Not found'}`);
+          addLog(`AI Analysis: ${data.message || 'Barcode not detected'}`);
         }
       } catch (geminiErr: any) {
         console.warn("Gemini API failed:", geminiErr);
-        addLog(`Gemini Error: ${geminiErr.message}`);
+        addLog(`AI Engine Error: ${geminiErr.message}`);
       }
 
       // PHASE 2: Native BarcodeDetector API (OS Level)

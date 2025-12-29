@@ -131,7 +131,7 @@ export default function Scan() {
                 {mode === 'result' && robot && (
                     <div className="flex flex-col items-center gap-8 py-8 w-full" id="tutorial-scan-result">
                         <div className="glass-panel p-8 rounded-2xl border-neon-cyan shadow-[0_0_20px_rgba(0,243,255,0.3)]">
-                            <RobotSVG parts={robot.parts} colors={robot.colors} size={200} animate />
+                            <RobotSVG parts={robot.parts} colors={robot.colors} size={200} animate={true} />
                         </div>
 
                         <div className="text-center space-y-4">

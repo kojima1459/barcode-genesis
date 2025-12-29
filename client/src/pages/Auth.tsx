@@ -31,6 +31,8 @@ export default function Auth() {
         message = "Login cancelled by user.";
       } else if (error.code === 'auth/popup-blocked') {
         message = "Popup blocked. Please allow popups for this site.";
+      } else if (error.code === 'auth/unauthorized-domain') {
+        message = `Domain not authorized: ${window.location.hostname}. Please add this to Firebase Console > Auth > Settings > Authorized domains.`;
       } else if (error.message) {
         message = error.message;
       }

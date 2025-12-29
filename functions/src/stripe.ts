@@ -4,7 +4,7 @@ import Stripe from "stripe";
 import { PRODUCTS } from "../../shared/products";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-  apiVersion: "2024-12-18.acacia",
+  apiVersion: "2025-12-15.clover" as any,
 });
 
 export const createCheckoutSession = functions.https.onCall(async (data, context) => {
@@ -91,7 +91,7 @@ export const stripeWebhook = functions.https.onRequest(async (req, res) => {
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
     const userId = session.metadata?.userId;
-    const productId = session.metadata?.productId;
+    // const productId = session.metadata?.productId;
     const productType = session.metadata?.productType;
     const amount = Number(session.metadata?.amount);
 
