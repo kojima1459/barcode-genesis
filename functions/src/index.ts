@@ -8,6 +8,56 @@ import { simulateBattle } from "./battleSystem";
 import { GenerateRobotRequest, GenerateRobotResponse } from "./types";
 import { getRandomSkill, normalizeSkillIds } from "./skills";
 import { SeededRandom } from "./seededRandom";
+// Node.js 20 has native fetch - no need for node-fetch
+
+
+// Use a version constant to help track deployments and identify cache issues
+const VERSION = "2.1.0-fixed-cors-v3";
+
+// Simple test function to verify Cloud Functions are working
+export const testFunctionHealth = functions
+  .runWith({ memory: '128MB', timeoutSeconds: 10 })
+  .https.onCall(async (_data, context) => {
+    console.log(`[${VERSION}] testFunctionHealth called`, { hasAuth: !!context.auth });
+    return {
+      status: 'ok',
+      version: VERSION,
+      timestamp: new Date().toISOString(),
+      hasAuth: !!context.auth,
+      nodeVersion: process.version,
+    };
+  });
+
+// New debug function to test basic connectivity without complex logic
+export const debugPing = functions
+  .runWith({ memory: '128MB', timeoutSeconds: 5 })
+  .https.onCall(async (data, context) => {
+    console.log(`[${VERSION}] debugPing (Callable) called`, { data });
+    return {
+      message: "pong",
+      version: VERSION,
+      timestamp: new Date().toISOString(),
+      echo: data
+    };
+  });
+
+// HTTP version of debugPing for easy browser testing (preflight check)
+export const ping = functions
+  .runWith({ memory: '128MB', timeoutSeconds: 5 })
+  .https.onRequest((req, res) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    if (req.method === 'OPTIONS') {
+      res.status(204).send('');
+      return;
+    }
+    res.status(200).send({
+      status: 'ok',
+      message: 'pong',
+      version: VERSION,
+      timestamp: new Date().toISOString()
+    });
+  });
 
 // Force rebuild: 2025-12-29T03:18:00
 admin.initializeApp();
@@ -133,7 +183,8 @@ export const generateRobot = functions.https.onCall(async (data: GenerateRobotRe
       robot: {
         ...robotData,
         id: robotRef.id
-      }
+      },
+      version: VERSION
     };
 
   } catch (error) {
@@ -228,69 +279,222 @@ export const batchDisassemble = functions.https.onCall(async (data: { robotIds: 
   }
 });
 
-// Google Cloud Vision API for high-precision barcode scanning
-import vision from '@google-cloud/vision';
+// ============================================
+// Vision API REST Implementation (No SDK)
+// ============================================
+// SDK was causing load-time crashes, so we use REST API directly.
 
-export const scanBarcodeWithVision = functions.https.onCall(async (data: { imageBase64: string }, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Auth required');
+// Helper: Extract barcode from Vision API response
+/**
+ * Validates EAN-13 check digit
+ */
+function isValidEan13(digits: string): boolean {
+  if (digits.length !== 13 || !/^\d+$/.test(digits)) return false;
+  let sum = 0;
+  for (let i = 0; i < 12; i++) {
+    sum += parseInt(digits[i]) * (i % 2 === 0 ? 1 : 3);
+  }
+  const checkDigit = (10 - (sum % 10)) % 10;
+  return checkDigit === parseInt(digits[12]);
+}
+
+/**
+ * Normalizes UPC-A (12 digits) to EAN-13 by prepending a 0
+ */
+function normalizeToEan13(digits: string): string | null {
+  if (digits.length === 13 && isValidEan13(digits)) return digits;
+  if (digits.length === 12) {
+    const padded = '0' + digits;
+    if (isValidEan13(padded)) return padded;
+  }
+  return null;
+}
+
+function extractBarcodeFromVisionResponse(response: any): string | null {
+  const candidates: string[] = [];
+
+  // 1. Try barcodeAnnotations (BARCODE_DETECTION)
+  if (response.barcodeAnnotations) {
+    for (const annotation of response.barcodeAnnotations) {
+      const raw = (annotation.rawValue || annotation.displayValue || '').replace(/[^0-9]/g, '');
+      if (raw) candidates.push(raw);
+    }
   }
 
-  const { imageBase64 } = data;
-  if (!imageBase64 || typeof imageBase64 !== 'string') {
-    throw new functions.https.HttpsError('invalid-argument', 'imageBase64 is required');
+  // 2. Try textAnnotations (TEXT_DETECTION)
+  if (response.textAnnotations) {
+    const fullText = response.textAnnotations[0]?.description || '';
+    // Look for all numeric sequences of 8, 12, or 13 digits
+    const matches = fullText.match(/\d{8,13}/g);
+    if (matches) {
+      candidates.push(...matches);
+    }
   }
 
-  try {
-    const client = new vision.ImageAnnotatorClient();
+  // Filter and validate candidates
+  for (const c of candidates) {
+    // Priority: EAN-13 (13 digits)
+    if (c.length === 13) {
+      if (isValidEan13(c)) return c;
+    }
+    // Priority: UPC-A (12 digits) -> EAN-13
+    if (c.length === 12) {
+      const ean = normalizeToEan13(c);
+      if (ean) return ean;
+    }
+    // Priority: EAN-8 (8 digits) - (simple length check as fallback)
+    if (c.length === 8) return c;
+  }
 
-    // Remove data URL prefix if present
-    const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+  return null;
+}
 
-    // Use TEXT_DETECTION to find barcode numbers in the image
-    const [result] = await client.annotateImage({
-      image: { content: base64Data },
-      features: [{ type: 'TEXT_DETECTION' }],
-    });
-
-    let barcode: string | null = null;
-
-    // Try to detect barcode from text (EAN-13 pattern)
-    if (result.textAnnotations && result.textAnnotations.length > 0) {
-      const fullText = result.textAnnotations[0].description || '';
-
-      // Find 13-digit number (EAN-13) - most common barcode format
-      const ean13Match = fullText.match(/\b\d{13}\b/);
-      if (ean13Match) {
-        barcode = ean13Match[0];
-      }
-
-      // Also try 12-digit (UPC-A)
-      if (!barcode) {
-        const upcMatch = fullText.match(/\b\d{12}\b/);
-        if (upcMatch) {
-          barcode = upcMatch[0];
-        }
-      }
-
-      // Try 8-digit (EAN-8)
-      if (!barcode) {
-        const ean8Match = fullText.match(/\b\d{8}\b/);
-        if (ean8Match) {
-          barcode = ean8Match[0];
-        }
-      }
+export const scanBarcodeWithVision = functions
+  .runWith({ memory: '256MB', timeoutSeconds: 60 })
+  .https.onCall(async (data: { imageBase64: string }, context) => {
+    // Auth check
+    if (!context.auth) {
+      throw new functions.https.HttpsError('unauthenticated', 'Auth required');
     }
 
-    console.log('Vision API scan result:', { barcodeFound: !!barcode, barcode });
-    return { barcode, success: !!barcode };
-  } catch (error: any) {
-    console.error('Vision API error:', error);
-    // Throw detailed error for debugging (using 'aborted' to avoid 'internal' masking)
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    throw new functions.https.HttpsError('aborted', `Vision Scan Failed: ${message}`);
-  }
-});
+    const { imageBase64 } = data;
+
+    // Input validation
+    if (!imageBase64 || typeof imageBase64 !== 'string') {
+      console.warn(`[${VERSION}] scanBarcodeWithVision: imageBase64 missing`);
+      throw new functions.https.HttpsError('invalid-argument', 'imageBase64 is required');
+    }
+
+    const imageSizeKB = Math.round(imageBase64.length / 1024);
+    console.log(`[${VERSION}] scanBarcodeWithVision started. Size: ${imageSizeKB}KB`);
+
+    if (imageSizeKB > 4000) {
+      console.error(`[${VERSION}] scanBarcodeWithVision: image too large (${imageSizeKB}KB)`);
+      throw new functions.https.HttpsError('invalid-argument', 'Image is too large. Please resize before sending.');
+    }
+    if (imageBase64.length < 100) {
+      throw new functions.https.HttpsError('invalid-argument', 'Image data too small');
+    }
+    if (imageBase64.length > 10 * 1024 * 1024) { // 10MB limit
+      throw new functions.https.HttpsError('invalid-argument', 'Image data too large (max 10MB)');
+    }
+
+    // Get API key from environment
+    const VISION_API_KEY = process.env.VISION_API_KEY || functions.config().vision?.api_key;
+    if (!VISION_API_KEY) {
+      console.error('VISION_API_KEY not configured');
+      throw new functions.https.HttpsError('failed-precondition', 'Vision API key not configured', {
+        hint: 'Set VISION_API_KEY in functions environment',
+      });
+    }
+
+    console.log('scanBarcodeWithVision called, image size:', imageBase64.length);
+
+    try {
+      // Remove data URL prefix if present
+      const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+      console.log('Base64 data length after cleanup:', base64Data.length);
+
+      // Call Vision API via REST
+      const visionUrl = `https://vision.googleapis.com/v1/images:annotate?key=${VISION_API_KEY}`;
+
+      const requestBody = {
+        requests: [{
+          image: { content: base64Data },
+          features: [
+            { type: 'BARCODE_DETECTION' },
+            { type: 'TEXT_DETECTION' },
+          ],
+        }],
+      };
+
+      console.log('Calling Vision API REST endpoint...');
+      const response = await fetch(visionUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+      });
+
+      const responseStatus = response.status;
+      const responseBody = await response.json();
+
+      console.log('Vision API response status:', responseStatus);
+
+      // Handle HTTP errors
+      if (!response.ok) {
+        const errorMessage = responseBody.error?.message || 'Unknown Vision API error';
+        const errorCode = responseBody.error?.code || responseStatus;
+
+        console.error('Vision API error:', { status: responseStatus, error: responseBody.error });
+
+        if (responseStatus === 403) {
+          throw new functions.https.HttpsError('permission-denied', `Vision API: ${errorMessage}`, {
+            status: responseStatus,
+            detail: responseBody.error,
+          });
+        }
+        if (responseStatus === 429) {
+          throw new functions.https.HttpsError('resource-exhausted', 'Vision API rate limit exceeded', {
+            status: responseStatus,
+          });
+        }
+        if (responseStatus === 400) {
+          throw new functions.https.HttpsError('invalid-argument', `Vision API: ${errorMessage}`, {
+            status: responseStatus,
+            detail: responseBody.error,
+          });
+        }
+
+        throw new functions.https.HttpsError('internal', `Vision API error [${errorCode}]: ${errorMessage}`, {
+          status: responseStatus,
+          detail: responseBody.error,
+        });
+      }
+
+      // Extract barcode from successful response
+      const annotationResponse = responseBody.responses?.[0];
+      if (!annotationResponse) {
+        console.log('No annotation response from Vision API');
+        return { barcode: null, success: false, raw: responseBody };
+      }
+
+      // Check for API-level errors in the response
+      if (annotationResponse.error) {
+        const apiError = annotationResponse.error;
+        console.error('Vision annotation error:', apiError);
+        throw new functions.https.HttpsError('internal', `Vision: ${apiError.message}`, {
+          code: apiError.code,
+          detail: apiError,
+        });
+      }
+
+      const barcode = extractBarcodeFromVisionResponse(annotationResponse);
+
+      if (!barcode) {
+        console.info(`[${VERSION}] scanBarcodeWithVision: No barcode found in image`);
+        throw new functions.https.HttpsError('not-found', 'barcode_not_found');
+      }
+
+      console.info(`[${VERSION}] scanBarcodeWithVision: Success. Found: ${barcode}`);
+
+      return {
+        success: true,
+        barcode,
+        version: VERSION
+      };
+
+    } catch (error: any) {
+      // Re-throw HttpsError as-is
+      if (error instanceof functions.https.HttpsError) {
+        throw error;
+      }
+
+      console.error('Unexpected error:', error);
+      throw new functions.https.HttpsError('internal', `Unexpected error: ${error.message}`, {
+        stack: error.stack?.substring(0, 500),
+      });
+    }
+  });
 
 // バトル開始API
 const MATERIAL_MAX_COUNT = 5;

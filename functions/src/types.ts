@@ -84,6 +84,7 @@ export interface GenerateRobotRequest {
 export interface GenerateRobotResponse {
   robotId: string;
   robot: RobotData;
+  version?: string;
 }
 
 export interface BattleLog {

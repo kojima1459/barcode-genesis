@@ -25,6 +25,48 @@
     ],
     "rewrites": [
       {
+        "source": "/api/scanBarcodeWithVision",
+        "function": {
+          "functionId": "scanBarcodeWithVision",
+          "region": "us-central1"
+        }
+      },
+      {
+        "source": "/api/generateRobot",
+        "function": {
+          "functionId": "generateRobot",
+          "region": "us-central1"
+        }
+      },
+      {
+        "source": "/api/getDailyMissions",
+        "function": {
+          "functionId": "getDailyMissions",
+          "region": "us-central1"
+        }
+      },
+      {
+        "source": "/api/claimLoginBonus",
+        "function": {
+          "functionId": "claimLoginBonus",
+          "region": "us-central1"
+        }
+      },
+      {
+        "source": "/api/claimMissionReward",
+        "function": {
+          "functionId": "claimMissionReward",
+          "region": "us-central1"
+        }
+      },
+      {
+        "source": "/api/followUser",
+        "function": {
+          "functionId": "followUser",
+          "region": "us-central1"
+        }
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }
