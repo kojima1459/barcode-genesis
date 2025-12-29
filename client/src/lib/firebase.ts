@@ -23,6 +23,14 @@ export const functions = getFunctions(app, 'us-central1');
 export const storage = getStorage(app);
 export const googleProvider = new GoogleAuthProvider();
 
+// Connect to emulators BEFORE enabling persistence or other operations
+if (import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === "1") {
+  connectAuthEmulator(auth, "http://localhost:9099");
+  connectFirestoreEmulator(db, "localhost", 8084);
+  connectFunctionsEmulator(functions, "localhost", 5001);
+  connectStorageEmulator(storage, "localhost", 9199);
+}
+
 // Enable offline persistence for Firestore (for PWA offline support)
 enableIndexedDbPersistence(db).catch((err) => {
   if (err.code === 'failed-precondition') {
@@ -33,11 +41,3 @@ enableIndexedDbPersistence(db).catch((err) => {
     console.warn('Firestore persistence unavailable: browser not supported');
   }
 });
-
-if (import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === "1") {
-  connectAuthEmulator(auth, "http://localhost:9099");
-  connectFirestoreEmulator(db, "localhost", 8084);
-  connectFunctionsEmulator(functions, "localhost", 5001);
-  connectStorageEmulator(storage, "localhost", 9199);
-}
-
