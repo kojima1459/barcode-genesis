@@ -30,197 +30,279 @@ interface RobotSVGProps {
   showGlow?: boolean;
 }
 
-// Mech-style gradients and filters definitions
-const Defs = ({ instanceId, colors }: { instanceId: string, colors: RobotColors }) => (
-  <defs>
-    {/* Body Gradient: Simple top-down lighting for 3D effect */}
-    <linearGradient id={`grad-primary-${instanceId}`} x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stopColor={colors.primary} stopOpacity="1" />
-      <stop offset="100%" stopColor="black" stopOpacity="0.5" />
-    </linearGradient>
-    <linearGradient id={`grad-secondary-${instanceId}`} x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stopColor={colors.secondary} stopOpacity="1" />
-      <stop offset="100%" stopColor="black" stopOpacity="0.5" />
-    </linearGradient>
-    <linearGradient id={`grad-accent-${instanceId}`} x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stopColor={colors.accent} stopOpacity="1" />
-      <stop offset="100%" stopColor="black" stopOpacity="0.3" />
-    </linearGradient>
-
-    {/* Metal/Glass sheen */}
-    <linearGradient id={`sheen-${instanceId}`} x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stopColor="white" stopOpacity="0.4" />
-      <stop offset="40%" stopColor="white" stopOpacity="0" />
-      <stop offset="100%" stopColor="white" stopOpacity="0.1" />
-    </linearGradient>
-
-    <filter id={`glow-${instanceId}`}>
-      <feGaussianBlur stdDeviation="2.5" result="coloredBlur" />
-      <feMerge>
-        <feMergeNode in="coloredBlur" />
-        <feMergeNode in="SourceGraphic" />
-      </feMerge>
-    </filter>
-  </defs>
-);
+// Deterministic random generator based on parts
+const getPseudoRandom = (seed: number) => {
+  const x = Math.sin(seed) * 10000;
+  return x - Math.floor(x);
+};
 
 export default function RobotSVG({ parts, colors, size = 200, className, animate = true, decals = [], showGlow = false }: RobotSVGProps) {
-  // Generate unique IDs
-  const instanceId = useMemo(() => Math.random().toString(36).substr(2, 9), []);
+  // Generate a deterministic seed from parts for style consistencies
+  const seed = useMemo(() => {
+    return Object.values(parts).reduce((acc, val) => acc + val, 0);
+  }, [parts]);
 
-  // --- Mech Design Constants ---
-  const STROKE_OUTER = 2.5; // Bold outer line
-  const STROKE_INNER = 1.0; // Delicate panel line
-  const COLOR_LINE = "#202020"; // Dark grey/black for lines
+  // Stable ID for gradients
+  const instanceId = useMemo(() => `mech-${seed}`, [seed]);
 
-  // Helper to wrap shape with mech styling
-  const MechShape = ({ children, type }: { children: React.ReactNode, type: 'primary' | 'secondary' }) => {
-    return <g stroke={COLOR_LINE} strokeLinejoin="miter">{children}</g>;
+  // --- Constants (User Requirements) ---
+  const STROKE_OUTER = 3.2;
+  const STROKE_PANEL = 1.2;
+  const OP_PANEL = 0.22;
+  const OP_SHADOW = 0.20;
+  const OP_RIM = 0.35;
+  const COLOR_OUTLINE = "#1a1a1a"; // Nearly black
+
+  // --- Graphic Helpers ---
+
+  // Gradient Definitions
+  const Defs = () => (
+    <defs>
+      {/* Main Metal Gradient: 3D feel with -35deg light source approx */}
+      <linearGradient id={`${instanceId}-metal-pri`} x1="20%" y1="0%" x2="80%" y2="100%">
+        <stop offset="0%" stopColor="white" stopOpacity="0.3" />
+        <stop offset="40%" stopColor="white" stopOpacity="0" />
+        <stop offset="100%" stopColor="black" stopOpacity="0.4" />
+      </linearGradient>
+
+      <linearGradient id={`${instanceId}-metal-sec`} x1="20%" y1="0%" x2="80%" y2="100%">
+        <stop offset="0%" stopColor="white" stopOpacity="0.4" />
+        <stop offset="50%" stopColor="white" stopOpacity="0" />
+        <stop offset="100%" stopColor="black" stopOpacity="0.5" />
+      </linearGradient>
+
+      {/* Rim Light Gradient */}
+      <linearGradient id={`${instanceId}-rim`} x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="white" stopOpacity={OP_RIM} />
+        <stop offset="20%" stopColor="white" stopOpacity="0" />
+        <stop offset="100%" stopColor="black" stopOpacity={OP_SHADOW} />
+      </linearGradient>
+
+      {/* Scanline / Texture Overlay */}
+      <pattern id={`${instanceId}-grid`} width="4" height="4" patternUnits="userSpaceOnUse">
+        <path d="M 4 0 L 0 0 0 4" fill="none" stroke="black" strokeWidth="0.5" opacity="0.1" />
+      </pattern>
+
+      <filter id={`${instanceId}-glow`}>
+        <feGaussianBlur stdDeviation="2.5" result="coloredBlur" />
+        <feMerge>
+          <feMergeNode in="coloredBlur" />
+          <feMergeNode in="SourceGraphic" />
+        </feMerge>
+      </filter>
+    </defs>
+  );
+
+  // Layering Component: Fill -> Shade -> Rim -> Outline -> Texture -> Details
+  const MechPart = ({
+    d,
+    fillColor,
+    texture = false,
+    children
+  }: {
+    d: string,
+    fillColor: string,
+    texture?: boolean,
+    children?: React.ReactNode
+  }) => (
+    <g>
+      {/* Base Fill */}
+      <path d={d} fill={fillColor} stroke="none" />
+
+      {/* Metal Gradient Overlay */}
+      <path d={d} fill={`url(#${instanceId}-metal-pri)`} stroke="none" style={{ mixBlendMode: "overlay" }} />
+
+      {/* Rim/Shadow Overlay */}
+      <path d={d} fill={`url(#${instanceId}-rim)`} stroke="none" />
+
+      {/* Texture Overlay (optional) */}
+      {texture && <path d={d} fill={`url(#${instanceId}-grid)`} stroke="none" />}
+
+      {/* Outline */}
+      <path
+        d={d}
+        fill="none"
+        stroke={COLOR_OUTLINE}
+        strokeWidth={STROKE_OUTER}
+        strokeLinejoin="miter"
+        strokeLinecap="square"
+      />
+
+      {/* Panel Lines & Details (Passed as children) */}
+      <g stroke="black" strokeWidth={STROKE_PANEL} strokeOpacity={OP_PANEL} fill="none">
+        {children}
+      </g>
+    </g>
+  );
+
+  // --- Shape Generators ---
+
+  const Head = () => {
+    // Proportions: Head -12% -> roughly scale 0.88 or simple pixel adjustment
+    // Previously ~40x40. Now closer to 32x35.
+    const variants = [
+      // H1: Command (Angular)
+      <MechPart d="M85 30 L115 30 L120 45 L112 62 L88 62 L80 45 Z" fillColor={colors.primary}>
+        <path d="M85 38 L115 38" />
+        <rect x="90" y="45" width="20" height="8" fill={colors.glow} stroke="none" filter={`url(#${instanceId}-glow)`} />
+      </MechPart>,
+      // H2: Scout (Sensor Dome)
+      <MechPart d="M88 60 L112 60 L112 40 C112 32 100 28 88 40 Z" fillColor={colors.primary}>
+        <circle cx="106" cy="40" r="4" fill={colors.glow} stroke="none" filter={`url(#${instanceId}-glow)`} />
+        <path d="M88 50 L112 50" />
+      </MechPart>,
+      // H3: Assault (Visor)
+      <MechPart d="M85 28 L115 28 L118 58 L82 58 Z" fillColor={colors.secondary}>
+        <path d="M85 42 L115 42 L112 50 L88 50 Z" fill={colors.glow} stroke="none" filter={`url(#${instanceId}-glow)`} />
+      </MechPart>,
+      // H4: Support (Antenna)
+      <MechPart d="M90 30 L110 30 L110 60 L90 60 Z" fillColor={colors.primary}>
+        <path d="M110 30 L125 10 L122 10 L110 35" strokeWidth={2} stroke={colors.accent} opacity="1" />
+        <rect x="92" y="38" width="16" height="12" fill="#222" stroke="none" />
+      </MechPart>
+    ];
+    return variants[(parts.head - 1) % variants.length] || variants[0];
   };
 
-  const shapes = useMemo(() => {
-    // Fill ids
-    const fillPri = `url(#grad-primary-${instanceId})`;
-    const fillSec = `url(#grad-secondary-${instanceId})`;
+  const Body = () => {
+    // Proportions: Torso -6% -> Slightly narrower
+    const variants = [
+      // B1: Standard Core
+      <MechPart d="M75 65 L125 65 L120 115 L80 115 Z" fillColor={colors.primary} texture>
+        <path d="M75 75 L125 75" />
+        <path d="M90 115 L90 95 L110 95 L110 115" />
+        <circle cx="100" cy="85" r="5" fill={colors.glow} stroke="none" filter={`url(#${instanceId}-glow)`} />
+      </MechPart>,
+      // B2: Heavy Plate
+      <MechPart d="M70 65 L130 65 L130 90 L120 120 L80 120 L70 90 Z" fillColor={colors.secondary} texture>
+        <path d="M70 90 L130 90" />
+        <rect x="95" y="100" width="10" height="15" fill="#333" stroke="none" />
+      </MechPart>,
+      // B3: Agile Frame
+      <MechPart d="M80 65 L120 65 L115 120 L85 120 Z" fillColor={colors.primary}>
+        <path d="M80 65 L120 120 M120 65 L80 120" strokeOpacity="0.1" />
+      </MechPart>
+    ];
+    return variants[(parts.body - 1) % variants.length] || variants[0];
+  };
 
-    return {
-      head: [
-        // H1: Standard Trooper - Reduced size, angled chin
-        <g key="h1">
-          <path d="M85 25 L115 25 L118 45 L110 60 L90 60 L82 45 Z" fill={fillSec} strokeWidth={STROKE_OUTER} />
-          <path d="M85 35 L115 35" strokeWidth={STROKE_INNER} stroke={COLOR_LINE} fill="none" opacity="0.5" />
-        </g>,
-        // H2: Scout Dome
-        <g key="h2">
-          <path d="M85 60 L115 60 L115 40 A15 15 0 0 0 85 40 Z" fill={fillSec} strokeWidth={STROKE_OUTER} />
-          <circle cx="100" cy="40" r="5" fill={colors.glow} filter={`url(#glow-${instanceId})`} stroke="none" />
-          <rect x="82" y="55" width="36" height="5" fill="#333" stroke="none" />
-        </g>,
-        // H3: Speed Visor
-        <g key="h3">
-          <path d="M85 20 L115 20 L120 55 L80 55 Z" fill={fillSec} strokeWidth={STROKE_OUTER} />
-          <path d="M85 40 L115 40 L112 50 L88 50 Z" fill={colors.glow} stroke="none" filter={`url(#glow-${instanceId})`} />
-        </g>,
-        // H4: Knight Helm
-        <g key="h4">
-          <path d="M80 15 L100 10 L120 15 L120 50 L100 65 L80 50 Z" fill={fillSec} strokeWidth={STROKE_OUTER} />
-          <path d="M100 10 L100 65" strokeWidth={STROKE_INNER} stroke={COLOR_LINE} fill="none" opacity="0.3" />
-        </g>,
-        // H5: Dual Antenna
-        <g key="h5">
-          <path d="M80 10 L85 25 L115 25 L120 10 L115 60 L85 60 Z" fill={fillSec} strokeWidth={STROKE_OUTER} />
-          <rect x="88" y="35" width="24" height="10" fill="#111" stroke="none" />
-        </g>,
-        // H6: Wide Sensor
-        <g key="h6">
-          <rect x="75" y="30" width="50" height="25" rx="2" fill={fillSec} strokeWidth={STROKE_OUTER} />
-          <rect x="80" y="35" width="40" height="10" fill={colors.glow} stroke="none" filter={`url(#glow-${instanceId})`} />
-        </g>,
-      ],
-      body: [
-        // B1: Boxy Standard with vents
-        <g key="b1">
-          <path d="M70 65 L130 65 L125 120 L75 120 Z" fill={fillPri} strokeWidth={STROKE_OUTER} />
-          <path d="M80 75 L120 75 M80 85 L120 85" strokeWidth={STROKE_INNER} stroke={COLOR_LINE} opacity="0.3" />
-          <rect x="90" y="95" width="20" height="15" fill="#222" stroke="none" rx="1" />
-        </g>,
-        // B2: Angular Heavy
-        <g key="b2">
-          <path d="M65 65 L135 65 L135 80 L120 120 L80 120 L65 80 Z" fill={fillPri} strokeWidth={STROKE_OUTER} />
-          <path d="M65 80 L135 80" strokeWidth={STROKE_INNER} stroke={COLOR_LINE} />
-          <circle cx="100" cy="95" r="10" fill={colors.glow} stroke="none" filter={`url(#glow-${instanceId})`} opacity="0.8" />
-        </g>,
-        // B3: Slim Agile
-        <g key="b3">
-          <path d="M80 65 L120 65 L115 120 L85 120 Z" fill={fillPri} strokeWidth={STROKE_OUTER} />
-          <path d="M80 65 L85 120 M120 65 L115 120" strokeWidth={STROKE_INNER} stroke="white" opacity="0.2" />
-        </g>,
-        // B4: Orb Core
-        <g key="b4">
-          <circle cx="100" cy="90" r="30" fill={fillPri} strokeWidth={STROKE_OUTER} />
-          <circle cx="100" cy="90" r="15" fill={colors.glow} stroke="none" filter={`url(#glow-${instanceId})`} />
-          <path d="M70 90 L130 90" strokeWidth={STROKE_INNER} stroke={COLOR_LINE} opacity="0.5" />
-        </g>,
-        // B5: Wide Tank
-        <g key="b5">
-          <path d="M60 70 L140 70 L135 110 L65 110 Z" fill={fillPri} strokeWidth={STROKE_OUTER} />
-          <rect x="70" y="80" width="10" height="20" fill="#333" stroke="none" rx="2" />
-          <rect x="120" y="80" width="10" height="20" fill="#333" stroke="none" rx="2" />
-        </g>,
-      ],
-      arm: [
-        // A1: Blocky Arm
-        <g key="a1">
-          <path d="M-10 0 L30 0 L25 50 L-5 50 Z" fill={fillSec} strokeWidth={STROKE_OUTER} />
-          <rect x="-5" y="10" width="25" height="5" fill="#111" opacity="0.3" stroke="none" />
-        </g>,
-        // A2: Piston Arm
-        <g key="a2">
-          <rect x="0" y="0" width="20" height="25" fill={fillSec} strokeWidth={STROKE_OUTER} rx="2" />
-          <rect x="5" y="25" width="10" height="20" fill="#555" stroke="none" />
-          <rect x="-5" y="45" width="30" height="30" fill={fillSec} strokeWidth={STROKE_OUTER} rx="2" />
-        </g>,
-        // A3: Shielded Arm
-        <g key="a3">
-          <path d="M-5 0 L25 0 L30 30 L20 60 L0 60 L-10 30 Z" fill={fillSec} strokeWidth={STROKE_OUTER} />
-          <path d="M-10 30 L30 30" strokeWidth={STROKE_INNER} stroke={COLOR_LINE} />
-        </g>,
-        // A4: Claw Arm
-        <g key="a4">
-          <rect x="0" y="0" width="20" height="50" fill={fillSec} strokeWidth={STROKE_OUTER} />
-          <path d="M0 50 L20 50 L25 70 L-5 70 Z" fill="#333" stroke="none" />
-          <path d="M5 70 L10 85 L15 70" fill={colors.accent} stroke="none" />
-        </g>,
-      ],
-      leg: [
-        // L1: Standard Mech Leg
-        <g key="l1">
-          <path d="M-5 0 L25 0 L20 40 L30 80 L-10 80 L0 40 Z" fill={fillPri} strokeWidth={STROKE_OUTER} />
-          <path d="M0 40 L20 40" strokeWidth={STROKE_INNER} stroke={COLOR_LINE} />
-          <rect x="5" y="50" width="10" height="20" fill="#222" opacity="0.3" stroke="none" />
-        </g>,
-        // L2: Reverse Joint
-        <g key="l2">
-          <path d="M0 0 L20 0 L25 30 L5 30 Z" fill={fillPri} strokeWidth={STROKE_OUTER} />
-          <path d="M5 30 L-5 50 L5 80 L25 80 L15 50 L25 30" fill={fillPri} strokeWidth={STROKE_OUTER} />
-          <circle cx="10" cy="30" r="4" fill="#333" stroke="none" />
-        </g>,
-        // L3: Heavy Block
-        <g key="l3">
-          <rect x="-5" y="0" width="30" height="80" fill={fillPri} strokeWidth={STROKE_OUTER} rx="2" />
-          <rect x="-5" y="60" width="30" height="20" fill="#222" stroke="none" opacity="0.2" />
-        </g>,
-        // L4: Hover (no foot)
-        <g key="l4">
-          <path d="M0 0 L20 0 L15 60 L5 60 Z" fill={fillPri} strokeWidth={STROKE_OUTER} />
-          <ellipse cx="10" cy="70" rx="15" ry="5" fill={colors.glow} filter={`url(#glow-${instanceId})`} stroke="none" />
-        </g>,
-      ],
-      backpack: [
-        // BP1: Standard Vents
-        <g key="bp1">
-          <rect x="20" y="30" width="15" height="40" fill="#444" stroke="none" />
-          <rect x="165" y="30" width="15" height="40" fill="#444" stroke="none" />
-        </g>,
-        // BP2: Wings
-        <g key="bp2">
-          <path d="M50 50 L-10 20 L0 80 L50 60 Z" fill={fillSec} strokeWidth="1" stroke="black" opacity="0.8" />
-          <path d="M150 50 L210 20 L200 80 L150 60 Z" fill={fillSec} strokeWidth="1" stroke="black" opacity="0.8" />
-        </g>,
-        // BP3: Heavy Pack
-        <g key="bp3">
-          <rect x="40" y="20" width="120" height="60" fill="#333" strokeWidth="2" stroke="black" rx="5" />
-          <circle cx="100" cy="50" r="15" fill={colors.glow} opacity="0.5" stroke="none" />
+  const Arms = () => {
+    // Proportions: Shoulder +18% (Wider)
+    // Left Arm (rendered at 0,0 then translated)
+    const shape = (() => {
+      const idx = (parts.armLeft - 1) % 4;
+      if (idx === 0) return ( // Blocky
+        <MechPart d="M0 0 L25 0 L22 35 L25 65 L0 65 L-5 35 Z" fillColor={colors.secondary}>
+          <rect x="0" y="10" width="20" height="5" fill={colors.accent} stroke="none" opacity="0.8" />
+        </MechPart>
+      );
+      if (idx === 1) return ( // Piston
+        <g>
+          <MechPart d="M0 0 L20 0 L20 20 L0 20 Z" fillColor={colors.secondary} />
+          <rect x="5" y="20" width="10" height="20" fill="#444" />
+          <MechPart d="M-5 40 L25 40 L20 70 L0 70 Z" fillColor={colors.secondary} />
         </g>
-      ]
-    };
-  }, [colors, instanceId]);
+      );
+      if (idx === 2) return ( // Shielded
+        <MechPart d="M-5 0 L30 0 L35 25 L20 65 L0 65 L-10 25 Z" fillColor={colors.secondary}>
+          <path d="M-10 25 L35 25" />
+        </MechPart>
+      );
+      return ( // Claw
+        <MechPart d="M0 0 L20 0 L20 45 L25 65 L-5 65 L0 45 Z" fillColor={colors.secondary}>
+          <path d="M5 65 L10 80 L15 65" fill={colors.accent} stroke="none" />
+        </MechPart>
+      );
+    })();
 
-  const getShape = (type: keyof typeof shapes, id: number) => {
-    const list = shapes[type];
-    // Default to first shape if list happens to be empty (though it won't be)
-    return list[(id - 1) % list.length] || list[0];
+    return (
+      <>
+        <g transform="translate(30, 65)">{shape}</g>
+        <g transform="translate(170, 65) scale(-1, 1)">{shape}</g>
+      </>
+    );
   };
+
+  const Legs = () => {
+    // Proportions: Legs +12% length
+    // Rendered at 0,0 then translated
+    const shape = (() => {
+      const idx = (parts.legLeft - 1) % 4;
+      if (idx === 0) return ( // Standard
+        <MechPart d="M0 0 L25 0 L20 40 L30 90 L-5 90 L0 40 Z" fillColor={colors.primary}>
+          <path d="M0 40 L25 40" />
+          <rect x="5" y="50" width="15" height="30" fill="#222" opacity="0.2" stroke="none" />
+        </MechPart>
+      );
+      if (idx === 1) return ( // Reverse Joint
+        <MechPart d="M0 0 L20 0 L28 40 L35 20 L40 50 L25 90 L-5 90 L0 40 Z" fillColor={colors.primary}>
+          <circle cx="28" cy="40" r="5" fill="#333" stroke="none" />
+        </MechPart>
+      );
+      if (idx === 2) return ( // Heavy
+        <MechPart d="M-5 0 L30 0 L30 90 L-5 90 Z" fillColor={colors.primary}>
+          <path d="M-5 60 L30 60" />
+        </MechPart>
+      );
+      return ( // Hover
+        <MechPart d="M0 0 L20 0 L15 70 L5 70 Z" fillColor={colors.primary}>
+          <ellipse cx="10" cy="80" rx="15" ry="4" fill={colors.glow} stroke="none" filter={`url(#${instanceId}-glow)`} />
+        </MechPart>
+      );
+    })();
+
+    return (
+      <>
+        <g transform="translate(68, 115)">{shape}</g>
+        <g transform="translate(132, 115) scale(-1, 1)">{shape}</g>
+      </>
+    );
+  };
+
+  const Backpack = () => {
+    // Always drawn
+    const variants = [
+      <MechPart d="M20 20 L60 20 L65 70 L15 70 Z" fillColor="#444">
+        <rect x="30" y="30" width="20" height="30" fill="#222" stroke="none" />
+      </MechPart>,
+      <MechPart d="M20 30 L60 20 L70 60 L10 60 Z" fillColor={colors.secondary}>
+        <circle cx="40" cy="40" r="10" fill={colors.glow} opacity="0.5" stroke="none" />
+      </MechPart>
+    ];
+    const shape = variants[(parts.backpack - 1) % variants.length] || variants[0];
+
+    return (
+      <>
+        <g transform="translate(0, 0)">{shape}</g>
+        <g transform="translate(200, 0) scale(-1, 1)">{shape}</g>
+      </>
+    );
+  };
+
+  const Weapon = () => {
+    // Proportions: Integrated weapon visual
+    // Rifle or Blade based on weapon part ID
+    const isRifle = parts.weapon % 2 === 0;
+
+    if (isRifle) {
+      return (
+        <g transform="translate(175, 80) rotate(-10)">
+          <MechPart d="M-5 0 L15 0 L15 60 L-5 60 Z" fillColor="#333" />
+          <rect x="0" y="-20" width="5" height="30" fill="#555" strokeWidth="1" stroke="black" />
+          <circle cx="5" cy="-20" r="3" fill={colors.glow} stroke="none" filter={`url(#${instanceId}-glow)`} />
+        </g>
+      );
+    } else {
+      // Blade
+      return (
+        <g transform="translate(175, 80) rotate(-15)">
+          <MechPart d="M0 0 L10 0 L10 20 L0 20 Z" fillColor="#333" />
+          <path d="M2 20 L8 20 L5 80 Z" fill={colors.glow} stroke={colors.accent} strokeWidth="1" filter={`url(#${instanceId}-glow)`} />
+        </g>
+      );
+    }
+  };
+
 
   return (
     <svg
@@ -230,70 +312,44 @@ export default function RobotSVG({ parts, colors, size = 200, className, animate
       className={className}
       xmlns="http://www.w3.org/2000/svg"
       role="img"
-      aria-label="Robot Visual"
+      aria-label="Mech Unit"
     >
-      <Defs instanceId={instanceId} colors={colors} />
+      <Defs />
 
-      {/* Styles for animations */}
+      {/* Animation Styles */}
       <style>{`
           @keyframes hover-${instanceId} {
             0%, 100% { transform: translateY(0); }
             50% { transform: translateY(-3px); }
           }
-          @keyframes pulse-${instanceId} {
-             0%, 100% { opacity: 0.8; }
-             50% { opacity: 1; filter: brightness(1.2); }
-          }
-          .mech-anim-${instanceId} {
+           .mech-anim-${instanceId} {
             animation: ${animate ? `hover-${instanceId} 4s ease-in-out infinite` : 'none'};
           }
       `}</style>
 
-      {/* Main Group with Hover Animation */}
+      {/* Background Glow (Optional) */}
+      {showGlow && (
+        <radialGradient id={`${instanceId}-bg-glow`} cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor={colors.glow} stopOpacity="0.15" />
+          <stop offset="100%" stopColor="transparent" stopOpacity="0" />
+        </radialGradient>
+      )}
+      {showGlow && <circle cx="100" cy="100" r="90" fill={`url(#${instanceId}-bg-glow)`} />}
+
+      {/* Render Order: Back -> Legs -> Arms -> Body -> Head -> Weapon */}
       <g className={`mech-anim-${instanceId}`}>
-
-        {/* Backpack Layer (Back) - Always visible, wider stance */}
-        <g>
-          {getShape('backpack', parts.backpack)}
-        </g>
-
-        {/* Legs Layer - Longer, attached lower */}
-        <g transform="translate(65, 120)">
-          {getShape('leg', parts.legLeft)}
-        </g>
-        <g transform="translate(135, 120) scale(-1, 1)">
-          {getShape('leg', parts.legRight)}
-        </g>
-
-        {/* Arms Layer - Wider shoulders */}
-        <g transform="translate(35, 65)">
-          {getShape('arm', parts.armLeft)}
-        </g>
-        <g transform="translate(165, 65) scale(-1, 1)">
-          {getShape('arm', parts.armRight)}
-        </g>
-
-        {/* Body Layer - Central */}
-        <g>
-          {getShape('body', parts.body)}
-        </g>
-
-        {/* Head Layer - Smaller, positioned higher */}
-        <g transform="translate(0, 0)">
-          {getShape('head', parts.head)}
-        </g>
-
-        {/* Weapon - If present or default */}
-        <g transform="translate(170, 70) rotate(-10)">
-          <rect x="0" y="-10" width="10" height="60" rx="1" fill="#222" stroke="none" />
-          <rect x="-5" y="40" width="20" height="10" rx="1" fill="#444" stroke="none" />
-          <rect x="2" y="-15" width="6" height="40" fill="#666" stroke="none" />
-          <circle cx="5" cy="-15" r="3" fill={colors.glow} filter={`url(#glow-${instanceId})`} stroke="none" />
-        </g>
+        <Backpack />
+        <Legs />
+        <Arms />
+        <Body />
+        <Head />
+        <Weapon />
       </g>
 
-      {/* Overlay: Scanlines or sheen for 'Real' feel */}
-      <rect x="0" y="0" width="200" height="200" fill={`url(#sheen-${instanceId})`} pointerEvents="none" style={{ mixBlendMode: 'overlay' }} />
+      {/* Decals Overlay */}
+      {decals.includes('hazard') && (
+        <path d="M100 80 L110 80 L105 90 Z" fill={colors.accent} opacity="0.6" style={{ mixBlendMode: 'multiply' }} />
+      )}
 
     </svg>
   );
