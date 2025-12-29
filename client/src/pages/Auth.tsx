@@ -5,6 +5,7 @@ import { Loader2, ShieldCheck, Cpu, Terminal, ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { motion } from "framer-motion";
+import { toast } from "sonner";
 
 export default function Auth() {
   const { signInWithGoogle, user } = useAuth();
@@ -23,8 +24,17 @@ export default function Auth() {
     try {
       await signInWithGoogle();
       setLocation("/");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Login failed:", error);
+      let message = "Login failed. Please try again.";
+      if (error.code === 'auth/popup-closed-by-user') {
+        message = "Login cancelled by user.";
+      } else if (error.code === 'auth/popup-blocked') {
+        message = "Popup blocked. Please allow popups for this site.";
+      } else if (error.message) {
+        message = error.message;
+      }
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }
