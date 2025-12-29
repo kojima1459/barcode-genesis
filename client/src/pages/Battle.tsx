@@ -13,7 +13,7 @@ import { Link } from "wouter";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { RobotData, BattleResult } from "@/types/shared";
+import { RobotData, BattleResult, MatchBattleResponse, MatchmakingResponse } from "@/types/shared";
 import ShareButton from "@/components/ShareButton";
 import { useSound } from "@/contexts/SoundContext";
 import { getItemLabel } from "@/lib/items";
@@ -22,6 +22,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Zap, Shield, Heart } from "lucide-react";
 import SEO from "@/components/SEO";
 import { useRobotFx } from "@/hooks/useRobotFx";
+import { simulateBattle as simulateTrainingBattle, getTrainingBattleId, BattleRobotData, normalizeTrainingInput, toBattleRobotData } from "@/lib/battleEngine";
 
 
 
@@ -284,70 +285,8 @@ export default function Battle() {
     toast('マッチメイキングをキャンセルしました');
   };
 
-  // ローカルバトルシミュレーション（トレーニングモード用）
-  const simulateLocalBattle = (attacker: RobotData, defender: RobotData): BattleResult => {
-    const logs: BattleLog[] = [];
-    let attackerHp = attacker.baseHp;
-    let defenderHp = defender.baseHp;
-    let turn = 1;
-    const maxTurns = 20;
-
-    // 先攻決定（スピードが高い方が先攻）
-    const attackerFirst = attacker.baseSpeed >= defender.baseSpeed;
-    const [first, second] = attackerFirst ? [attacker, defender] : [defender, attacker];
-    let firstHp = attackerFirst ? attackerHp : defenderHp;
-    let secondHp = attackerFirst ? defenderHp : attackerHp;
-
-    while (firstHp > 0 && secondHp > 0 && turn <= maxTurns) {
-      // 先攻の攻撃
-      const firstDamage = Math.max(1, first.baseAttack - Math.floor(second.baseDefense / 2) + Math.floor(Math.random() * 10));
-      const firstCrit = Math.random() < 0.1;
-      const actualFirstDamage = firstCrit ? firstDamage * 2 : firstDamage;
-      secondHp = Math.max(0, secondHp - actualFirstDamage);
-      logs.push({
-        turn,
-        attackerId: first.id,
-        defenderId: second.id,
-        action: 'attack',
-        damage: actualFirstDamage,
-        isCritical: firstCrit,
-        attackerHp: firstHp,
-        defenderHp: secondHp,
-        message: `${first.name} の攻撃！ ${second.name} に ${actualFirstDamage} ダメージ！`
-      });
-
-      if (secondHp <= 0) break;
-
-      // 後攻の攻撃
-      const secondDamage = Math.max(1, second.baseAttack - Math.floor(first.baseDefense / 2) + Math.floor(Math.random() * 10));
-      const secondCrit = Math.random() < 0.1;
-      const actualSecondDamage = secondCrit ? secondDamage * 2 : secondDamage;
-      firstHp = Math.max(0, firstHp - actualSecondDamage);
-      logs.push({
-        turn,
-        attackerId: second.id,
-        defenderId: first.id,
-        action: 'attack',
-        damage: actualSecondDamage,
-        isCritical: secondCrit,
-        attackerHp: secondHp,
-        defenderHp: firstHp,
-        message: `${second.name} の攻撃！ ${first.name} に ${actualSecondDamage} ダメージ！`
-      });
-
-      turn++;
-    }
-
-    const winnerId = firstHp > 0 ? first.id : second.id;
-    const loserId = firstHp > 0 ? second.id : first.id;
-
-    return {
-      winnerId,
-      loserId,
-      logs,
-      rewards: { exp: 0, coins: 0 } // トレーニングでは報酬なし
-    };
-  };
+  // ローカルバトルシミュレーション is now handled by client/src/lib/battleEngine.ts
+  // See: simulateBattle, getTrainingBattleId
 
   // バトル開始
   const startBattle = async () => {
@@ -362,7 +301,7 @@ export default function Battle() {
     setCheerP1(false);
     setCheerP2(false);
 
-    // トレーニングモードの場合はローカルシミュレーション
+    // トレーニングモードの場合は決定的ローカルシミュレーション
     if (isTrainingMode) {
       const myRobot = robots.find(r => r.id === selectedRobotId);
       const enemyRobot = robots.find(r => r.id === enemyRobotId);
@@ -372,9 +311,16 @@ export default function Battle() {
         return;
       }
 
-      const result = simulateLocalBattle(myRobot, enemyRobot);
+      // Convert RobotData to BattleRobotData using helper
+      const rawP1 = toBattleRobotData(myRobot);
+      const rawP2 = toBattleRobotData(enemyRobot);
+
+      // Normalize robot order for consistent results (same 2 robots -> same battle)
+      const { p1, p2, normalizedCheer } = normalizeTrainingInput(rawP1, rawP2, { p1: cheerP1, p2: cheerP2 });
+      const battleId = getTrainingBattleId(p1.id!, p2.id!);
+      const result = simulateTrainingBattle(p1, p2, battleId, normalizedCheer);
       setBattleResult(result);
-      playBattleLogs(result); // Pass the full result object
+      playBattleLogs(result);
 
       const animationDuration = result.logs.length * 1000 + 500;
       setTimeout(() => {
@@ -395,7 +341,8 @@ export default function Battle() {
         useItemId: (!isTrainingMode && selectedItemId) ? selectedItemId : undefined,
         cheer: { p1: cheerP1, p2: cheerP2 }  // Pass cheer reservation
       });
-      const data = result.data as any;
+      // Safety: Use type assertion with the defined interface, validating at runtime implicitly by property access structure
+      const data = result.data as MatchBattleResponse;
 
       if (data.battleId) {
         // matchBattle returns different structure
@@ -459,11 +406,12 @@ export default function Battle() {
       // ============================================
       // CHEER SYSTEM: Display based on server log.cheerApplied
       // ============================================
-      const displayDamage = log.damage; // Server already applied 1.2x
+      // log.damage; // Server already applied 1.2x
       const cheerApplied = !!log.cheerApplied;
 
       if (cheerApplied) {
-        toast(`🎉 声援が刃になった（×${log.cheerMultiplier || 1.2}）`, { duration: 1500 });
+        toast.message(`🎉 声援が刃になった（×${log.cheerMultiplier || 1.2}）`, { duration: 1500 });
+        playSE('se_levelup');
       }
 
       // VFX Logic
@@ -491,13 +439,15 @@ export default function Battle() {
           setTimeout(() => setActiveEffect(null), 500);
         }
 
+        const shownDamage = log.damage; // Strictly use server-provided damage
+
         setDamagePopups(prev => [
           ...prev,
           {
             id: index + "-" + Math.random(),
-            value: displayDamage,
+            value: shownDamage, // Use fixed variable for display integrity
             isCritical: log.isCritical || cheerApplied,
-            cheerApplied: cheerApplied,
+            cheerApplied: cheerApplied, // Enhance damage popup styles for cheer application.
             x: Math.random() * 40 - 20,
             y: -50
           }
@@ -760,10 +710,10 @@ export default function Battle() {
                         const newVal = e.target.checked;
                         setCheerP1(newVal);
                         if (newVal) {
-                          toast.success('観客が青側に肩入れした！', { duration: 2000 });
+                          toast.message('観客が青側に肩入れした！', { duration: 2000 });
                           playSE('se_levelup');
                         } else {
-                          toast('声援が引っ込んだ…', { duration: 1500 });
+                          toast.message('声援が引っ込んだ…', { duration: 1500 });
                         }
                       }}
                       className="w-4 h-4 accent-cyan-500"
@@ -778,10 +728,10 @@ export default function Battle() {
                         const newVal = e.target.checked;
                         setCheerP2(newVal);
                         if (newVal) {
-                          toast.success('観客が赤側を焚きつけた！', { duration: 2000 });
+                          toast.message('観客が赤側を焚きつけた！', { duration: 2000 });
                           playSE('se_levelup');
                         } else {
-                          toast('声援が引っ込んだ…', { duration: 1500 });
+                          toast.message('声援が引っ込んだ…', { duration: 1500 });
                         }
                       }}
                       className="w-4 h-4 accent-red-500"
@@ -849,7 +799,7 @@ export default function Battle() {
                         animate={{ opacity: 1, y: -80, scale: p.isCritical ? 2.5 : 1.5, rotate: 0 }}
                         exit={{ opacity: 0, scale: 0 }}
                         transition={{ duration: 0.8, ease: "easeOut" }}
-                        className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 z-50 font-black italic stroke-black pointer-events-none select-none flex items-center justify-center w-full text-center ${p.isCritical ? 'text-neon-pink neon-text-purple text-6xl' : 'text-white text-4xl'}`}
+                        className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 z-50 font-black italic stroke-black pointer-events-none select-none flex items-center justify-center w-full text-center ${p.isCritical ? 'text-neon-pink neon-text-purple text-6xl' : (p.cheerApplied ? 'text-green-200 text-5xl' : 'text-white text-4xl')}`}
                         style={{ textShadow: "4px 4px 0px #000" }}
                       >
                         {p.value}
@@ -961,7 +911,7 @@ export default function Battle() {
                         animate={{ opacity: 1, y: -80, scale: p.isCritical ? 2.5 : 1.5 }}
                         exit={{ opacity: 0, scale: 0 }}
                         transition={{ duration: 0.8, ease: "easeOut" }}
-                        className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 z-50 font-black italic select-none pointer-events-none text-center w-full ${p.isCritical ? 'text-neon-yellow neon-text-yellow text-6xl' : 'text-white text-4xl'}`}
+                        className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 z-50 font-black italic select-none pointer-events-none text-center w-full ${p.isCritical ? 'text-neon-yellow neon-text-yellow text-6xl' : (p.cheerApplied ? 'text-green-200 text-5xl' : 'text-white text-4xl')}`}
                         style={{ textShadow: "4px 4px 0px #000" }}
                       >
                         {p.value}
@@ -981,7 +931,7 @@ export default function Battle() {
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   key={i}
-                  className={`p-2 border-l-2 pl-3 rounded bg-black/20 backdrop-blur-sm ${log.damage > 0 ? "border-neon-pink text-pink-200" : "border-neon-cyan text-cyan-200"}`}
+                  className={`p-2 border-l-2 pl-3 rounded bg-black/20 backdrop-blur-sm ${log.cheerApplied ? "border-green-400 bg-green-900/10" : ""} ${log.damage > 0 ? "border-neon-pink text-pink-200" : "border-neon-cyan text-cyan-200"}`}
                 >
                   <span className="opacity-50 text-[10px] mr-2 text-white/60">TURN {String(log.turn).padStart(2, '0')}</span>
                   {log.message}

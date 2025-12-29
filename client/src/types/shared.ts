@@ -94,6 +94,10 @@ export interface BattleLog {
     attackerHp: number;
     defenderHp: number;
     message: string;
+    // Cheer System (応援)
+    cheerApplied?: boolean;
+    cheerSide?: 'P1' | 'P2';
+    cheerMultiplier?: number;
 }
 
 export interface BattleResult {
@@ -106,4 +110,26 @@ export interface BattleResult {
         newSkill?: string;
         upgradedSkill?: string;
     };
+}
+
+export interface MatchBattleResponse {
+    battleId: string;
+    result: {
+        winner: 'player' | 'opponent';
+        log: BattleLog[];
+    };
+    rewards?: {
+        exp: number;
+        coins: number;
+        newSkill?: string;
+        upgradedSkill?: string;
+    };
+    experienceGained?: number;
+}
+
+export interface MatchmakingResponse {
+    status: 'matched' | 'waiting' | 'timeout' | 'expired';
+    queueId?: string;
+    battleId?: string;
+    opponent?: RobotData;
 }

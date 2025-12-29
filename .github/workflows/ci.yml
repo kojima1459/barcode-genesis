@@ -2,68 +2,34 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
-  build-and-test:
+  test-and-e2e:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
+    environment: staging
 
     steps:
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '20'
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
 
-    # Cache dependencies
-    - name: Cache node modules
-      uses: actions/cache@v3
-      id: npm-cache
-      with:
-        path: |
-          **/node_modules
-        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-        restore-keys: |
-          ${{ runner.os }}-node-
+      - name: Install dependencies
+        run: npm ci
 
-    # Install Client Dependencies
-    - name: Install Client dependencies
-      run: |
-        cd client
-        npm ci
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps chromium
 
-    # Install Functions Dependencies
-    - name: Install Functions dependencies
-      run: |
-        cd functions
-        npm ci
-
-    # Helper: Check Types matches
-    # (Optional: run custom script to ensure types/shared.ts is consistent)
-
-    # Build Functions (Type Check)
-    - name: Build Functions
-      run: |
-        cd functions
-        npm run build
-
-    # Build Client
-    - name: Build Client
-      run: |
-        cd client
-        npm run build
-
-    # Run Tests (if configured)
-    # - name: Run Tests
-    #   run: |
-    #     cd client
-    #     npm test
-
-    # Lint
-    # - name: Lint
-    #   run: |
-    #     cd client
-    #     npm run lint
+      - name: Run CI (Unit Tests -> Build -> E2E)
+        run: npm run test:ci
+        env:
+          E2E_BASE_URL: ${{ secrets.E2E_BASE_URL }}
+          E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
