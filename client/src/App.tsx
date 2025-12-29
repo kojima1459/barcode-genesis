@@ -26,6 +26,7 @@ import BottomNav from "@/components/BottomNav";
 import { useEffect } from "react";
 import { AnimatePresence } from "framer-motion";
 import PageTransition from "@/components/PageTransition";
+import OfflineBanner from "@/components/OfflineBanner";
 
 function GlobalSoundManager() {
   const { playSE } = useSound();
@@ -90,6 +91,7 @@ function App() {
           <ThemeProvider defaultTheme="dark">
             <AuthProvider>
               <TooltipProvider>
+                <OfflineBanner />
                 <Toaster />
                 <Router />
               </TooltipProvider>

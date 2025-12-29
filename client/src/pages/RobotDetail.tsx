@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { httpsCallable } from "firebase/functions";
 import { collection, doc, getDoc, getDocs, orderBy, query } from "firebase/firestore";
 import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from "recharts";
-import { ArrowLeft, Loader2, Zap } from "lucide-react";
+import { ArrowLeft, Loader2, Zap, Cpu, Calendar, Barcode, Trophy, Skull } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -60,6 +60,14 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
   const [isApplyingCosmetic, setIsApplyingCosmetic] = useState(false);
   const [cosmeticError, setCosmeticError] = useState<string | null>(null);
 
+  // Battle history state
+  const [battleHistory, setBattleHistory] = useState<Array<{
+    id: string;
+    opponentName: string;
+    won: boolean;
+    date: Date;
+  }>>([]);
+
   useEffect(() => {
     if (!user) {
       setLoading(false);
@@ -95,6 +103,31 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
         setBaseRobot({ id: baseSnap.id, ...baseSnap.data() } as RobotData);
         setRobots(robotsData);
         setInventory(inventoryData);
+
+        // Fetch battle history (from user's battle_logs subcollection if exists)
+        try {
+          const battleLogsRef = collection(db, "users", user.uid, "battle_logs");
+          const battleLogsQuery = query(battleLogsRef, orderBy("createdAt", "desc"));
+          const battleLogsSnap = await getDocs(battleLogsQuery);
+          const relevantBattles: Array<{ id: string; opponentName: string; won: boolean; date: Date }> = [];
+
+          battleLogsSnap.docs.forEach((docSnap) => {
+            const data = docSnap.data();
+            if (data.robotId === robotId || data.playerRobotId === robotId) {
+              relevantBattles.push({
+                id: docSnap.id,
+                opponentName: data.opponentRobotName || data.opponentName || "Unknown",
+                won: data.won ?? data.winnerId === robotId,
+                date: data.createdAt?.toDate?.() || new Date(),
+              });
+            }
+          });
+
+          setBattleHistory(relevantBattles.slice(0, 5));
+        } catch (historyError) {
+          console.warn("Could not fetch battle history:", historyError);
+          // Non-critical error, continue without history
+        }
       } catch (error) {
         console.error("Failed to load robot detail:", error);
         toast.error("Failed to load robot detail");
@@ -379,6 +412,70 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
             </span>
           </div>
         </div>
+
+        {/* Origin Section - Robot's Birth Info */}
+        <div className="glass-panel p-6 rounded-xl border border-white/5">
+          <h3 className="text-sm font-bold text-neon-magenta mb-4 font-orbitron tracking-widest flex items-center gap-2">
+            <Cpu className="w-4 h-4" /> ORIGIN DATA
+          </h3>
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="flex items-center gap-2">
+              <Barcode className="w-4 h-4 text-muted-foreground" />
+              <div>
+                <div className="text-xs text-muted-foreground">Source Barcode</div>
+                <div className="font-mono text-neon-cyan">{baseRobot.barcode || "N/A"}</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-muted-foreground" />
+              <div>
+                <div className="text-xs text-muted-foreground">Genesis Date</div>
+                <div className="font-mono">
+                  {baseRobot.createdAt?.toDate?.()?.toLocaleDateString("ja-JP") ||
+                    (baseRobot.createdAt as any)?.seconds ?
+                    new Date((baseRobot.createdAt as any).seconds * 1000).toLocaleDateString("ja-JP") :
+                    "Unknown"}
+                </div>
+              </div>
+            </div>
+          </div>
+          {/* Flavor text */}
+          <div className="mt-4 p-3 bg-black/30 rounded-lg border border-white/5 text-xs text-muted-foreground italic">
+            「このユニットはバーコード {baseRobot.barcode?.slice(0, 6) || "??????"}... から抽出されたデータを基に、第{(baseRobot.parts?.head || 1) % 7 + 1}世代合成プロトコルにより生成されました。」
+          </div>
+        </div>
+
+        {/* Battle History */}
+        {battleHistory.length > 0 && (
+          <div className="glass-panel p-6 rounded-xl border border-white/5">
+            <h3 className="text-sm font-bold text-neon-yellow mb-4 font-orbitron tracking-widest flex items-center gap-2">
+              <Trophy className="w-4 h-4" /> BATTLE RECORD
+            </h3>
+            <div className="space-y-2">
+              {battleHistory.map((battle, index) => (
+                <div
+                  key={battle.id || index}
+                  className={`flex items-center justify-between p-2 rounded-lg ${battle.won ? 'bg-green-500/10 border border-green-500/20' : 'bg-red-500/10 border border-red-500/20'}`}
+                >
+                  <div className="flex items-center gap-2">
+                    {battle.won ? (
+                      <Trophy className="w-4 h-4 text-green-400" />
+                    ) : (
+                      <Skull className="w-4 h-4 text-red-400" />
+                    )}
+                    <span className="text-sm">vs {battle.opponentName}</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {battle.date.toLocaleDateString("ja-JP")}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 text-xs text-muted-foreground text-center">
+              勝率: {battleHistory.length > 0 ? Math.round((battleHistory.filter(b => b.won).length / battleHistory.length) * 100) : 0}%
+            </div>
+          </div>
+        )}
 
         {/* Status Visualization */}
         <div className="glass-panel p-6 rounded-xl border border-white/5 relative overflow-hidden">

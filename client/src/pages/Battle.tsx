@@ -50,6 +50,11 @@ export default function Battle() {
   const [queueId, setQueueId] = useState<string | null>(null);
   const [matchmakingStatus, setMatchmakingStatus] = useState<string>('');
 
+  // Overload (battle intervention) state
+  const [hasUsedOverload, setHasUsedOverload] = useState(false);
+  const [isOverloadActive, setIsOverloadActive] = useState(false);
+  const [overloadFlash, setOverloadFlash] = useState(false);
+
   // 自分のロボット一覧取得
   useEffect(() => {
     const fetchMyRobots = async () => {
@@ -739,6 +744,62 @@ export default function Battle() {
                 <span className="absolute -top-10 left-1/2 -translate-x-1/2 text-9xl opacity-10 blur-sm pointer-events-none">VS</span>
                 VS
               </div>
+
+              {/* Overload Button - Battle Intervention */}
+              {isBattling && !hasUsedOverload && (
+                <motion.div
+                  className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 2 }}
+                >
+                  <Button
+                    onClick={() => {
+                      setHasUsedOverload(true);
+                      setIsOverloadActive(true);
+                      setOverloadFlash(true);
+                      playSE('se_levelup');
+                      toast.success('オーバーロード発動！次の攻撃が強化！');
+                      setTimeout(() => setOverloadFlash(false), 500);
+                      setTimeout(() => setIsOverloadActive(false), 3000);
+                    }}
+                    className="bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 hover:from-orange-600 hover:via-red-600 hover:to-pink-600 text-white font-bold px-6 py-3 rounded-full shadow-[0_0_20px_rgba(255,100,50,0.5)] animate-pulse"
+                  >
+                    <Zap className="w-5 h-5 mr-2" />
+                    オーバーロード
+                  </Button>
+                  <div className="text-xs text-center mt-1 text-muted-foreground">
+                    1回のみ使用可能
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Overload Flash Effect */}
+              <AnimatePresence>
+                {overloadFlash && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 bg-orange-500/40 z-50 pointer-events-none"
+                  />
+                )}
+              </AnimatePresence>
+
+              {/* Overload Active Indicator */}
+              <AnimatePresence>
+                {isOverloadActive && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    className="absolute top-4 left-1/2 -translate-x-1/2 z-30 bg-gradient-to-r from-orange-500 to-red-500 text-white px-4 py-2 rounded-full text-sm font-bold shadow-lg"
+                  >
+                    <Zap className="w-4 h-4 inline mr-1" />
+                    OVERLOAD ACTIVE - ダメージ1.5倍
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* Enemy Robot */}
               <motion.div

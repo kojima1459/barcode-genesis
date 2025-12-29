@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, connectAuthEmulator } from "firebase/auth";
-import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
+import { getFirestore, connectFirestoreEmulator, enableIndexedDbPersistence } from "firebase/firestore";
 import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
 
 // Firebase Console から取得した正しい設定
@@ -21,8 +21,20 @@ export const db = getFirestore(app);
 export const functions = getFunctions(app, 'us-central1');
 export const googleProvider = new GoogleAuthProvider();
 
+// Enable offline persistence for Firestore (for PWA offline support)
+enableIndexedDbPersistence(db).catch((err) => {
+  if (err.code === 'failed-precondition') {
+    // Multiple tabs open, persistence can only be enabled in one tab at a time
+    console.warn('Firestore persistence unavailable: multiple tabs open');
+  } else if (err.code === 'unimplemented') {
+    // The browser doesn't support IndexedDB
+    console.warn('Firestore persistence unavailable: browser not supported');
+  }
+});
+
 if (import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === "1") {
   connectAuthEmulator(auth, "http://localhost:9099");
   connectFirestoreEmulator(db, "localhost", 8084);
   connectFunctionsEmulator(functions, "localhost", 5001);
 }
+

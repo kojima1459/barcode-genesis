@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { functions } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
 import { toast } from "sonner";
+import ScannerOverlay from "./ScannerOverlay";
 
 interface BarcodeScannerProps {
   onScanSuccess: (decodedText: string) => void;
@@ -249,7 +250,11 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
         <div
           id={scannerRegionId}
           className={`w-full overflow-hidden rounded-lg border bg-black/5 relative ${!isScanning ? 'hidden' : ''}`}
+          style={{ minHeight: isScanning ? '300px' : undefined }}
         >
+          {/* AR Scanner Overlay */}
+          <ScannerOverlay isScanning={isScanning} status={scanStatus} />
+
           {/* Smart Scan Guide Overlay */}
           {isScanning && (
             <div className="absolute inset-0 z-10 pointer-events-none">
