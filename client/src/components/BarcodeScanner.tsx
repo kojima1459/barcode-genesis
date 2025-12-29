@@ -4,10 +4,10 @@ import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from "@zxing/library";
 import { useRef, useState } from "react";
-import { AlertCircle, Keyboard, Image, Loader2, Sparkles, CheckCircle2 } from "lucide-react";
+import { AlertCircle, Keyboard, Image, Loader2, Sparkles, Camera, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { httpsCallable } from "firebase/functions";
-import { functions, auth } from "@/lib/firebase";
+import { functions } from "@/lib/firebase";
 import Quagga from "@ericblade/quagga2";
 
 interface BarcodeScannerProps {
@@ -20,6 +20,9 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [debugLog, setDebugLog] = useState<string[]>([]);
   const [isScanning, setIsScanning] = useState(false);
+  
+  // 2つのinput要素のためのref
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const addLog = (msg: string) => {
@@ -53,12 +56,15 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
         const result = await scanBarcodeFromImage({ imageBase64: resizedBase64 });
         const data = result.data as any;
 
+        console.log("AI Response:", data);
+
+        // 新しいJSON形式のレスポンスに対応
         if (data && data.success && data.barcode) {
           const code = data.barcode;
           setManualCode(code);
-          toast.success(`AIスキャン成功: ${code}`);
+          toast.success(`AIスキャン成功: ${code} (${data.type || 'Unknown'})`);
           setIsScanning(false);
-          if (fileInputRef.current) fileInputRef.current.value = '';
+          resetInputs();
           onScanSuccess(code);
           return;
         } else {
@@ -82,6 +88,8 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
             const code = barcodes[0].rawValue;
             setManualCode(code);
             toast.success(`ネイティブ検知: ${code}`);
+            resetInputs();
+            onScanSuccess(code);
             return;
           }
         } catch (nativeErr) {
@@ -104,6 +112,8 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
       if (resultText) {
         setManualCode(resultText);
         toast.success(`精密ローカル検知: ${resultText}`);
+        resetInputs();
+        onScanSuccess(resultText);
         return;
       }
 
@@ -117,6 +127,8 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
         if (quaggaResult) {
           setManualCode(quaggaResult);
           toast.success(`補助エンジンで検出: ${quaggaResult}`);
+          resetInputs();
+          onScanSuccess(quaggaResult);
           return;
         }
       } catch (qErr) {
@@ -129,10 +141,16 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
     } catch (error: any) {
       console.error("Barcode scan chain failed:", error);
       setErrorMsg("すべてのエンジンでの解析に失敗しました。\n\n【コツ】\n・バーコードを真っ直ぐ、大きく撮影してください\n・光の反射（白飛び）を防いでください\n・どうしても読み取れない場合は下の番号を入力してください");
+      if (onScanFailure) onScanFailure(error);
     } finally {
       setIsScanning(false);
-      if (e.target) e.target.value = '';
+      resetInputs();
     }
+  };
+
+  const resetInputs = () => {
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   // Consolidated high-quality image resizing for Cloud Vision
@@ -294,6 +312,7 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="bg-secondary/20 p-4 rounded-lg border border-dashed border-primary/30 text-center">
+            {/* カメラ用Input (captureあり) */}
             <input
               type="file"
               accept="image/*"
@@ -301,36 +320,55 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
               onChange={handleImageScan}
               className="hidden"
               id="camera-input"
+              ref={cameraInputRef}
+              disabled={isScanning}
+            />
+            
+            {/* アルバム用Input (captureなし) */}
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleImageScan}
+              className="hidden"
+              id="file-input"
               ref={fileInputRef}
               disabled={isScanning}
             />
-            <label
-              htmlFor="camera-input"
-              className={`
-                flex flex-col items-center justify-center gap-2 cursor-pointer py-8
-                ${isScanning ? 'opacity-50 cursor-not-allowed' : 'hover:bg-primary/5 transition-colors'}
-              `}
-            >
-              {isScanning ? (
-                <>
-                  <Loader2 className="w-12 h-12 text-primary animate-spin" />
-                  <span className="font-bold text-lg animate-pulse">AI解析中...</span>
-                  <span className="text-xs text-muted-foreground">Gemini AIが画像を読み取っています</span>
-                </>
-              ) : (
-                <>
-                  <div className="relative">
-                    <Image className="w-12 h-12 text-primary mb-2" />
-                    <Sparkles className="w-5 h-5 text-yellow-500 absolute -top-1 -right-1 animate-pulse" />
-                  </div>
-                  <span className="font-bold text-lg text-primary">カメラを起動 / 画像を選択</span>
-                  <span className="text-xs text-muted-foreground">
-                    バーコードの写真を撮るだけでOK<br/>
-                    (AIが数字も読み取ります)
-                  </span>
-                </>
-              )}
-            </label>
+
+            {isScanning ? (
+              <div className="flex flex-col items-center justify-center gap-2 py-8">
+                <Loader2 className="w-12 h-12 text-primary animate-spin" />
+                <span className="font-bold text-lg animate-pulse">AI解析中...</span>
+                <span className="text-xs text-muted-foreground">Gemini AIが画像を読み取っています</span>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-4">
+                <div className="grid grid-cols-2 gap-4">
+                  {/* カメラボタン */}
+                  <label
+                    htmlFor="camera-input"
+                    className="flex flex-col items-center justify-center gap-2 cursor-pointer py-6 bg-background rounded-lg border border-primary/20 hover:bg-primary/5 transition-colors"
+                  >
+                    <Camera className="w-8 h-8 text-primary" />
+                    <span className="font-bold text-sm">カメラで撮影</span>
+                  </label>
+
+                  {/* アルバムボタン */}
+                  <label
+                    htmlFor="file-input"
+                    className="flex flex-col items-center justify-center gap-2 cursor-pointer py-6 bg-background rounded-lg border border-primary/20 hover:bg-primary/5 transition-colors"
+                  >
+                    <Upload className="w-8 h-8 text-primary" />
+                    <span className="font-bold text-sm">アルバムから</span>
+                  </label>
+                </div>
+                
+                <div className="text-xs text-muted-foreground">
+                  <Sparkles className="w-3 h-3 inline mr-1 text-yellow-500" />
+                  AIがバーコードの数字を自動で読み取ります
+                </div>
+              </div>
+            )}
           </div>
 
           {errorMsg && (
