@@ -39,7 +39,7 @@ export default function Battle() {
   const [battleResult, setBattleResult] = useState<BattleResult | null>(null);
   const [currentLogIndex, setCurrentLogIndex] = useState(-1);
   const [isBattling, setIsBattling] = useState(false);
-  const [damagePopups, setDamagePopups] = useState<{ id: string; value: number; isCritical: boolean; x: number; y: number }[]>([]);
+  const [damagePopups, setDamagePopups] = useState<{ id: string; value: number; isCritical: boolean; cheerApplied?: boolean; x: number; y: number }[]>([]);
   const [shaking, setShaking] = useState<string | null>(null); // robotId that is shaking (taking damage)
 
   const [enemyRobots, setEnemyRobots] = useState<RobotData[]>([]);
@@ -497,6 +497,7 @@ export default function Battle() {
             id: index + "-" + Math.random(),
             value: displayDamage,
             isCritical: log.isCritical || cheerApplied,
+            cheerApplied: cheerApplied,
             x: Math.random() * 40 - 20,
             y: -50
           }
@@ -755,7 +756,16 @@ export default function Battle() {
                     <input
                       type="checkbox"
                       checked={cheerP1}
-                      onChange={(e) => setCheerP1(e.target.checked)}
+                      onChange={(e) => {
+                        const newVal = e.target.checked;
+                        setCheerP1(newVal);
+                        if (newVal) {
+                          toast.success('観客が青側に肩入れした！', { duration: 2000 });
+                          playSE('se_levelup');
+                        } else {
+                          toast('声援が引っ込んだ…', { duration: 1500 });
+                        }
+                      }}
                       className="w-4 h-4 accent-cyan-500"
                     />
                     <span className="text-cyan-400 font-bold text-sm">青を焚きつける(P1)</span>
@@ -764,7 +774,16 @@ export default function Battle() {
                     <input
                       type="checkbox"
                       checked={cheerP2}
-                      onChange={(e) => setCheerP2(e.target.checked)}
+                      onChange={(e) => {
+                        const newVal = e.target.checked;
+                        setCheerP2(newVal);
+                        if (newVal) {
+                          toast.success('観客が赤側を焚きつけた！', { duration: 2000 });
+                          playSE('se_levelup');
+                        } else {
+                          toast('声援が引っ込んだ…', { duration: 1500 });
+                        }
+                      }}
                       className="w-4 h-4 accent-red-500"
                     />
                     <span className="text-red-400 font-bold text-sm">赤を焚きつける(P2)</span>
@@ -834,6 +853,7 @@ export default function Battle() {
                         style={{ textShadow: "4px 4px 0px #000" }}
                       >
                         {p.value}
+                        {p.cheerApplied && <span className="block text-sm text-green-400 absolute -bottom-5 w-full text-center font-bold tracking-wide">×1.2</span>}
                         {p.isCritical && <span className="block text-sm text-yellow-400 absolute -top-4 w-full text-center tracking-widest">クリティカル！</span>}
                       </motion.div>
                     )
