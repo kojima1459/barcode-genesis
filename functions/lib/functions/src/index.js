@@ -90,7 +90,7 @@ const getUserCredits = (user) => {
     return typeof credits === "number" ? credits : 0;
 };
 // ロボット生成API
-const FREE_DAILY_LIMIT = 1;
+const FREE_DAILY_LIMIT = 100; // Temporarily increased for testing (was 1)
 const PREMIUM_DAILY_LIMIT = 10;
 exports.generateRobot = functions.https.onCall(async (data, context) => {
     // 認証チェック

@@ -107,7 +107,7 @@ const getUserCredits = (user: any): number => {
 };
 
 // ロボット生成API
-const FREE_DAILY_LIMIT = 1;
+const FREE_DAILY_LIMIT = 100; // Temporarily increased for testing (was 1)
 const PREMIUM_DAILY_LIMIT = 10;
 
 export const generateRobot = functions.https.onCall(async (data: GenerateRobotRequest, context): Promise<GenerateRobotResponse> => {
