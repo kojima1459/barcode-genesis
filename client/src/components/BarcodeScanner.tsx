@@ -157,7 +157,7 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
     }
   };
 
-  // High-precision scan using Google Cloud Vision API
+  // High-precision scan using client-side barcode detection from image file
   const handleVisionScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
 
@@ -166,43 +166,30 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
     setErrorMsg(null);
 
     try {
-      // Convert file to base64
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(imageFile);
+      // Use html5-qrcode to scan barcode from image file
+      const html5QrCode = new Html5Qrcode("vision-scanner-temp", {
+        verbose: false,
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E
+        ]
       });
 
-      // Call Cloud Vision API via Cloud Function
-      const scanBarcodeWithVision = httpsCallable(functions, 'scanBarcodeWithVision');
-      const result = await scanBarcodeWithVision({ imageBase64: base64 });
-      const data = result.data as { barcode: string | null; success: boolean };
+      const result = await html5QrCode.scanFile(imageFile, /* showImage */ false);
 
-      if (data.success && data.barcode) {
-        toast.success(`バーコードを検出しました: ${data.barcode}`);
-        onScanSuccess(data.barcode);
-      } else {
-        setErrorMsg("高精度スキャンでもバーコードを検出できませんでした。\n画像がはっきり写っているか確認してください。");
-      }
+      // Barcode detected - auto-fill the manual input field
+      setManualCode(result);
+      toast.success(`バーコードを検出しました: ${result}\n入力欄に自動入力しました。「生成」をタップしてください。`);
+
+      // Clean up
+      html5QrCode.clear();
     } catch (error: any) {
-      console.error("Vision API scan failed:", error);
+      console.error("Image barcode scan failed:", error);
 
-      // DEBUG: エラーの詳細を表示
-      const code = error?.code || 'UNKNOWN';
-      const message = error?.message || 'No message';
-      const name = error?.name || 'Unknown Error';
-      const details = error?.details || '';
-
-      let debugInfo = `【デバッグ情報】\n`;
-      debugInfo += `エラーコード: ${code}\n`;
-      debugInfo += `エラー名: ${name}\n`;
-      debugInfo += `メッセージ: ${message}\n`;
-      if (details) {
-        debugInfo += `詳細: ${JSON.stringify(details)}\n`;
-      }
-
-      setErrorMsg(debugInfo);
+      // Show user-friendly error message
+      setErrorMsg("画像からバーコードを検出できませんでした。\n\n【コツ】\n・バーコード全体がはっきり写っている画像をお使いください\n・明るい場所で撮影した画像が認識されやすいです\n・バーコードの数字が見える画像だと、その番号を手入力できます");
     } finally {
       setIsVisionScanning(false);
       // Reset file input
@@ -386,6 +373,9 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
             読み取りにくいバーコードにおすすめ
           </p>
         </div>
+
+        {/* Hidden element for html5-qrcode scanFile */}
+        <div id="vision-scanner-temp" className="hidden" />
 
       </CardContent>
     </Card>
