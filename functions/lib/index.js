@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.stripeWebhook = exports.createPortalSession = exports.createSubscriptionSession = exports.createCheckoutSession = exports.applyCosmeticItem = exports.useUpgradeItem = exports.checkAchievements = exports.updateRanking = exports.followUser = exports.claimMissionReward = exports.getDailyMissions = exports.claimLoginBonus = exports.equipItem = exports.purchaseItem = exports.inheritSkill = exports.synthesizeRobots = exports.matchBattle = exports.batchDisassemble = exports.generateRobot = void 0;
+exports.checkMatchStatus = exports.leaveMatchmaking = exports.joinMatchmaking = exports.stripeWebhook = exports.createPortalSession = exports.createSubscriptionSession = exports.createCheckoutSession = exports.applyCosmeticItem = exports.useUpgradeItem = exports.checkAchievements = exports.updateRanking = exports.followUser = exports.claimMissionReward = exports.getDailyMissions = exports.claimLoginBonus = exports.equipItem = exports.purchaseItem = exports.inheritSkill = exports.synthesizeRobots = exports.matchBattle = exports.scanBarcodeWithVision = exports.batchDisassemble = exports.generateRobot = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
@@ -145,6 +145,67 @@ exports.batchDisassemble = functions.https.onCall(async (data, context) => {
     catch (error) {
         console.error('batchDisassemble error:', error);
         throw new functions.https.HttpsError('internal', 'Failed to disassemble robots');
+    }
+});
+// Google Cloud Vision API for high-precision barcode scanning
+const vision_1 = require("@google-cloud/vision");
+exports.scanBarcodeWithVision = functions.https.onCall(async (data, context) => {
+    var _a, _b;
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'Auth required');
+    }
+    const { imageBase64 } = data;
+    if (!imageBase64 || typeof imageBase64 !== 'string') {
+        throw new functions.https.HttpsError('invalid-argument', 'imageBase64 is required');
+    }
+    try {
+        const client = new vision_1.default.ImageAnnotatorClient();
+        // Remove data URL prefix if present
+        const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+        const [result] = await client.annotateImage({
+            image: { content: base64Data },
+            features: [{ type: 'PRODUCT_SEARCH' }, { type: 'TEXT_DETECTION' }],
+        });
+        // Try to find barcode from product search or text
+        let barcode = null;
+        // Check for barcode in product search results
+        if ((_a = result.productSearchResults) === null || _a === void 0 ? void 0 : _a.productGroupedResults) {
+            for (const group of result.productSearchResults.productGroupedResults) {
+                if (group.results) {
+                    for (const r of group.results) {
+                        // Extract barcode-like patterns from product info
+                        const productLabels = ((_b = r.product) === null || _b === void 0 ? void 0 : _b.productLabels) || [];
+                        for (const label of productLabels) {
+                            if (label.key === 'barcode' || label.key === 'gtin') {
+                                barcode = label.value || null;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // Fallback: Try to detect barcode from text (EAN-13 pattern)
+        if (!barcode && result.textAnnotations && result.textAnnotations.length > 0) {
+            const fullText = result.textAnnotations[0].description || '';
+            // Find 13-digit number (EAN-13)
+            const ean13Match = fullText.match(/\b\d{13}\b/);
+            if (ean13Match) {
+                barcode = ean13Match[0];
+            }
+            // Also try 12-digit (UPC-A)
+            if (!barcode) {
+                const upcMatch = fullText.match(/\b\d{12}\b/);
+                if (upcMatch) {
+                    barcode = upcMatch[0];
+                }
+            }
+        }
+        return { barcode, success: !!barcode };
+    }
+    catch (error) {
+        console.error('Vision API error:', error);
+        throw new functions.https.HttpsError('internal', 'Failed to process image');
     }
 });
 // バトル開始API
@@ -1215,6 +1276,196 @@ exports.stripeWebhook = functions
     catch (error) {
         console.error('Webhook processing error:', error);
         res.status(500).send('Webhook processing failed');
+    }
+});
+// ====================
+// オンラインマッチメイキング
+// ====================
+const MATCHMAKING_RATING_RANGE = 200; // ±200のレーティング差まで許容
+const MATCHMAKING_TIMEOUT_MS = 30000; // 30秒でタイムアウト
+exports.joinMatchmaking = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'Auth required');
+    }
+    const { robotId } = data;
+    if (!robotId) {
+        throw new functions.https.HttpsError('invalid-argument', 'robotId is required');
+    }
+    const userId = context.auth.uid;
+    const db = admin.firestore();
+    try {
+        // 1. ユーザーのロボットとレーティングを取得
+        const userDoc = await db.collection('users').doc(userId).get();
+        const robotDoc = await db.collection('users').doc(userId).collection('robots').doc(robotId).get();
+        if (!robotDoc.exists) {
+            throw new functions.https.HttpsError('not-found', 'Robot not found');
+        }
+        const userData = userDoc.data() || {};
+        const playerRating = userData.rating || 1000;
+        const robotData = robotDoc.data();
+        // 2. 既存のキュー登録をチェック（重複防止）
+        const existingQueue = await db.collection('matchmaking_queue')
+            .where('userId', '==', userId)
+            .where('status', '==', 'waiting')
+            .get();
+        if (!existingQueue.empty) {
+            // 既に待機中
+            return { status: 'waiting', queueId: existingQueue.docs[0].id };
+        }
+        // 3. マッチング相手を探す
+        const potentialMatches = await db.collection('matchmaking_queue')
+            .where('status', '==', 'waiting')
+            .where('rating', '>=', playerRating - MATCHMAKING_RATING_RANGE)
+            .where('rating', '<=', playerRating + MATCHMAKING_RATING_RANGE)
+            .orderBy('rating')
+            .orderBy('createdAt')
+            .limit(10)
+            .get();
+        // 自分以外のプレイヤーを探す
+        const opponent = potentialMatches.docs.find(doc => doc.data().userId !== userId);
+        if (opponent) {
+            // マッチング成功！
+            const opponentData = opponent.data();
+            // バトルを作成
+            const battleRef = db.collection('online_battles').doc();
+            const battleId = battleRef.id;
+            await db.runTransaction(async (transaction) => {
+                // キューから削除
+                transaction.update(opponent.ref, { status: 'matched', matchedAt: admin.firestore.FieldValue.serverTimestamp() });
+                // バトル作成
+                transaction.set(battleRef, {
+                    player1: {
+                        odcId: opponentData.userId,
+                        odcName: opponentData.userName,
+                        robotId: opponentData.robotId,
+                        robotName: opponentData.robotName,
+                        rating: opponentData.rating,
+                    },
+                    player2: {
+                        odcId: userId,
+                        odcName: userData.displayName || 'Player',
+                        robotId: robotId,
+                        robotName: (robotData === null || robotData === void 0 ? void 0 : robotData.name) || 'Robot',
+                        rating: playerRating,
+                    },
+                    status: 'ready',
+                    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                });
+            });
+            return {
+                status: 'matched',
+                battleId,
+                opponent: {
+                    name: opponentData.userName,
+                    robotName: opponentData.robotName,
+                    rating: opponentData.rating,
+                }
+            };
+        }
+        else {
+            // マッチング相手がいない → キューに追加
+            const queueRef = await db.collection('matchmaking_queue').add({
+                userId: userId,
+                userName: userData.displayName || 'Player',
+                robotId: robotId,
+                robotName: (robotData === null || robotData === void 0 ? void 0 : robotData.name) || 'Robot',
+                rating: playerRating,
+                status: 'waiting',
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+            return { status: 'waiting', queueId: queueRef.id };
+        }
+    }
+    catch (error) {
+        console.error('joinMatchmaking error:', error);
+        if (error instanceof functions.https.HttpsError)
+            throw error;
+        throw new functions.https.HttpsError('internal', 'Matchmaking failed');
+    }
+});
+exports.leaveMatchmaking = functions.https.onCall(async (data, context) => {
+    var _a;
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'Auth required');
+    }
+    const userId = context.auth.uid;
+    const db = admin.firestore();
+    try {
+        // キューIDが指定されていればそれを削除、なければユーザーのすべての待機中エントリを削除
+        if (data.queueId) {
+            const queueDoc = await db.collection('matchmaking_queue').doc(data.queueId).get();
+            if (queueDoc.exists && ((_a = queueDoc.data()) === null || _a === void 0 ? void 0 : _a.userId) === userId) {
+                await queueDoc.ref.delete();
+            }
+        }
+        else {
+            const userQueues = await db.collection('matchmaking_queue')
+                .where('userId', '==', userId)
+                .where('status', '==', 'waiting')
+                .get();
+            const batch = db.batch();
+            userQueues.docs.forEach(doc => batch.delete(doc.ref));
+            await batch.commit();
+        }
+        return { success: true };
+    }
+    catch (error) {
+        console.error('leaveMatchmaking error:', error);
+        throw new functions.https.HttpsError('internal', 'Failed to leave matchmaking');
+    }
+});
+// オンラインバトルのステータスをチェック（ポーリング用）
+exports.checkMatchStatus = functions.https.onCall(async (data, context) => {
+    var _a;
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'Auth required');
+    }
+    const { queueId } = data;
+    if (!queueId) {
+        throw new functions.https.HttpsError('invalid-argument', 'queueId is required');
+    }
+    const userId = context.auth.uid;
+    const db = admin.firestore();
+    try {
+        const queueDoc = await db.collection('matchmaking_queue').doc(queueId).get();
+        if (!queueDoc.exists) {
+            return { status: 'expired' };
+        }
+        const queueData = queueDoc.data();
+        if (queueData.userId !== userId) {
+            throw new functions.https.HttpsError('permission-denied', 'Not your queue entry');
+        }
+        if (queueData.status === 'matched') {
+            // マッチした相手を探す
+            const battles = await db.collection('online_battles')
+                .where('status', '==', 'ready')
+                .orderBy('createdAt', 'desc')
+                .limit(5)
+                .get();
+            for (const battleDoc of battles.docs) {
+                const battle = battleDoc.data();
+                if (battle.player1.userId === userId || battle.player2.userId === userId) {
+                    return {
+                        status: 'matched',
+                        battleId: battleDoc.id,
+                        opponent: battle.player1.userId === userId ? battle.player2 : battle.player1
+                    };
+                }
+            }
+        }
+        // タイムアウトチェック
+        const createdAt = ((_a = queueData.createdAt) === null || _a === void 0 ? void 0 : _a.toMillis()) || 0;
+        if (Date.now() - createdAt > MATCHMAKING_TIMEOUT_MS) {
+            await queueDoc.ref.delete();
+            return { status: 'timeout' };
+        }
+        return { status: 'waiting' };
+    }
+    catch (error) {
+        console.error('checkMatchStatus error:', error);
+        if (error instanceof functions.https.HttpsError)
+            throw error;
+        throw new functions.https.HttpsError('internal', 'Failed to check match status');
     }
 });
 //# sourceMappingURL=index.js.map

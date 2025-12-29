@@ -4,8 +4,11 @@ import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { useEffect, useRef, useState } from "react";
-import { Camera, Upload, AlertCircle, Keyboard, CheckCircle2, Sun, Ruler } from "lucide-react";
+import { Camera, Upload, AlertCircle, Keyboard, CheckCircle2, Sun, Ruler, Sparkles, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { functions } from "@/lib/firebase";
+import { httpsCallable } from "firebase/functions";
+import { toast } from "sonner";
 
 interface BarcodeScannerProps {
   onScanSuccess: (decodedText: string) => void;
@@ -23,6 +26,10 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
   const [scanStatus, setScanStatus] = useState<ScanStatus>('idle');
   const [scanMessage, setScanMessage] = useState<string>("");
   const [showSuccess, setShowSuccess] = useState(false);
+
+  // Vision API state
+  const [isVisionScanning, setIsVisionScanning] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannerRegionId = "html5qr-code-full-region";
@@ -65,11 +72,9 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
           handleScanSuccess(decodedText);
         },
         (errorMessage) => {
-          // Track failures for smart feedback
           failureCountRef.current++;
 
           if (failureCountRef.current > 30 && failureCountRef.current % 10 === 0) {
-            // After ~3 seconds of no detection
             setScanMessage('バーコードが見つかりません。明るい場所で、カメラを10-15cm離してお試しください。');
           } else if (failureCountRef.current > 10) {
             setScanMessage('スキャン中... カメラを安定させてください');
@@ -113,14 +118,12 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
     setScanMessage('読み取り成功！');
     setShowSuccess(true);
 
-    // Haptic feedback if available
     if ('vibrate' in navigator) {
       navigator.vibrate(100);
     }
 
     await stopScanning();
 
-    // Delay to show success animation
     setTimeout(() => {
       setShowSuccess(false);
       onScanSuccess(decodedText);
@@ -150,6 +153,44 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
           console.warn("Scan failed, retrying without strict constraints...");
           setErrorMsg("バーコードを読み取れませんでした。\n・バーコード全体が写っているか確認してください\n・明るい場所で撮影してください\n・ピントが合っているか確認してください");
         });
+    }
+  };
+
+  // High-precision scan using Google Cloud Vision API
+  const handleVisionScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+
+    const imageFile = e.target.files[0];
+    setIsVisionScanning(true);
+    setErrorMsg(null);
+
+    try {
+      // Convert file to base64
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(imageFile);
+      });
+
+      // Call Cloud Vision API via Cloud Function
+      const scanBarcodeWithVision = httpsCallable(functions, 'scanBarcodeWithVision');
+      const result = await scanBarcodeWithVision({ imageBase64: base64 });
+      const data = result.data as { barcode: string | null; success: boolean };
+
+      if (data.success && data.barcode) {
+        toast.success(`バーコードを検出しました: ${data.barcode}`);
+        onScanSuccess(data.barcode);
+      } else {
+        setErrorMsg("高精度スキャンでもバーコードを検出できませんでした。\n画像がはっきり写っているか確認してください。");
+      }
+    } catch (error) {
+      console.error("Vision API scan failed:", error);
+      setErrorMsg("高精度スキャンに失敗しました。\nネットワーク接続を確認してください。");
+    } finally {
+      setIsVisionScanning(false);
+      // Reset file input
+      e.target.value = '';
     }
   };
 
@@ -293,8 +334,42 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
           </div>
         )}
 
+        {/* 高精度スキャン (Vision API) */}
+        <div className="relative">
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handleVisionScan}
+            disabled={isVisionScanning}
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+            aria-label="高精度スキャン"
+          />
+          <Button
+            variant="secondary"
+            className="w-full gap-2 bg-gradient-to-r from-purple-500/20 to-cyan-500/20 border border-purple-500/30 hover:border-purple-500/50"
+            disabled={isVisionScanning}
+          >
+            {isVisionScanning ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                AI解析中...
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4 text-purple-400" />
+                高精度スキャン（AI解析）
+              </>
+            )}
+          </Button>
+          <p className="text-xs text-muted-foreground text-center mt-1">
+            読み取りにくいバーコードにおすすめ
+          </p>
+        </div>
+
       </CardContent>
     </Card>
   );
 }
+
 

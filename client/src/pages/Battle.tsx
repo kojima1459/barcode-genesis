@@ -6,7 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { db, functions } from "@/lib/firebase";
 import { collection, collectionGroup, getDocs, query, orderBy, limit, where, onSnapshot } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
-import { ArrowLeft, Loader2, Sword, Trophy, Search, Star } from "lucide-react";
+import { ArrowLeft, Loader2, Sword, Trophy, Search, Star, Wifi, Users, X } from "lucide-react";
 import RobotSVG from "@/components/RobotSVG";
 import { ElementalBurst, SkillCutIn } from "@/components/BattleEffects";
 import { Link } from "wouter";
@@ -43,6 +43,12 @@ export default function Battle() {
   const [friendId, setFriendId] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [isTrainingMode, setIsTrainingMode] = useState(false);
+
+  // Online Matchmaking state
+  const [battleMode, setBattleMode] = useState<'battle' | 'training' | 'online'>('battle');
+  const [isMatchmaking, setIsMatchmaking] = useState(false);
+  const [queueId, setQueueId] = useState<string | null>(null);
+  const [matchmakingStatus, setMatchmakingStatus] = useState<string>('');
 
   // 自分のロボット一覧取得
   useEffect(() => {
@@ -135,6 +141,85 @@ export default function Battle() {
     } finally {
       setIsSearching(false);
     }
+  };
+
+  // Online matchmaking functions
+  const startMatchmaking = async () => {
+    if (!selectedRobotId) {
+      toast.error('ロボットを選択してください');
+      return;
+    }
+
+    setIsMatchmaking(true);
+    setMatchmakingStatus('対戦相手を探しています...');
+
+    try {
+      const joinMatchmaking = httpsCallable(functions, 'joinMatchmaking');
+      const result = await joinMatchmaking({ robotId: selectedRobotId });
+      const data = result.data as { status: string; queueId?: string; battleId?: string; opponent?: any };
+
+      if (data.status === 'matched') {
+        setMatchmakingStatus('マッチング成功！');
+        toast.success(`対戦相手が見つかりました: ${data.opponent?.name || 'Unknown'}`);
+        // TODO: Navigate to online battle or use existing battle system
+        setIsMatchmaking(false);
+        setBattleMode('battle');
+      } else if (data.status === 'waiting') {
+        setQueueId(data.queueId || null);
+        setMatchmakingStatus('対戦相手を待っています...');
+        // Start polling
+        pollMatchStatus(data.queueId!);
+      }
+    } catch (error) {
+      console.error('Matchmaking failed:', error);
+      toast.error('マッチメイキングに失敗しました');
+      setIsMatchmaking(false);
+    }
+  };
+
+  const pollMatchStatus = async (qId: string) => {
+    const checkMatchStatus = httpsCallable(functions, 'checkMatchStatus');
+
+    const poll = async () => {
+      try {
+        const result = await checkMatchStatus({ queueId: qId });
+        const data = result.data as { status: string; battleId?: string; opponent?: any };
+
+        if (data.status === 'matched') {
+          setMatchmakingStatus('マッチング成功！');
+          toast.success('対戦相手が見つかりました！');
+          setIsMatchmaking(false);
+          setQueueId(null);
+          // TODO: Start battle with opponent
+        } else if (data.status === 'timeout' || data.status === 'expired') {
+          setMatchmakingStatus('タイムアウト');
+          toast.error('マッチング相手が見つかりませんでした');
+          setIsMatchmaking(false);
+          setQueueId(null);
+        } else if (data.status === 'waiting' && isMatchmaking) {
+          // Continue polling
+          setTimeout(poll, 2000);
+        }
+      } catch (error) {
+        console.error('Poll error:', error);
+        setIsMatchmaking(false);
+      }
+    };
+
+    poll();
+  };
+
+  const cancelMatchmaking = async () => {
+    try {
+      const leaveMatchmaking = httpsCallable(functions, 'leaveMatchmaking');
+      await leaveMatchmaking({ queueId });
+    } catch (error) {
+      console.error('Leave matchmaking error:', error);
+    }
+    setIsMatchmaking(false);
+    setQueueId(null);
+    setMatchmakingStatus('');
+    toast('マッチメイキングをキャンセルしました');
   };
 
   // ローカルバトルシミュレーション（トレーニングモード用）
@@ -451,13 +536,15 @@ export default function Battle() {
 
             <Card>
               <CardContent className="p-6 space-y-4">
-                <Tabs defaultValue="battle" onValueChange={(v) => {
+                <Tabs value={battleMode} onValueChange={(v) => {
+                  setBattleMode(v as 'battle' | 'training' | 'online');
                   setIsTrainingMode(v === 'training');
                   setEnemyRobotId(null);
                 }}>
                   <TabsList className="w-full">
-                    <TabsTrigger value="battle" className="flex-1">🆚 対戦モード</TabsTrigger>
-                    <TabsTrigger value="training" className="flex-1">🏋️ トレーニング</TabsTrigger>
+                    <TabsTrigger value="battle" className="flex-1">🆚 対戦</TabsTrigger>
+                    <TabsTrigger value="online" className="flex-1"><Wifi className="w-3 h-3 mr-1" />オンライン</TabsTrigger>
+                    <TabsTrigger value="training" className="flex-1">🏋️ 練習</TabsTrigger>
                   </TabsList>
                 </Tabs>
 
@@ -532,6 +619,48 @@ export default function Battle() {
                       )}
                     </div>
                   </>
+                )}
+
+                {battleMode === 'online' && (
+                  <div className="space-y-4">
+                    <h2 className="text-xl font-bold flex items-center gap-2">
+                      <Users className="w-5 h-5" />
+                      オンライン対戦
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      世界中のプレイヤーとリアルタイムでマッチング！近いレーティングの相手と対戦します。
+                    </p>
+
+                    {!isMatchmaking ? (
+                      <Button
+                        onClick={startMatchmaking}
+                        disabled={!selectedRobotId}
+                        className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
+                        size="lg"
+                      >
+                        <Wifi className="w-4 h-4 mr-2" />
+                        対戦相手を探す
+                      </Button>
+                    ) : (
+                      <div className="text-center space-y-4">
+                        <div className="flex items-center justify-center gap-2">
+                          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                          <span className="text-lg">{matchmakingStatus}</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          30秒以内に相手が見つからない場合はタイムアウトします
+                        </div>
+                        <Button
+                          onClick={cancelMatchmaking}
+                          variant="outline"
+                          className="w-full"
+                        >
+                          <X className="w-4 h-4 mr-2" />
+                          キャンセル
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 )}
               </CardContent>
             </Card>
