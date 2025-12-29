@@ -58,6 +58,13 @@ export default function Battle() {
   const [isOverloadActive, setIsOverloadActive] = useState(false);
   const [overloadFlash, setOverloadFlash] = useState(false);
 
+  // Cheer (応援) state - P1 = player (blue/left), P2 = opponent (red/right)
+  const [p1CheerUsed, setP1CheerUsed] = useState(false);
+  const [p1CheerReady, setP1CheerReady] = useState(false);
+  const [p2CheerUsed, setP2CheerUsed] = useState(false);
+  const [p2CheerReady, setP2CheerReady] = useState(false);
+  const [cheerLogs, setCheerLogs] = useState<Array<{ type: string; side: 'P1' | 'P2'; message: string; timestamp: number }>>([]);
+
   // Visual effects state
   const [activeEffect, setActiveEffect] = useState<{ element: string; x: number; y: number } | null>(null);
   const [activeCutIn, setActiveCutIn] = useState<{ skillName: string; robotId: string } | null>(null);
@@ -354,6 +361,12 @@ export default function Battle() {
     setIsBattling(true);
     setBattleResult(null);
     setCurrentLogIndex(-1);
+    // Reset cheer state for new battle
+    setP1CheerUsed(false);
+    setP1CheerReady(false);
+    setP2CheerUsed(false);
+    setP2CheerReady(false);
+    setCheerLogs([]);
 
     // トレーニングモードの場合はローカルシミュレーション
     if (isTrainingMode) {
@@ -448,6 +461,40 @@ export default function Battle() {
       setCurrentLogIndex(index);
       const log = result.logs[index];
 
+      // ============================================
+      // CHEER SYSTEM: Apply 1.2x multiplier if ready
+      // ============================================
+      let displayDamage = log.damage;
+      let cheerApplied = false;
+
+      // Determine attacker side: P1 = player (selectedRobotId), P2 = opponent
+      const isP1Attack = log.attackerId === selectedRobotId;
+      const isP2Attack = log.attackerId !== selectedRobotId;
+
+      if (isP1Attack && p1CheerReady && log.damage > 0) {
+        displayDamage = Math.floor(log.damage * 1.2);
+        cheerApplied = true;
+        setP1CheerReady(false);
+        setCheerLogs(prev => [...prev, {
+          type: 'CHEER_APPLIED',
+          side: 'P1',
+          message: '声援が刃になった（×1.2）',
+          timestamp: Date.now()
+        }]);
+        toast('🔥 声援が刃になった（×1.2）', { duration: 1500 });
+      } else if (isP2Attack && p2CheerReady && log.damage > 0) {
+        displayDamage = Math.floor(log.damage * 1.2);
+        cheerApplied = true;
+        setP2CheerReady(false);
+        setCheerLogs(prev => [...prev, {
+          type: 'CHEER_APPLIED',
+          side: 'P2',
+          message: '声援が刃になった（×1.2）',
+          timestamp: Date.now()
+        }]);
+        toast('🔥 声援が刃になった（×1.2）', { duration: 1500 });
+      }
+
       // VFX Logic
       if (log.damage > 0) {
         playSE('se_attack');
@@ -477,8 +524,8 @@ export default function Battle() {
           ...prev,
           {
             id: index + "-" + Math.random(),
-            value: log.damage,
-            isCritical: log.isCritical,
+            value: displayDamage,
+            isCritical: log.isCritical || cheerApplied,
             x: Math.random() * 40 - 20,
             y: -50
           }
@@ -829,6 +876,64 @@ export default function Battle() {
                   <div className="text-xs text-center mt-1 text-muted-foreground">
                     1回のみ使用可能
                   </div>
+                </motion.div>
+              )}
+
+              {/* Cheer Buttons - 応援ボタン */}
+              {isBattling && (
+                <motion.div
+                  className="absolute bottom-20 left-1/2 -translate-x-1/2 z-30 flex gap-4"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 1.5 }}
+                >
+                  {/* P1 Cheer Button (Blue/Player) */}
+                  <Button
+                    onClick={() => {
+                      if (p1CheerUsed) return;
+                      setP1CheerUsed(true);
+                      setP1CheerReady(true);
+                      playSE('se_levelup');
+                      setCheerLogs(prev => [...prev, {
+                        type: 'CHEER_USED',
+                        side: 'P1',
+                        message: '観客が青側に肩入れした！',
+                        timestamp: Date.now()
+                      }]);
+                      toast.success('観客が青側に肩入れした！');
+                    }}
+                    disabled={p1CheerUsed}
+                    className={`px-4 py-2 rounded-full font-bold transition-all ${p1CheerUsed
+                      ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white shadow-[0_0_15px_rgba(0,200,255,0.5)] animate-pulse'
+                      }`}
+                  >
+                    {p1CheerUsed ? '使用済み' : '青を焚きつける(P1)'}
+                  </Button>
+
+                  {/* P2 Cheer Button (Red/Opponent) */}
+                  <Button
+                    onClick={() => {
+                      if (p2CheerUsed) return;
+                      setP2CheerUsed(true);
+                      setP2CheerReady(true);
+                      playSE('se_levelup');
+                      setCheerLogs(prev => [...prev, {
+                        type: 'CHEER_USED',
+                        side: 'P2',
+                        message: '観客が赤側を焚きつけた！',
+                        timestamp: Date.now()
+                      }]);
+                      toast.success('観客が赤側を焚きつけた！');
+                    }}
+                    disabled={p2CheerUsed}
+                    className={`px-4 py-2 rounded-full font-bold transition-all ${p2CheerUsed
+                      ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white shadow-[0_0_15px_rgba(255,100,100,0.5)] animate-pulse'
+                      }`}
+                  >
+                    {p2CheerUsed ? '使用済み' : '赤を焚きつける(P2)'}
+                  </Button>
                 </motion.div>
               )}
 
