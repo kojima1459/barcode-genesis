@@ -93,6 +93,25 @@ export interface GenerateRobotResponse {
   version?: string;
 }
 
+// ============================================
+// BattleEngine v2 Types
+// ============================================
+
+export type Stance = "ATTACK" | "GUARD" | "TRICK";
+export type StanceOutcome = "WIN" | "LOSE" | "DRAW";
+
+export interface PassiveTrigger {
+  partType: "weapon" | "backpack" | "accessory";
+  partId: number;
+  effectName: string;
+  effectDetail: string;
+}
+
+export interface OverdriveState {
+  gauge: number;        // 0-100
+  isActive: boolean;    // Active this turn?
+}
+
 export interface BattleLog {
   turn: number;
   attackerId: string;
@@ -104,6 +123,21 @@ export interface BattleLog {
   attackerHp: number;
   defenderHp: number;
   message: string;
+
+  // BattleEngine v2: Stance
+  stanceAttacker?: Stance;
+  stanceDefender?: Stance;
+  stanceOutcome?: StanceOutcome;
+  stanceMultiplier?: number;
+
+  // BattleEngine v2: Overdrive
+  overdriveTriggered?: boolean;
+  overdriveMessage?: string;
+  attackerOverdriveGauge?: number;
+  defenderOverdriveGauge?: number;
+
+  // BattleEngine v2: Passive
+  passiveTriggered?: PassiveTrigger;
 }
 
 export interface BattleResult {
