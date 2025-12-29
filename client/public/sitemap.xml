@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  
+  <url>
+    <loc>https://barcodegame-42858.web.app</loc>
+    <lastmod>2025-12-29T04:35:39.275Z</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://barcodegame-42858.web.app" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://barcodegame-42858.web.app" />
+  </url>
+  <url>
+    <loc>https://barcodegame-42858.web.app/battle</loc>
+    <lastmod>2025-12-29T04:35:39.275Z</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://barcodegame-42858.web.app/battle" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://barcodegame-42858.web.app/battle" />
+  </url>
+  <url>
+    <loc>https://barcodegame-42858.web.app/collection</loc>
+    <lastmod>2025-12-29T04:35:39.275Z</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://barcodegame-42858.web.app/collection" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://barcodegame-42858.web.app/collection" />
+  </url>
+  <url>
+    <loc>https://barcodegame-42858.web.app/leaderboard</loc>
+    <lastmod>2025-12-29T04:35:39.275Z</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://barcodegame-42858.web.app/leaderboard" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://barcodegame-42858.web.app/leaderboard" />
+  </url>
+  <url>
+    <loc>https://barcodegame-42858.web.app/shop</loc>
+    <lastmod>2025-12-29T04:35:39.275Z</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://barcodegame-42858.web.app/shop" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://barcodegame-42858.web.app/shop" />
+  </url>
+  <url>
+    <loc>https://barcodegame-42858.web.app/profile</loc>
+    <lastmod>2025-12-29T04:35:39.275Z</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://barcodegame-42858.web.app/profile" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://barcodegame-42858.web.app/profile" />
+  </url>
+</urlset>

@@ -162,7 +162,7 @@ export default function Shop() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-4 flex flex-col">
+    <div className="min-h-screen bg-background p-4 flex flex-col pb-24">
       <header className="flex items-center mb-6 max-w-4xl mx-auto w-full">
         <Link href="/">
           <Button variant="ghost" className="mr-4">

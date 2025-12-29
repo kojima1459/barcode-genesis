@@ -14,6 +14,9 @@ import { getItemLabel } from "@/lib/items";
 import { toast } from "sonner";
 import { RobotData } from "@/types/shared";
 import { useSound } from "@/contexts/SoundContext";
+import { useLanguage } from "@/contexts/LanguageContext";
+import SEO from "@/components/SEO";
+import ShareCardModal from "@/components/ShareCardModal";
 
 
 type InventoryMap = Record<string, number>;
@@ -374,6 +377,10 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
 
   return (
     <div className="min-h-screen bg-dark-bg p-4 flex flex-col pb-24 relative overflow-hidden text-foreground">
+      <SEO
+        title={baseRobot ? `${baseRobot.name} | ${t("app_title")}` : t("loading")}
+        description={baseRobot ? `${baseRobot.name} (Lv.${baseRobot.level}) - ${baseRobot.rarityName} Unit. HP: ${baseRobot.baseHp}, ATK: ${baseRobot.baseAttack}, DEF: ${baseRobot.baseDefense}` : ""}
+      />
       <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-20 pointer-events-none" />
 
       <main className="max-w-2xl mx-auto w-full relative z-10 space-y-6">

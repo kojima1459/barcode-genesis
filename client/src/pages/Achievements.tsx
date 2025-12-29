@@ -49,7 +49,7 @@ export default function Achievements() {
     }, [user]);
 
     return (
-        <div className="container mx-auto p-4 max-w-4xl">
+        <div className="container mx-auto p-4 max-w-4xl pb-24">
             <div className="flex items-center gap-2 mb-6">
                 <Trophy className="w-8 h-8 text-yellow-500" />
                 <h1 className="text-3xl font-bold">Achievements</h1>

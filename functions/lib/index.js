@@ -45,6 +45,8 @@ const getUserCredits = (user) => {
     return typeof credits === "number" ? credits : 0;
 };
 // ロボット生成API
+const FREE_DAILY_LIMIT = 1;
+const PREMIUM_DAILY_LIMIT = 10;
 exports.generateRobot = functions.https.onCall(async (data, context) => {
     // 認証チェック
     if (!context.auth) {
@@ -60,16 +62,31 @@ exports.generateRobot = functions.https.onCall(async (data, context) => {
         const db = admin.firestore();
         const userRef = db.collection('users').doc(userId);
         const robotRef = userRef.collection('robots').doc(barcode);
+        const todayKey = getJstDateKey();
         // ロボットデータ生成
         const robotData = (0, robotGenerator_1.generateRobotFromBarcode)(barcode, userId);
         await db.runTransaction(async (t) => {
+            const userSnap = await t.get(userRef);
+            const userData = userSnap.exists ? userSnap.data() : {};
+            const isPremium = !!(userData === null || userData === void 0 ? void 0 : userData.isPremium);
+            const lastGenDate = userData === null || userData === void 0 ? void 0 : userData.lastGenerationDateKey;
+            const currentDailyCount = (lastGenDate === todayKey) ? ((userData === null || userData === void 0 ? void 0 : userData.dailyGenerationCount) || 0) : 0;
+            const limit = isPremium ? PREMIUM_DAILY_LIMIT : FREE_DAILY_LIMIT;
+            if (currentDailyCount >= limit) {
+                throw new functions.https.HttpsError('resource-exhausted', isPremium
+                    ? `Premium limit reached (${PREMIUM_DAILY_LIMIT}/day). Come back tomorrow!`
+                    : `Free limit reached (${FREE_DAILY_LIMIT}/day). Upgrade to Premium for ${PREMIUM_DAILY_LIMIT}/day!`);
+            }
             const existing = await t.get(robotRef);
             (0, robotGenerator_1.assertRobotNotExists)(existing.exists);
             const serverTimestamp = admin.firestore.FieldValue.serverTimestamp();
             t.set(robotRef, Object.assign(Object.assign({}, robotData), { id: robotRef.id, createdAt: serverTimestamp, updatedAt: serverTimestamp }));
             t.set(userRef, {
                 totalRobots: admin.firestore.FieldValue.increment(1),
-                credits: admin.firestore.FieldValue.increment(0)
+                credits: admin.firestore.FieldValue.increment(0),
+                lastGenerationDateKey: todayKey,
+                dailyGenerationCount: currentDailyCount + 1,
+                updatedAt: serverTimestamp
             }, { merge: true });
         });
         return {
@@ -710,17 +727,19 @@ exports.claimLoginBonus = functions.https.onCall(async (_data, context) => {
         if (lastLoginDateKey === todayKey) {
             throw new functions.https.HttpsError('failed-precondition', 'Already claimed today');
         }
+        const isPremium = !!(userData === null || userData === void 0 ? void 0 : userData.isPremium);
+        const bonusAmount = isPremium ? LOGIN_BONUS_CREDITS * 2 : LOGIN_BONUS_CREDITS;
         const currentStreak = typeof (userData === null || userData === void 0 ? void 0 : userData.loginStreak) === "number" ? userData.loginStreak : 0;
         const newStreak = lastLoginDateKey === yesterdayKey ? currentStreak + 1 : 1;
         const credits = getUserCredits(userData);
-        const newCredits = credits + LOGIN_BONUS_CREDITS;
+        const newCredits = credits + bonusAmount;
         t.set(userRef, {
             credits: newCredits,
             lastLoginDateKey: todayKey,
             loginStreak: newStreak,
             updatedAt: admin.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
-        return { streak: newStreak, credits: newCredits };
+        return { streak: newStreak, credits: newCredits, bonusAmount };
     });
     return result;
 });

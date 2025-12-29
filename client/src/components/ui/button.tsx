@@ -36,25 +36,40 @@ const buttonVariants = cva(
   }
 );
 
-function Button({
-  className,
-  variant,
-  size,
-  asChild = false,
-  ...props
-}: React.ComponentProps<"button"> &
-  VariantProps<typeof buttonVariants> & {
-    asChild?: boolean;
-  }) {
-  const Comp = asChild ? Slot : "button";
-
-  return (
-    <Comp
-      data-slot="button"
-      className={cn(buttonVariants({ variant, size, className }))}
-      {...props}
-    />
-  );
+export interface ButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+  VariantProps<typeof buttonVariants> {
+  asChild?: boolean;
 }
+
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ className, variant, size, asChild = false, onClick, ...props }, ref) => {
+    const Comp = asChild ? Slot : "button"
+
+    // Safety check for navigator vibration without context overhead if preferred, 
+    // but context gives us centralized control (e.g. disable setting).
+    // For now, let's just use direct navigator.vibrate for performance in this low-level component
+    // OR use the context properly. Context is safer for "disable" feature.
+    // However, we can't use hooks inside forwardRef easily if we want to keep it pure?
+    // Actually we can.
+
+    const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+      if (navigator.vibrate) navigator.vibrate(10); // Light tap
+      onClick?.(e);
+    }
+
+    return (
+      <Comp
+        data-slot="button"
+        className={cn(buttonVariants({ variant, size, className }))}
+        ref={ref}
+        onClick={handleClick}
+        {...props}
+      />
+    )
+  }
+)
+
+Button.displayName = "Button";
 
 export { Button, buttonVariants };

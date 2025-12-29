@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
+import { useTutorial } from "@/contexts/TutorialContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { db, functions } from "@/lib/firebase";
 import { callGenerateRobot } from "@/lib/functions";
 import { httpsCallable } from "firebase/functions";
 import { collection, doc, getDoc, getDocs } from "firebase/firestore";
-import { Loader2, LogOut, Scan, ShoppingCart, Sword, Trophy, Zap, ScanBarcode, Swords } from "lucide-react";
+import { Loader2, LogOut, Scan, ShoppingCart, Sword, Trophy, Zap, ScanBarcode, Swords, HelpCircle } from "lucide-react";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import RobotSVG from "@/components/RobotSVG";
 import { toast } from "sonner";
@@ -20,6 +22,7 @@ import SoundSettings from "@/components/SoundSettings";
 import { useSound } from "@/contexts/SoundContext";
 import { RobotData } from "@/types/shared";
 import AdBanner from "@/components/AdBanner";
+import ThemeSwitcher from "@/components/ThemeSwitcher";
 
 
 
@@ -34,6 +37,7 @@ interface Mission {
 
 export default function Home() {
   const { t } = useLanguage();
+  const { completeStep } = useTutorial();
   const { playBGM, playSE } = useSound();
   const { user, logout } = useAuth();
   const [mode, setMode] = useState<'menu' | 'scan' | 'result'>('menu');
@@ -55,6 +59,8 @@ export default function Home() {
 
   const [robots, setRobots] = useState<RobotData[]>([]);
   const [robotsLoading, setRobotsLoading] = useState(true);
+  const [showLimitModal, setShowLimitModal] = useState(false);
+  const [limitMessage, setLimitMessage] = useState("");
 
   useEffect(() => {
     // playBGM('bgm_menu'); // ユーザー要望により起動時の英語アナウンス（BGMに含まれる）を停止
@@ -145,6 +151,12 @@ export default function Home() {
       const code = error?.code;
       const message = error?.message || 'Unknown error';
 
+      if (code === 'resource-exhausted') {
+        setLimitMessage(message);
+        setShowLimitModal(true);
+        return;
+      }
+
       let userMessage = "Error: " + message;
       if (code === 'internal') {
         userMessage = 'サーバーエラーが発生しました。時間を置いて再度お試しください。(internal)';
@@ -152,8 +164,6 @@ export default function Home() {
         userMessage = '無効なバーコードです。(invalid-argument)';
       } else if (code === 'unauthenticated') {
         userMessage = '認証エラーです。再度ログインしてください。(unauthenticated)';
-      } else if (code === 'resource-exhausted') {
-        userMessage = 'リクエスト数が多すぎます。しばらく待ってください。(resource-exhausted)';
       }
 
       toast.error(userMessage, {
@@ -282,6 +292,7 @@ export default function Home() {
             </div>
             {/* User Avatar or something could go here */}
             <div className="flex gap-2">
+              <ThemeSwitcher />
               <SoundSettings />
               <LanguageSwitcher />
             </div>
@@ -290,8 +301,13 @@ export default function Home() {
 
         {/* Action Buttons */}
         <section className="grid grid-cols-2 gap-4">
+
           <Link href="/scan">
-            <Button className="h-32 w-full flex flex-col gap-2 glass-panel border-neon-cyan hover:bg-neon-cyan/10 transition-all group">
+            <Button
+              id="tutorial-generate-btn"
+              onClick={() => completeStep('HOME_GENERATE')}
+              className="h-32 w-full flex flex-col gap-2 glass-panel border-neon-cyan hover:bg-neon-cyan/10 transition-all group"
+            >
               <ScanBarcode className="w-12 h-12 text-neon-cyan group-hover:drop-shadow-[0_0_10px_rgba(0,243,255,0.8)] transition-all" />
               <span className="font-bold text-lg tracking-wider">GENERATE</span>
             </Button>
@@ -347,6 +363,32 @@ export default function Home() {
 
         <AdBanner />
         <TutorialModal />
+
+        <Dialog open={showLimitModal} onOpenChange={setShowLimitModal}>
+          <DialogContent className="bg-card border-neon-cyan text-foreground">
+            <DialogHeader>
+              <DialogTitle className="text-neon-cyan flex items-center gap-2">
+                <Zap className="h-5 w-5" />
+                GENERATION LIMIT REACHED
+              </DialogTitle>
+              <DialogDescription className="text-muted-foreground pt-4">
+                {limitMessage}
+                <br /><br />
+                アップグレードして制限を解除しませんか？
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="flex-col gap-2 sm:flex-row">
+              <Link href="/premium">
+                <Button className="w-full sm:w-auto bg-neon-yellow text-black hover:bg-neon-yellow/80 font-bold" onClick={() => setShowLimitModal(false)}>
+                  プレミアムプランを見る
+                </Button>
+              </Link>
+              <Button variant="ghost" className="w-full sm:w-auto" onClick={() => setShowLimitModal(false)}>
+                閉じる
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );

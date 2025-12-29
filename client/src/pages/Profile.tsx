@@ -93,7 +93,7 @@ export default function Profile() {
   if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
 
   return (
-    <div className="min-h-screen bg-background p-4 flex flex-col">
+    <div className="min-h-screen bg-background p-4 pb-24 flex flex-col">
       <header className="flex items-center mb-8 max-w-4xl mx-auto w-full">
         <Link href="/" onClick={() => playSE('se_click')}>
           <Button variant="ghost" className="mr-4">

@@ -20,6 +20,7 @@ import { getItemLabel } from "@/lib/items";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion, AnimatePresence } from "framer-motion";
 import { Zap, Shield, Heart } from "lucide-react";
+import SEO from "@/components/SEO";
 
 
 
@@ -54,6 +55,56 @@ export default function Battle() {
   const [hasUsedOverload, setHasUsedOverload] = useState(false);
   const [isOverloadActive, setIsOverloadActive] = useState(false);
   const [overloadFlash, setOverloadFlash] = useState(false);
+
+  // Visual effects state
+  const [activeEffect, setActiveEffect] = useState<{ element: string; x: number; y: number } | null>(null);
+  const [activeCutIn, setActiveCutIn] = useState<{ skillName: string; robotId: string } | null>(null);
+
+  // Resume loop helper for cut-ins
+  const startResumeLoop = (startIndex: number, result: BattleResult) => {
+    let index = startIndex;
+    const interval = setInterval(() => {
+      if (index >= result.logs.length) {
+        clearInterval(interval);
+        setIsBattling(false);
+        return;
+      }
+      setCurrentLogIndex(index);
+      const log = result.logs[index];
+
+      if (log.damage > 0) {
+        playSE('se_attack');
+        setShaking(log.defenderId);
+        setTimeout(() => setShaking(null), 500);
+
+        setDamagePopups(prev => [
+          ...prev,
+          {
+            id: index + "-" + Math.random(),
+            value: log.damage,
+            isCritical: log.isCritical,
+            x: Math.random() * 40 - 20,
+            y: -50
+          }
+        ]);
+        setTimeout(() => {
+          setDamagePopups(prev => prev.slice(1));
+        }, 1000);
+      }
+
+      if (log.skillName) {
+        clearInterval(interval);
+        setActiveCutIn({ skillName: log.skillName, robotId: log.attackerId });
+        setTimeout(() => {
+          setActiveCutIn(null);
+          startResumeLoop(index + 1, result);
+        }, 1500);
+        return;
+      }
+
+      index++;
+    }, 1200);
+  };
 
   // 自分のロボット一覧取得
   useEffect(() => {
@@ -475,7 +526,11 @@ export default function Battle() {
   if (loading) return <div className="flex justify-center p-8 min-h-screen items-center bg-dark-bg"><Loader2 className="animate-spin text-neon-cyan h-12 w-12" /></div>;
 
   return (
-    <div className="min-h-screen bg-dark-bg text-foreground p-4 flex flex-col pb-20 overflow-hidden relative">
+    <div className="min-h-screen bg-dark-bg text-foreground p-4 flex flex-col pb-24 overflow-hidden relative">
+      <SEO
+        title={t("seo_battle_title")}
+        description={t("seo_battle_desc")}
+      />
       <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-20 pointer-events-none" />
       <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/80 pointer-events-none" />
       <header className="flex items-center mb-8 max-w-4xl mx-auto w-full">

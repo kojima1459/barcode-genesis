@@ -30,14 +30,14 @@ export default function Leaderboard() {
       try {
         // Query all robots ordered by wins descending
         const q = query(
-          collectionGroup(db, "robots"), 
-          orderBy("wins", "desc"), 
+          collectionGroup(db, "robots"),
+          orderBy("wins", "desc"),
           limit(20)
         );
-        
+
         const snapshot = await getDocs(q);
         const data: RobotData[] = [];
-        
+
         snapshot.forEach(doc => {
           const robot = { id: doc.id, ...doc.data() } as RobotData;
           // Extract userId from reference path if not in data
@@ -50,7 +50,7 @@ export default function Leaderboard() {
           }
           data.push(robot);
         });
-        
+
         setTopRobots(data);
       } catch (error) {
         console.error("Error fetching leaderboard:", error);
@@ -72,7 +72,7 @@ export default function Leaderboard() {
   };
 
   return (
-    <div className="min-h-screen bg-background p-4 flex flex-col">
+    <div className="min-h-screen bg-background p-4 flex flex-col pb-24">
       <header className="flex items-center mb-8 max-w-4xl mx-auto w-full">
         <Link href="/">
           <Button variant="ghost" className="mr-4">
@@ -103,18 +103,18 @@ export default function Leaderboard() {
             ) : (
               <div className="space-y-2">
                 {topRobots.map((robot, index) => (
-                  <div 
+                  <div
                     key={robot.id}
                     className={`flex items-center p-4 rounded-lg border ${index < 3 ? 'bg-secondary/10 border-primary/20' : 'bg-card'}`}
                   >
                     <div className="flex items-center justify-center w-12 mr-4">
                       {getRankIcon(index)}
                     </div>
-                    
+
                     <div className="relative w-12 h-12 mr-4 flex-shrink-0">
                       <RobotSVG parts={robot.parts} colors={robot.colors} size={48} />
                     </div>
-                    
+
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="font-bold truncate">{robot.name}</span>
@@ -126,7 +126,7 @@ export default function Leaderboard() {
                         Owner: <span className="font-mono">{robot.userId?.substring(0, 8)}...</span>
                       </div>
                     </div>
-                    
+
                     <div className="text-right ml-4">
                       <div className="font-bold text-lg text-primary">{robot.wins || 0}</div>
                       <div className="text-xs text-muted-foreground">{t('wins')}</div>

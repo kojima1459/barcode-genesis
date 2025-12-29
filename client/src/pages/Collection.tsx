@@ -11,6 +11,7 @@ import { Link } from "wouter";
 import { toast } from "sonner";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { RobotData } from "@/types/shared";
+import SEO from "@/components/SEO";
 
 type SortKey = 'createdAt' | 'baseAttack' | 'baseHp' | 'baseSpeed' | 'rarityName';
 type SortOrder = 'asc' | 'desc';
@@ -145,7 +146,12 @@ export default function Collection() {
   const rarities = ['Common', 'Rare', 'Epic', 'Legendary'];
 
   return (
-    <div className="min-h-screen bg-background p-4 flex flex-col pb-24">
+    <div className="min-h-screen bg-background p-4 flex flex-col pb-24 relative overflow-hidden">
+      <SEO
+        title={t("seo_collection_title")}
+        description={t("seo_collection_desc")}
+      />
+      <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-20 pointer-events-none" />
       <header className="flex items-center mb-4 max-w-6xl mx-auto w-full flex-wrap gap-2">
         <Link href="/">
           <Button variant="ghost" className="mr-2">
@@ -232,7 +238,7 @@ export default function Collection() {
           <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
             <p className="text-lg mb-4">{filterRarity ? `${filterRarity}のロボットがいません` : 'No robots found.'}</p>
             {!filterRarity && (
-              <Link href="/">
+              <Link href="/scan">
                 <Button>Scan your first barcode!</Button>
               </Link>
             )}
@@ -243,8 +249,8 @@ export default function Collection() {
               <Card
                 key={robot.id}
                 className={`overflow-hidden transition-all cursor-pointer group relative ${isSelectMode && selectedIds.has(robot.id)
-                    ? 'ring-2 ring-primary border-primary'
-                    : 'hover:border-primary'
+                  ? 'ring-2 ring-primary border-primary'
+                  : 'hover:border-primary'
                   }`}
                 onClick={() => isSelectMode && toggleSelection(robot.id)}
               >
@@ -268,9 +274,9 @@ export default function Collection() {
                     <div className="flex justify-between items-center text-xs">
                       <span className="text-muted-foreground">Lv.{robot.level || 1}</span>
                       <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${robot.rarityName === 'Legendary' ? 'bg-yellow-500/20 text-yellow-500' :
-                          robot.rarityName === 'Epic' ? 'bg-purple-500/20 text-purple-500' :
-                            robot.rarityName === 'Rare' ? 'bg-blue-500/20 text-blue-500' :
-                              'bg-gray-500/20 text-gray-400'
+                        robot.rarityName === 'Epic' ? 'bg-purple-500/20 text-purple-500' :
+                          robot.rarityName === 'Rare' ? 'bg-blue-500/20 text-blue-500' :
+                            'bg-gray-500/20 text-gray-400'
                         }`}>
                         {robot.rarityName}
                       </span>

@@ -116,7 +116,7 @@ export default function Premium() {
     };
 
     return (
-        <div className="min-h-screen bg-background p-4 flex flex-col">
+        <div className="min-h-screen bg-background p-4 flex flex-col pb-24">
             <header className="flex items-center mb-6 max-w-4xl mx-auto w-full">
                 <Link href="/">
                     <Button variant="ghost" className="mr-4">
@@ -142,6 +142,10 @@ export default function Premium() {
                             <ul className="space-y-2 text-sm">
                                 <li className="flex items-center gap-2">
                                     <Sparkles className="h-4 w-4 text-yellow-500" />
+                                    ロボット生成上限UP（1日10体まで）
+                                </li>
+                                <li className="flex items-center gap-2">
+                                    <Sparkles className="h-4 w-4 text-yellow-500" />
                                     毎日ログインボーナス2倍（100クレジット）
                                 </li>
                                 <li className="flex items-center gap-2">
@@ -154,7 +158,7 @@ export default function Premium() {
                                 </li>
                                 <li className="flex items-center gap-2">
                                     <Sparkles className="h-4 w-4 text-yellow-500" />
-                                    広告非表示（将来対応）
+                                    広告完全非表示
                                 </li>
                             </ul>
 

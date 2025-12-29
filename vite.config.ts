@@ -24,6 +24,8 @@ const plugins = [
       display: 'standalone',
       orientation: 'portrait',
       start_url: '/',
+      id: '/',
+      categories: ['games', 'entertainment'],
       icons: [
         {
           src: '/icon-192.png',
@@ -39,7 +41,16 @@ const plugins = [
           src: '/icon-512.png',
           sizes: '512x512',
           type: 'image/png',
-          purpose: 'any maskable'
+          purpose: 'maskable'
+        }
+      ],
+      screenshots: [
+        {
+          src: '/ogp.png',
+          sizes: '1200x630',
+          type: 'image/png',
+          form_factor: 'wide',
+          label: 'Barcode Genesis - バーコードバトルRPG'
         }
       ]
     },
@@ -99,6 +110,16 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'framer-motion', 'lucide-react'],
+          firebase: ['firebase/app', 'firebase/firestore', 'firebase/auth', 'firebase/functions'],
+          recharts: ['recharts'],
+        }
+      }
+    },
+    chunkSizeWarningLimit: 1000,
   },
   server: {
     port: 5173,
