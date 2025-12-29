@@ -83,7 +83,6 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
             ref={fileInputRef}
             type="file"
             accept="image/*"
-            capture="environment"
             onChange={handleImageScan}
             disabled={isScanning}
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
