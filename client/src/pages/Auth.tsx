@@ -16,7 +16,18 @@ export default function Auth() {
   const [password, setPassword] = useState("");
   const [, setLocation] = useLocation();
 
-  // ... handleLogin (Google) stays same
+  const handleLogin = async () => {
+    setIsLoading(true);
+    try {
+      await signInWithGoogle();
+      setLocation("/");
+    } catch (error) {
+      console.error("Login failed:", error);
+      toast.error("Authentication failed. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleEmailAuth = async (isSignUp: boolean) => {
     if (!email || !password) {
