@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { SeededRandom } = require("../lib/seededRandom");
+const { SeededRandom } = require("../lib/functions/src/seededRandom");
 
 test("same seed yields the same sequence", () => {
   const rngA = new SeededRandom("same-seed");

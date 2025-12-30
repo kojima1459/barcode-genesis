@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Home, Swords, Grid, ShoppingBag, User } from "lucide-react";
+import { BattleIcon, HomeIcon, ProfileIcon, ShopIcon, UnitsIcon } from "@/components/icons/AppIcons";
 import { useSound } from "@/contexts/SoundContext";
 
 export default function BottomNav() {
@@ -13,11 +13,11 @@ export default function BottomNav() {
     }
 
     const navItems = [
-        { path: "/", icon: Home, label: "HOME", ariaLabel: "ホームへ移動" },
-        { path: "/battle", icon: Swords, label: "BATTLE", ariaLabel: "バトルへ移動" },
-        { path: "/collection", icon: Grid, label: "UNITS", ariaLabel: "コレクションへ移動" },
-        { path: "/shop", icon: ShoppingBag, label: "SHOP", ariaLabel: "ショップへ移動" },
-        { path: "/profile", icon: User, label: "PROFILE", ariaLabel: "プロフィールへ移動" },
+        { path: "/", icon: HomeIcon, label: "Home", ariaLabel: "ホームへ移動" },
+        { path: "/battle", icon: BattleIcon, label: "Battle", ariaLabel: "バトルへ移動" },
+        { path: "/collection", icon: UnitsIcon, label: "Units", ariaLabel: "コレクションへ移動" },
+        { path: "/shop", icon: ShopIcon, label: "Shop", ariaLabel: "ショップへ移動" },
+        { path: "/profile", icon: ProfileIcon, label: "Profile", ariaLabel: "プロフィールへ移動" },
     ];
 
     return (
@@ -26,7 +26,10 @@ export default function BottomNav() {
             role="navigation"
             aria-label="メインナビゲーション"
         >
-            <div className="glass-panel rounded-2xl flex justify-around items-center p-3 pointer-events-auto">
+            <div
+                className="glass-panel rounded-2xl flex justify-around items-center p-3 pointer-events-auto"
+                style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 12px)" }}
+            >
                 {navItems.map((item) => {
                     const isActive = location === item.path;
                     return (
@@ -41,12 +44,11 @@ export default function BottomNav() {
                                 className={`flex flex-col items-center gap-1 transition-all duration-300 min-w-[48px] min-h-[48px] justify-center ${isActive ? "text-primary scale-110" : "text-muted-foreground hover:text-foreground"
                                     }`}
                             >
-                                <item.icon
-                                    className={`h-6 w-6 ${isActive ? "neon-text-cyan drop-shadow-[0_0_8px_rgba(0,243,255,0.6)]" : ""}`}
-                                    strokeWidth={isActive ? 2.5 : 1.5}
+                            <item.icon
+                                    className={`h-5 w-5 ${isActive ? "neon-text-cyan drop-shadow-[0_0_8px_rgba(62,208,240,0.5)]" : ""}`}
                                     aria-hidden="true"
                                 />
-                                <span className={`text-[10px] font-orbitron tracking-wider ${isActive ? "text-primary neon-text-cyan" : ""}`}>
+                                <span className={`text-[11px] font-orbitron tracking-[0.08em] ${isActive ? "text-primary neon-text-cyan" : ""}`}>
                                     {item.label}
                                 </span>
                             </div>

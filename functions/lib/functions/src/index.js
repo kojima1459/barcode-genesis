@@ -1,6 +1,17 @@
 "use strict";
+var __rest = (this && this.__rest) || function (s, e) {
+    var t = {};
+    for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
+        t[p] = s[p];
+    if (s != null && typeof Object.getOwnPropertySymbols === "function")
+        for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) {
+            if (e.indexOf(p[i]) < 0 && Object.prototype.propertyIsEnumerable.call(s, p[i]))
+                t[p[i]] = s[p[i]];
+        }
+    return t;
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.resolveFighterData = exports.createVariant = exports.scanBarcodeFromImage = exports.checkMatchStatus = exports.leaveMatchmaking = exports.joinMatchmaking = exports.stripeWebhook = exports.createPortalSession = exports.createSubscriptionSession = exports.createCheckoutSession = exports.applyCosmeticItem = exports.useUpgradeItem = exports.checkAchievements = exports.updateRanking = exports.followUser = exports.claimMissionReward = exports.getDailyMissions = exports.claimLoginBonus = exports.equipItem = exports.purchaseItem = exports.inheritSkill = exports.synthesizeRobots = exports.matchBattle = exports.evolveRobot = exports.batchDisassemble = exports.generateRobot = exports.ping = exports.debugPing = exports.testFunctionHealth = void 0;
+exports.resolveFighterData = exports.createVariant = exports.scanBarcodeFromImage = exports.checkMatchStatus = exports.leaveMatchmaking = exports.joinMatchmaking = exports.stripeWebhook = exports.createPortalSession = exports.createSubscriptionSession = exports.createCheckoutSession = exports.applyCosmeticItem = exports.useUpgradeItem = exports.craftItem = exports.checkAchievements = exports.updateRanking = exports.followUser = exports.claimMissionReward = exports.getDailyMissions = exports.claimLoginBonus = exports.claimDailyLogin = exports.equipItem = exports.purchaseItem = exports.inheritSkill = exports.synthesizeRobots = exports.matchBattle = exports.evolveRobot = exports.batchDisassemble = exports.awardScanToken = exports.generateRobot = exports.ping = exports.debugPing = exports.testFunctionHealth = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
@@ -12,6 +23,13 @@ const skills_1 = require("./skills");
 const seededRandom_1 = require("./seededRandom");
 const levelSystem_1 = require("./levelSystem");
 const variantSystem_1 = require("./variantSystem");
+const battleRewards_1 = require("./battleRewards");
+const scanTokens_1 = require("./scanTokens");
+const crafting_1 = require("./crafting");
+const battleEntryFee_1 = require("./battleEntryFee");
+const ledger_1 = require("./ledger");
+const dateKey_1 = require("./dateKey");
+const dailyLogin_1 = require("./dailyLogin");
 // Node.js 20 has native fetch - no need for node-fetch
 // Use a version constant to help track deployments and identify cache issues
 const VERSION = "2.1.0-fixed-cors-v3";
@@ -67,22 +85,12 @@ const ITEM_CATALOG = {
 const isItemId = (itemId) => {
     return Object.prototype.hasOwnProperty.call(ITEM_CATALOG, itemId);
 };
-const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const LOGIN_BONUS_CREDITS = 50;
 const DAILY_MISSIONS = [
     { id: "scan_barcode", title: "Scan 1 barcode", target: 1, rewardCredits: 30 },
     { id: "win_battle", title: "Win 1 battle", target: 1, rewardCredits: 40 },
     { id: "synthesize", title: "Synthesize 1 robot", target: 1, rewardCredits: 50 }
 ];
-const getJstDateKey = (date = new Date()) => {
-    const jst = new Date(date.getTime() + JST_OFFSET_MS);
-    return jst.toISOString().slice(0, 10);
-};
-const getYesterdayJstDateKey = () => {
-    const jst = new Date(Date.now() + JST_OFFSET_MS);
-    jst.setUTCDate(jst.getUTCDate() - 1);
-    return jst.toISOString().slice(0, 10);
-};
 const buildDailyMissions = () => {
     return DAILY_MISSIONS.map((mission) => (Object.assign(Object.assign({}, mission), { progress: 0, claimed: false })));
 };
@@ -133,11 +141,15 @@ exports.generateRobot = functions.https.onCall(async (data, context) => {
         const db = admin.firestore();
         const userRef = db.collection('users').doc(userId);
         const robotRef = userRef.collection('robots').doc(barcode);
-        const todayKey = getJstDateKey();
+        const todayKey = (0, dateKey_1.getJstDateKey)();
+        const scanDailyRef = userRef.collection('scanDaily').doc(todayKey);
         // ロボットデータ生成
         const robotData = (0, robotGenerator_1.generateRobotFromBarcode)(barcode, userId);
         await db.runTransaction(async (t) => {
-            const userSnap = await t.get(userRef);
+            const [userSnap, scanDailySnap] = await Promise.all([
+                t.get(userRef),
+                t.get(scanDailyRef)
+            ]);
             const userData = userSnap.exists ? userSnap.data() : {};
             const isPremium = !!(userData === null || userData === void 0 ? void 0 : userData.isPremium);
             const lastGenDate = userData === null || userData === void 0 ? void 0 : userData.lastGenerationDateKey;
@@ -151,14 +163,32 @@ exports.generateRobot = functions.https.onCall(async (data, context) => {
             const existing = await t.get(robotRef);
             (0, robotGenerator_1.assertRobotNotExists)(existing.exists);
             const serverTimestamp = admin.firestore.FieldValue.serverTimestamp();
+            const scanDailyState = (0, scanTokens_1.normalizeScanDaily)(scanDailySnap.exists ? scanDailySnap.data() : {});
+            const scanAward = (0, scanTokens_1.applyScanDailyAward)(scanDailyState, barcode);
+            const scanTokenIncrement = scanAward.awarded ? scanTokens_1.SCAN_TOKEN_PER_SCAN : 0;
             t.set(robotRef, Object.assign(Object.assign({}, robotData), { id: robotRef.id, createdAt: serverTimestamp, updatedAt: serverTimestamp }));
             t.set(userRef, {
                 totalRobots: admin.firestore.FieldValue.increment(1),
                 credits: admin.firestore.FieldValue.increment(0),
+                scanTokens: admin.firestore.FieldValue.increment(scanTokenIncrement),
                 lastGenerationDateKey: todayKey,
                 dailyGenerationCount: currentDailyCount + 1,
                 updatedAt: serverTimestamp
             }, { merge: true });
+            if (scanAward.awarded) {
+                t.set(scanDailyRef, {
+                    dateKey: todayKey,
+                    issuedCount: scanAward.nextState.issuedCount,
+                    updatedAt: serverTimestamp,
+                    [`barcodes.${barcode}`]: true
+                }, { merge: true });
+                const ledgerRef = userRef.collection('ledger').doc();
+                t.set(ledgerRef, Object.assign(Object.assign({}, (0, ledger_1.buildLedgerEntry)({
+                    type: "SCAN",
+                    deltaScanTokens: scanTokenIncrement,
+                    refId: `${todayKey}:${barcode}`
+                })), { createdAt: serverTimestamp }));
+            }
             // Daily Mission: Scan Barcode
             await updateMissionProgressInternal(t, userRef, todayKey, "scan_barcode");
         });
@@ -180,6 +210,77 @@ exports.generateRobot = functions.https.onCall(async (data, context) => {
             throw error;
         }
         throw new functions.https.HttpsError('internal', 'An error occurred while generating the robot.');
+    }
+});
+// ScanToken issuance (daily per barcode)
+exports.awardScanToken = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'Auth required');
+    }
+    const barcode = data === null || data === void 0 ? void 0 : data.barcode;
+    if (typeof barcode !== 'string') {
+        throw new functions.https.HttpsError('invalid-argument', 'Invalid barcode');
+    }
+    try {
+        (0, robotGenerator_1.assertValidBarcode)(barcode);
+    }
+    catch (_error) {
+        throw new functions.https.HttpsError('invalid-argument', 'Invalid barcode');
+    }
+    const userId = context.auth.uid;
+    const db = admin.firestore();
+    const userRef = db.collection('users').doc(userId);
+    const dateKey = (0, dateKey_1.getJstDateKey)();
+    const scanDailyRef = userRef.collection('scanDaily').doc(dateKey);
+    try {
+        const result = await db.runTransaction(async (t) => {
+            const [userSnap, scanDailySnap] = await Promise.all([
+                t.get(userRef),
+                t.get(scanDailyRef)
+            ]);
+            if (!userSnap.exists) {
+                throw new functions.https.HttpsError('failed-precondition', 'User not found');
+            }
+            const userData = userSnap.data() || {};
+            const scanDailyState = (0, scanTokens_1.normalizeScanDaily)(scanDailySnap.exists ? scanDailySnap.data() : {});
+            const scanAward = (0, scanTokens_1.applyScanDailyAward)(scanDailyState, barcode);
+            if (!scanAward.awarded) {
+                throw new functions.https.HttpsError('already-exists', 'Scan token already issued');
+            }
+            const currentTokens = (0, scanTokens_1.normalizeScanTokens)(userData.scanTokens);
+            const nextTokens = currentTokens + scanTokens_1.SCAN_TOKEN_PER_SCAN;
+            const serverTimestamp = admin.firestore.FieldValue.serverTimestamp();
+            t.set(scanDailyRef, {
+                dateKey,
+                issuedCount: scanAward.nextState.issuedCount,
+                updatedAt: serverTimestamp,
+                [`barcodes.${barcode}`]: true
+            }, { merge: true });
+            t.set(userRef, {
+                scanTokens: nextTokens,
+                updatedAt: serverTimestamp
+            }, { merge: true });
+            const ledgerRef = userRef.collection('ledger').doc();
+            t.set(ledgerRef, Object.assign(Object.assign({}, (0, ledger_1.buildLedgerEntry)({
+                type: "SCAN",
+                deltaScanTokens: scanTokens_1.SCAN_TOKEN_PER_SCAN,
+                refId: `${dateKey}:${barcode}`
+            })), { createdAt: serverTimestamp }));
+            return {
+                awarded: true,
+                dateKey,
+                barcode,
+                scanTokensBalance: nextTokens
+            };
+        });
+        return result;
+    }
+    catch (error) {
+        if (error instanceof functions.https.HttpsError) {
+            throw error;
+        }
+        console.error("awardScanToken error:", error);
+        throw new functions.https.HttpsError('internal', 'Failed to award scan token');
     }
 });
 // レア度に応じたクレジット変換レート
@@ -445,16 +546,20 @@ const findOpponent = async (db, playerId, playerRating) => {
     };
 };
 const BATTLE_ITEM_IDS = ['repair_kit', 'attack_boost', 'defense_boost', 'critical_lens'];
-const calculateReward = (result) => {
-    switch (result) {
-        case 'win': return { credits: 2, xp: 10 };
-        case 'loss': return { credits: 0, xp: 3 };
-        case 'draw': return { credits: 1, xp: 5 };
-    }
+const PRE_BATTLE_ITEM_TYPES = ['BOOST', 'SHIELD', 'JAMMER', 'DISRUPT', 'CANCEL_CRIT'];
+const normalizePreBattleItem = (item) => {
+    if (!item)
+        return null;
+    if (item === 'CANCEL_CRIT' || item === 'DISRUPT')
+        return 'JAMMER';
+    return PRE_BATTLE_ITEM_TYPES.includes(item) ? item : null;
 };
-const DAILY_CREDIT_CAP = 20;
+const stripItemFields = (log) => {
+    const { itemApplied, itemSide, itemType, itemEffect, itemEvent, itemMessage } = log, rest = __rest(log, ["itemApplied", "itemSide", "itemType", "itemEffect", "itemEvent", "itemMessage"]);
+    return rest;
+};
 exports.matchBattle = functions.https.onCall(async (data, context) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16;
     if (!context.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'Auth required');
     }
@@ -466,9 +571,8 @@ exports.matchBattle = functions.https.onCall(async (data, context) => {
     if (useItemId && !BATTLE_ITEM_IDS.includes(useItemId)) {
         throw new functions.https.HttpsError('invalid-argument', 'Invalid battle item');
     }
-    // Pre-battle item validation
-    const validBattleItemTypes = ['BOOST', 'SHIELD', 'CANCEL_CRIT'];
-    if ((battleItems === null || battleItems === void 0 ? void 0 : battleItems.p1) && !validBattleItemTypes.includes(battleItems.p1)) {
+    const normalizedBattleItem = normalizePreBattleItem(battleItems === null || battleItems === void 0 ? void 0 : battleItems.p1);
+    if ((battleItems === null || battleItems === void 0 ? void 0 : battleItems.p1) && !normalizedBattleItem) {
         throw new functions.https.HttpsError('invalid-argument', 'Invalid P1 battle item type');
     }
     try {
@@ -479,6 +583,12 @@ exports.matchBattle = functions.https.onCall(async (data, context) => {
         const player = playerSnap.data() || {};
         const playerRating = typeof player.rankingPoints === 'number' ? player.rankingPoints : 1000;
         const currentWinStreak = typeof player.currentWinStreak === 'number' ? player.currentWinStreak : 0;
+        const playerLevel = typeof player.level === "number"
+            ? player.level
+            : (0, battleRewards_1.levelFromXp)(typeof player.xp === "number" ? player.xp : 0);
+        if (normalizedBattleItem && playerLevel < 5) {
+            throw new functions.https.HttpsError('failed-precondition', 'item-slots-locked');
+        }
         // アイテム所持事前チェック（UXのため。厳密なチェックはトランザクション内で）
         if (useItemId) {
             const itemSnap = await db.collection('users').doc(userId).collection('inventory').doc(useItemId).get();
@@ -487,13 +597,30 @@ exports.matchBattle = functions.https.onCall(async (data, context) => {
                 throw new functions.https.HttpsError('failed-precondition', 'Item not in inventory');
             }
         }
-        // Pre-battle item credit check (1 credit per item)
-        const BATTLE_ITEM_CREDIT_COST = 1;
-        const battleItemCost = (battleItems === null || battleItems === void 0 ? void 0 : battleItems.p1) ? BATTLE_ITEM_CREDIT_COST : 0;
-        if (battleItemCost > 0) {
-            const credits = getUserCredits(player);
-            if (credits < battleItemCost) {
-                throw new functions.https.HttpsError('resource-exhausted', 'クレジットが不足しています（アイテム使用）');
+        // Pre-battle item inventory check (UX only; strict check in transaction)
+        if (normalizedBattleItem) {
+            const inventoryCollection = db.collection('users').doc(userId).collection('inventory');
+            if (normalizedBattleItem === 'JAMMER') {
+                const jammerSnap = await inventoryCollection.doc('JAMMER').get();
+                const jammerQty = (_d = (_c = jammerSnap.data()) === null || _c === void 0 ? void 0 : _c.qty) !== null && _d !== void 0 ? _d : 0;
+                if (jammerQty < 1) {
+                    const disruptSnap = await inventoryCollection.doc('DISRUPT').get();
+                    const disruptQty = (_f = (_e = disruptSnap.data()) === null || _e === void 0 ? void 0 : _e.qty) !== null && _f !== void 0 ? _f : 0;
+                    if (disruptQty < 1) {
+                        const legacySnap = await inventoryCollection.doc('CANCEL_CRIT').get();
+                        const legacyQty = (_h = (_g = legacySnap.data()) === null || _g === void 0 ? void 0 : _g.qty) !== null && _h !== void 0 ? _h : 0;
+                        if (legacyQty < 1) {
+                            throw new functions.https.HttpsError('failed-precondition', 'Item not in inventory');
+                        }
+                    }
+                }
+            }
+            else {
+                const itemSnap = await inventoryCollection.doc(normalizedBattleItem).get();
+                const qty = (_k = (_j = itemSnap.data()) === null || _j === void 0 ? void 0 : _j.qty) !== null && _k !== void 0 ? _k : 0;
+                if (qty < 1) {
+                    throw new functions.https.HttpsError('failed-precondition', 'Item not in inventory');
+                }
             }
         }
         // 3. 対戦相手選択
@@ -505,8 +632,9 @@ exports.matchBattle = functions.https.onCall(async (data, context) => {
         // Pass cheer input: p1 = player, p2 = opponent
         const cheerInput = cheer ? { p1: !!cheer.p1, p2: !!cheer.p2 } : undefined;
         // Pass battle items: p1 = player, p2 = opponent (opponent doesn't use items in PvE)
-        const battleItemInput = (battleItems === null || battleItems === void 0 ? void 0 : battleItems.p1) ? { p1: battleItems.p1, p2: null } : undefined;
+        const battleItemInput = normalizedBattleItem ? { p1: normalizedBattleItem, p2: null } : undefined;
         const battleResult = (0, battleSystem_1.simulateBattle)(playerRobot, opponentRobot, battleId, playerItems, cheerInput, battleItemInput);
+        const publicLogs = battleResult.logs.map(stripItemFields);
         // 勝敗判定
         const winnerIsPlayer = battleResult.winnerId === playerRobot.id;
         const winnerIsOpponent = battleResult.winnerId === opponentRobot.id;
@@ -524,46 +652,111 @@ exports.matchBattle = functions.https.onCall(async (data, context) => {
             ratingChange = Math.round(ratingChange * 0.5);
         }
         // 6. 報酬計算
-        const baseRewards = calculateReward(resultType);
-        const earnedXp = baseRewards.xp;
+        const winnerUid = winnerIsPlayer ? userId : null;
         // 7. Firestore更新（トランザクション）
         const txnReward = await db.runTransaction(async (transaction) => {
-            var _a, _b;
-            // ユーザーデータ再取得（クレジット/DailyCapの整合性確保）
+            var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r;
             const userRef = db.collection('users').doc(userId);
-            const userSnap = await transaction.get(userRef);
+            const battleRef = db.collection('battles').doc(battleId);
+            const battleResultRef = userRef.collection('battleResults').doc(battleId);
+            const [userSnap, battleSnap, battleResultSnap] = await Promise.all([
+                transaction.get(userRef),
+                transaction.get(battleRef),
+                transaction.get(battleResultRef)
+            ]);
             if (!userSnap.exists)
                 throw new functions.https.HttpsError('not-found', 'User not found in transaction');
             const userData = userSnap.data() || {};
-            // Idempotency: 既に処理済みの場合はスキップ
-            const battleResultRef = userRef.collection('battleResults').doc(battleId);
-            const battleResultSnap = await transaction.get(battleResultRef);
-            if (battleResultSnap.exists) {
-                return null;
+            const userLevel = typeof userData.level === "number"
+                ? userData.level
+                : (0, battleRewards_1.levelFromXp)(typeof userData.xp === "number" ? userData.xp : 0);
+            if (normalizedBattleItem && userLevel < 5) {
+                throw new functions.https.HttpsError('failed-precondition', 'item-slots-locked');
             }
-            // Calculate Credits with Daily Cap
-            const todayKey = getJstDateKey();
-            const lastDateKey = userData.dailyEarnedDateKey;
-            let currentDailyCredits = 0;
-            if (lastDateKey === todayKey) {
-                currentDailyCredits = userData.dailyEarnedCredits || 0;
+            if (battleResultSnap.exists || (battleSnap.exists && ((_a = battleSnap.data()) === null || _a === void 0 ? void 0 : _a.rewardGranted))) {
+                const fallbackXp = typeof userData.xp === "number" ? userData.xp : 0;
+                const fallbackLevel = typeof userData.level === "number" ? userData.level : 1;
+                const battleData = battleSnap.exists ? battleSnap.data() : {};
+                const existingReward = (_b = battleData === null || battleData === void 0 ? void 0 : battleData.reward) !== null && _b !== void 0 ? _b : {
+                    creditsReward: 0,
+                    xpReward: 0,
+                    scanTokensGained: 0,
+                    xpBefore: fallbackXp,
+                    xpAfter: fallbackXp,
+                    levelBefore: fallbackLevel,
+                    levelAfter: fallbackLevel,
+                    dailyCapApplied: false,
+                    dailyCreditsCapApplied: false,
+                    capped: false,
+                    capRemaining: battleRewards_1.DAILY_CREDITS_CAP,
+                    reason: null,
+                };
+                const resolvedLevelAfter = typeof existingReward.levelAfter === "number" ? existingReward.levelAfter : fallbackLevel;
+                const resolvedLevelBefore = typeof existingReward.levelBefore === "number" ? existingReward.levelBefore : fallbackLevel;
+                return {
+                    reward: existingReward,
+                    earnedCredits: (_c = existingReward.creditsReward) !== null && _c !== void 0 ? _c : 0,
+                    earnedXp: (_d = existingReward.xpReward) !== null && _d !== void 0 ? _d : 0,
+                    scanTokensGained: (_e = existingReward.scanTokensGained) !== null && _e !== void 0 ? _e : 0,
+                    leveledUp: resolvedLevelAfter > resolvedLevelBefore,
+                    newWorkshopLines: (0, levelSystem_1.getWorkshopLines)(resolvedLevelAfter),
+                };
             }
-            let earnedCredits = baseRewards.credits;
-            let dailyCapApplied = false;
-            if (currentDailyCredits + earnedCredits > DAILY_CREDIT_CAP) {
-                earnedCredits = Math.max(0, DAILY_CREDIT_CAP - currentDailyCredits);
-                dailyCapApplied = true;
+            const entryFeeState = (0, battleEntryFee_1.resolveEntryFee)({
+                credits: getUserCredits(userData),
+                entryFeeCharged: battleSnap.exists && ((_f = battleSnap.data()) === null || _f === void 0 ? void 0 : _f.entryFeeCharged) === true,
+            });
+            if (entryFeeState.insufficient) {
+                throw new functions.https.HttpsError('failed-precondition', 'insufficient-credits');
             }
-            const newDailyCredits = (lastDateKey === todayKey ? currentDailyCredits : 0) + earnedCredits;
-            // User Level Update
-            const currentUserLevel = userData.level || 1;
-            const currentUserXp = userData.xp || 0;
-            const lvlResult = (0, levelSystem_1.applyUserXp)(currentUserLevel, currentUserXp, earnedXp);
+            const entryFeeCharged = entryFeeState.charged;
+            const entryFeeAmount = entryFeeCharged ? entryFeeState.fee : 0;
+            const todayKey = (0, dateKey_1.getJstDateKey)();
+            const rewardResult = (0, battleRewards_1.applyBattleRewards)({
+                battleData: { status: "completed", winner: resultType },
+                userData,
+                userId,
+                winnerUid,
+                todayKey,
+                dailyCreditsCap: battleRewards_1.DAILY_CREDITS_CAP,
+            });
+            const earnedCredits = rewardResult.reward.creditsReward;
+            const earnedXp = rewardResult.reward.xpReward;
+            const scanTokensGained = (_g = rewardResult.reward.scanTokensGained) !== null && _g !== void 0 ? _g : 0;
+            const leveledUp = rewardResult.reward.levelAfter > rewardResult.reward.levelBefore;
+            const newWorkshopLines = (0, levelSystem_1.getWorkshopLines)(rewardResult.levelAfter);
+            // Pre-battle item consumption (inventory only)
+            if (normalizedBattleItem) {
+                const inventoryCollection = userRef.collection('inventory');
+                let consumeRef = inventoryCollection.doc(normalizedBattleItem);
+                const itemDoc = await transaction.get(consumeRef);
+                let availableQty = (_j = (_h = itemDoc.data()) === null || _h === void 0 ? void 0 : _h.qty) !== null && _j !== void 0 ? _j : 0;
+                if (availableQty < 1 && normalizedBattleItem === 'JAMMER') {
+                    const fallbackIds = ['DISRUPT', 'CANCEL_CRIT'];
+                    for (const fallbackId of fallbackIds) {
+                        const fallbackRef = inventoryCollection.doc(fallbackId);
+                        const fallbackDoc = await transaction.get(fallbackRef);
+                        const fallbackQty = (_l = (_k = fallbackDoc.data()) === null || _k === void 0 ? void 0 : _k.qty) !== null && _l !== void 0 ? _l : 0;
+                        if (fallbackQty > 0) {
+                            consumeRef = fallbackRef;
+                            availableQty = fallbackQty;
+                            break;
+                        }
+                    }
+                }
+                if (availableQty < 1) {
+                    throw new functions.https.HttpsError('failed-precondition', 'Item not in inventory');
+                }
+                transaction.update(consumeRef, {
+                    qty: admin.firestore.FieldValue.increment(-1),
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+            }
             // アイテム消費
             if (useItemId) {
                 const itemRef = db.collection('users').doc(userId).collection('inventory').doc(useItemId);
                 const itemDoc = await transaction.get(itemRef);
-                if (!itemDoc.exists || ((_b = (_a = itemDoc.data()) === null || _a === void 0 ? void 0 : _a.qty) !== null && _b !== void 0 ? _b : 0) < 1) {
+                if (!itemDoc.exists || ((_o = (_m = itemDoc.data()) === null || _m === void 0 ? void 0 : _m.qty) !== null && _o !== void 0 ? _o : 0) < 1) {
                     throw new functions.https.HttpsError('failed-precondition', 'Item not in inventory');
                 }
                 transaction.update(itemRef, {
@@ -572,7 +765,7 @@ exports.matchBattle = functions.https.onCall(async (data, context) => {
                 });
             }
             // バトル結果保存
-            transaction.set(db.collection('battles').doc(battleId), {
+            transaction.set(battleRef, {
                 id: battleId,
                 playerId: userId,
                 playerUsername: player.username || 'Unknown',
@@ -589,11 +782,32 @@ exports.matchBattle = functions.https.onCall(async (data, context) => {
                 opponentFinalHp: 0,
                 experienceGained: earnedXp,
                 rankingPointsChange: ratingChange,
-                battleLog: battleResult.logs,
+                battleLog: publicLogs,
                 rewards: {
-                    credits: earnedCredits, xp: earnedXp, dailyCapApplied,
-                    levelUp: lvlResult.leveledUp, newLevel: lvlResult.newLevel, newWorkshopLines: lvlResult.workshopLines
+                    credits: earnedCredits,
+                    xp: earnedXp,
+                    exp: earnedXp,
+                    coins: earnedCredits,
+                    dailyCapApplied: rewardResult.reward.dailyCapApplied,
+                    dailyCreditsCapApplied: rewardResult.reward.dailyCreditsCapApplied,
+                    levelUp: leveledUp,
+                    newLevel: rewardResult.reward.levelAfter,
+                    newWorkshopLines,
+                    capped: rewardResult.reward.capped,
+                    capRemaining: rewardResult.reward.capRemaining,
+                    reason: rewardResult.reward.reason,
+                    creditsReward: rewardResult.reward.creditsReward,
+                    xpReward: rewardResult.reward.xpReward,
+                    scanTokensGained: (_p = rewardResult.reward.scanTokensGained) !== null && _p !== void 0 ? _p : 0,
+                    xpBefore: rewardResult.reward.xpBefore,
+                    xpAfter: rewardResult.reward.xpAfter,
+                    levelBefore: rewardResult.reward.levelBefore,
+                    levelAfter: rewardResult.reward.levelAfter
                 },
+                entryFeeCharged,
+                rewardGranted: rewardResult.granted,
+                reward: rewardResult.reward,
+                rewardGrantedAt: admin.firestore.FieldValue.serverTimestamp(),
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
                 duration: 0
             });
@@ -604,25 +818,34 @@ exports.matchBattle = functions.https.onCall(async (data, context) => {
                 result: resultType,
                 creditsEarned: earnedCredits,
                 xpEarned: earnedXp,
+                scanTokensGained,
+                battleLog: battleResult.logs,
+                battleItems: battleItemInput !== null && battleItemInput !== void 0 ? battleItemInput : null,
+                entryFeeCharged,
+                reward: rewardResult.reward,
                 createdAt: admin.firestore.FieldValue.serverTimestamp()
             });
             // プレイヤー統計更新
             const playerUpdates = {
-                level: lvlResult.newLevel,
-                xp: lvlResult.newXp,
-                workshopLines: lvlResult.workshopLines,
+                level: rewardResult.levelAfter,
+                xp: rewardResult.xpAfter,
+                workshopLines: newWorkshopLines,
                 totalBattles: admin.firestore.FieldValue.increment(1),
                 rankingPoints: admin.firestore.FieldValue.increment(ratingChange),
-                credits: admin.firestore.FieldValue.increment(earnedCredits - battleItemCost),
-                dailyEarnedCredits: newDailyCredits,
-                dailyEarnedDateKey: todayKey,
+                credits: admin.firestore.FieldValue.increment(earnedCredits - entryFeeAmount),
+                scanTokens: admin.firestore.FieldValue.increment(scanTokensGained),
                 updatedAt: admin.firestore.FieldValue.serverTimestamp()
             };
+            if (rewardResult.dailyBattleDateKey) {
+                playerUpdates.dailyBattleDateKey = rewardResult.dailyBattleDateKey;
+                playerUpdates.dailyBattleCreditsEarned = (_q = rewardResult.dailyBattleCreditsEarned) !== null && _q !== void 0 ? _q : 0;
+                playerUpdates.dailyBattleXpEarned = (_r = rewardResult.dailyBattleXpEarned) !== null && _r !== void 0 ? _r : 0;
+            }
             if (winnerIsPlayer) {
                 playerUpdates.totalWins = admin.firestore.FieldValue.increment(1);
                 playerUpdates.currentWinStreak = admin.firestore.FieldValue.increment(1);
                 // Daily Mission: Win Battle
-                await updateMissionProgressInternal(transaction, db.collection("users").doc(userId), todayKey, "win_battle");
+                await updateMissionProgressInternal(transaction, userRef, todayKey, "win_battle");
             }
             else if (winnerIsOpponent) {
                 playerUpdates.totalLosses = admin.firestore.FieldValue.increment(1);
@@ -631,7 +854,7 @@ exports.matchBattle = functions.https.onCall(async (data, context) => {
             else {
                 playerUpdates.totalDraws = admin.firestore.FieldValue.increment(1);
             }
-            transaction.update(db.collection('users').doc(userId), playerUpdates);
+            transaction.update(userRef, playerUpdates);
             // ロボット統計更新
             const currentExp = getRobotXp(playerRobot) + earnedXp;
             const currentLevel = playerRobot.level || 1;
@@ -671,7 +894,14 @@ exports.matchBattle = functions.https.onCall(async (data, context) => {
             if (!playerRobot.isVariant) {
                 transaction.update(db.collection('users').doc(userId).collection('robots').doc(playerRobot.id), robotUpdates);
             }
-            return { earnedCredits, earnedXp, dailyCapApplied, lvlResult };
+            return {
+                reward: rewardResult.reward,
+                earnedCredits,
+                earnedXp,
+                scanTokensGained,
+                leveledUp,
+                newWorkshopLines
+            };
         });
         return {
             battleId,
@@ -680,16 +910,28 @@ exports.matchBattle = functions.https.onCall(async (data, context) => {
                 winner: resultType === 'win' ? 'player' : resultType === 'loss' ? 'opponent' : 'draw',
                 log: battleResult.logs,
             },
-            experienceGained: (_c = txnReward === null || txnReward === void 0 ? void 0 : txnReward.earnedXp) !== null && _c !== void 0 ? _c : 0,
+            experienceGained: (_l = txnReward === null || txnReward === void 0 ? void 0 : txnReward.earnedXp) !== null && _l !== void 0 ? _l : 0,
             rankingPointsChange: ratingChange,
             rewards: {
-                exp: (_d = txnReward === null || txnReward === void 0 ? void 0 : txnReward.earnedXp) !== null && _d !== void 0 ? _d : 0,
-                credits: (_e = txnReward === null || txnReward === void 0 ? void 0 : txnReward.earnedCredits) !== null && _e !== void 0 ? _e : 0,
-                coins: (_f = txnReward === null || txnReward === void 0 ? void 0 : txnReward.earnedCredits) !== null && _f !== void 0 ? _f : 0,
-                dailyCapApplied: (_g = txnReward === null || txnReward === void 0 ? void 0 : txnReward.dailyCapApplied) !== null && _g !== void 0 ? _g : false,
-                levelUp: (_h = txnReward === null || txnReward === void 0 ? void 0 : txnReward.lvlResult) === null || _h === void 0 ? void 0 : _h.leveledUp,
-                newLevel: (_j = txnReward === null || txnReward === void 0 ? void 0 : txnReward.lvlResult) === null || _j === void 0 ? void 0 : _j.newLevel,
-                newWorkshopLines: (_k = txnReward === null || txnReward === void 0 ? void 0 : txnReward.lvlResult) === null || _k === void 0 ? void 0 : _k.workshopLines
+                exp: (_m = txnReward === null || txnReward === void 0 ? void 0 : txnReward.earnedXp) !== null && _m !== void 0 ? _m : 0,
+                credits: (_o = txnReward === null || txnReward === void 0 ? void 0 : txnReward.earnedCredits) !== null && _o !== void 0 ? _o : 0,
+                xp: (_p = txnReward === null || txnReward === void 0 ? void 0 : txnReward.earnedXp) !== null && _p !== void 0 ? _p : 0,
+                coins: (_q = txnReward === null || txnReward === void 0 ? void 0 : txnReward.earnedCredits) !== null && _q !== void 0 ? _q : 0,
+                creditsReward: (_s = (_r = txnReward === null || txnReward === void 0 ? void 0 : txnReward.reward) === null || _r === void 0 ? void 0 : _r.creditsReward) !== null && _s !== void 0 ? _s : 0,
+                xpReward: (_u = (_t = txnReward === null || txnReward === void 0 ? void 0 : txnReward.reward) === null || _t === void 0 ? void 0 : _t.xpReward) !== null && _u !== void 0 ? _u : 0,
+                scanTokensGained: (_w = (_v = txnReward === null || txnReward === void 0 ? void 0 : txnReward.reward) === null || _v === void 0 ? void 0 : _v.scanTokensGained) !== null && _w !== void 0 ? _w : 0,
+                xpBefore: (_y = (_x = txnReward === null || txnReward === void 0 ? void 0 : txnReward.reward) === null || _x === void 0 ? void 0 : _x.xpBefore) !== null && _y !== void 0 ? _y : 0,
+                xpAfter: (_0 = (_z = txnReward === null || txnReward === void 0 ? void 0 : txnReward.reward) === null || _z === void 0 ? void 0 : _z.xpAfter) !== null && _0 !== void 0 ? _0 : 0,
+                levelBefore: (_2 = (_1 = txnReward === null || txnReward === void 0 ? void 0 : txnReward.reward) === null || _1 === void 0 ? void 0 : _1.levelBefore) !== null && _2 !== void 0 ? _2 : 1,
+                levelAfter: (_4 = (_3 = txnReward === null || txnReward === void 0 ? void 0 : txnReward.reward) === null || _3 === void 0 ? void 0 : _3.levelAfter) !== null && _4 !== void 0 ? _4 : 1,
+                capped: (_6 = (_5 = txnReward === null || txnReward === void 0 ? void 0 : txnReward.reward) === null || _5 === void 0 ? void 0 : _5.capped) !== null && _6 !== void 0 ? _6 : false,
+                capRemaining: (_7 = txnReward === null || txnReward === void 0 ? void 0 : txnReward.reward) === null || _7 === void 0 ? void 0 : _7.capRemaining,
+                reason: (_9 = (_8 = txnReward === null || txnReward === void 0 ? void 0 : txnReward.reward) === null || _8 === void 0 ? void 0 : _8.reason) !== null && _9 !== void 0 ? _9 : null,
+                dailyCapApplied: (_11 = (_10 = txnReward === null || txnReward === void 0 ? void 0 : txnReward.reward) === null || _10 === void 0 ? void 0 : _10.dailyCapApplied) !== null && _11 !== void 0 ? _11 : false,
+                dailyCreditsCapApplied: (_13 = (_12 = txnReward === null || txnReward === void 0 ? void 0 : txnReward.reward) === null || _12 === void 0 ? void 0 : _12.dailyCreditsCapApplied) !== null && _13 !== void 0 ? _13 : false,
+                levelUp: (_14 = txnReward === null || txnReward === void 0 ? void 0 : txnReward.leveledUp) !== null && _14 !== void 0 ? _14 : false,
+                newLevel: (_16 = (_15 = txnReward === null || txnReward === void 0 ? void 0 : txnReward.reward) === null || _15 === void 0 ? void 0 : _15.levelAfter) !== null && _16 !== void 0 ? _16 : 1,
+                newWorkshopLines: txnReward === null || txnReward === void 0 ? void 0 : txnReward.newWorkshopLines
             }
         };
     }
@@ -753,7 +995,7 @@ exports.synthesizeRobots = functions.https.onCall(async (data, context) => {
             updatedAt: admin.firestore.FieldValue.serverTimestamp()
         });
         // Daily Mission: Synthesize
-        const todayKey = getJstDateKey();
+        const todayKey = (0, dateKey_1.getJstDateKey)();
         const userRef = admin.firestore().collection("users").doc(userId);
         await updateMissionProgressInternal(t, userRef, todayKey, "synthesize");
         materialRefs.forEach((ref) => t.delete(ref));
@@ -837,6 +1079,7 @@ exports.purchaseItem = functions.https.onCall(async (data, context) => {
         const userSnap = await t.get(userRef);
         const userData = userSnap.exists ? userSnap.data() : {};
         const credits = getUserCredits(userData);
+        const serverTimestamp = admin.firestore.FieldValue.serverTimestamp();
         if (credits < cost) {
             throw new functions.https.HttpsError('failed-precondition', 'insufficient-funds');
         }
@@ -846,8 +1089,8 @@ exports.purchaseItem = functions.https.onCall(async (data, context) => {
             : 0;
         const newQty = currentQty + qty;
         const newCredits = credits - cost;
-        t.set(userRef, { credits: newCredits }, { merge: true });
-        t.set(inventoryRef, { itemId, qty: newQty }, { merge: true });
+        t.set(userRef, { credits: newCredits, updatedAt: serverTimestamp }, { merge: true });
+        t.set(inventoryRef, { itemId, qty: newQty, updatedAt: serverTimestamp }, { merge: true });
         return {
             credits: newCredits,
             inventoryDelta: { itemId, qty, totalQty: newQty }
@@ -883,6 +1126,7 @@ exports.equipItem = functions.https.onCall(async (data, context) => {
         if (!robotSnap.exists) {
             throw new functions.https.HttpsError('not-found', 'Robot not found');
         }
+        const serverTimestamp = admin.firestore.FieldValue.serverTimestamp();
         const robotData = robotSnap.data();
         const equipped = ((_a = robotData.equipped) !== null && _a !== void 0 ? _a : {});
         const currentItem = (_b = equipped[slotKey]) !== null && _b !== void 0 ? _b : null;
@@ -897,10 +1141,10 @@ exports.equipItem = functions.https.onCall(async (data, context) => {
                 ? (_d = returnSnap.data()) === null || _d === void 0 ? void 0 : _d.qty
                 : 0;
             const newReturnQty = returnQty + 1;
-            t.set(returnRef, { itemId: currentItem, qty: newReturnQty }, { merge: true });
+            t.set(returnRef, { itemId: currentItem, qty: newReturnQty, updatedAt: serverTimestamp }, { merge: true });
             t.update(robotRef, {
                 [`equipped.${slotKey}`]: null,
-                updatedAt: admin.firestore.FieldValue.serverTimestamp()
+                updatedAt: serverTimestamp
             });
             inventoryUpdates[currentItem] = newReturnQty;
             return { equipped: Object.assign(Object.assign({}, equipped), { [slotKey]: null }), inventory: inventoryUpdates };
@@ -917,7 +1161,7 @@ exports.equipItem = functions.https.onCall(async (data, context) => {
             throw new functions.https.HttpsError('failed-precondition', 'insufficient-inventory');
         }
         const newEquipQty = equipQty - 1;
-        t.set(equipRef, { itemId, qty: newEquipQty }, { merge: true });
+        t.set(equipRef, { itemId, qty: newEquipQty, updatedAt: serverTimestamp }, { merge: true });
         inventoryUpdates[itemId] = newEquipQty;
         if (currentItem) {
             const returnRef = inventoryCollection.doc(currentItem);
@@ -926,47 +1170,129 @@ exports.equipItem = functions.https.onCall(async (data, context) => {
                 ? (_h = returnSnap.data()) === null || _h === void 0 ? void 0 : _h.qty
                 : 0;
             const newReturnQty = returnQty + 1;
-            t.set(returnRef, { itemId: currentItem, qty: newReturnQty }, { merge: true });
+            t.set(returnRef, { itemId: currentItem, qty: newReturnQty, updatedAt: serverTimestamp }, { merge: true });
             inventoryUpdates[currentItem] = newReturnQty;
         }
         const nextEquipped = Object.assign(Object.assign({}, equipped), { [slotKey]: itemId });
         t.update(robotRef, {
             [`equipped.${slotKey}`]: itemId,
-            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            updatedAt: serverTimestamp
         });
         return { equipped: nextEquipped, inventory: inventoryUpdates };
     });
     return result;
 });
 // ログインボーナスAPI
+// 日次ログイン請求API (称号/バッジ)
+exports.claimDailyLogin = functions.https.onCall(async (_data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'Auth required');
+    }
+    const userId = context.auth.uid;
+    const userRef = admin.firestore().collection('users').doc(userId);
+    const todayKey = (0, dateKey_1.getJstDateKey)();
+    const yesterdayKey = (0, dateKey_1.getYesterdayJstDateKey)();
+    const result = await admin.firestore().runTransaction(async (t) => {
+        const userSnap = await t.get(userRef);
+        if (!userSnap.exists) {
+            throw new functions.https.HttpsError('failed-precondition', 'User not found');
+        }
+        const userData = userSnap.data() || {};
+        const lastDailyClaimDateKey = typeof (userData === null || userData === void 0 ? void 0 : userData.lastDailyClaimDateKey) === "string"
+            ? userData.lastDailyClaimDateKey
+            : userData === null || userData === void 0 ? void 0 : userData.lastLoginDateKey;
+        const isPremium = !!(userData === null || userData === void 0 ? void 0 : userData.isPremium);
+        const bonusAmount = isPremium ? LOGIN_BONUS_CREDITS * 2 : LOGIN_BONUS_CREDITS;
+        const resolved = (0, dailyLogin_1.resolveDailyLogin)({
+            todayKey,
+            yesterdayKey,
+            bonusAmount,
+            state: {
+                lastDailyClaimDateKey,
+                loginStreak: userData === null || userData === void 0 ? void 0 : userData.loginStreak,
+                maxLoginStreak: userData === null || userData === void 0 ? void 0 : userData.maxLoginStreak,
+                badgeIds: userData === null || userData === void 0 ? void 0 : userData.badgeIds,
+                titleId: userData === null || userData === void 0 ? void 0 : userData.titleId,
+                credits: getUserCredits(userData),
+            },
+        });
+        if (!resolved.claimed) {
+            return {
+                claimed: false,
+                dateKey: resolved.dateKey,
+                streak: resolved.streak,
+                newBadges: [],
+                titleId: resolved.titleId,
+                creditsGained: 0,
+            };
+        }
+        const serverTimestamp = admin.firestore.FieldValue.serverTimestamp();
+        t.set(userRef, {
+            credits: resolved.credits,
+            lastDailyClaimDateKey: resolved.dateKey,
+            lastLoginDateKey: resolved.dateKey,
+            loginStreak: resolved.streak,
+            maxLoginStreak: resolved.maxStreak,
+            badgeIds: resolved.badgeIds,
+            titleId: resolved.titleId,
+            updatedAt: serverTimestamp,
+        }, { merge: true });
+        return {
+            claimed: true,
+            dateKey: resolved.dateKey,
+            streak: resolved.streak,
+            newBadges: resolved.newBadges,
+            titleId: resolved.titleId,
+            creditsGained: resolved.creditsGained,
+        };
+    });
+    return result;
+});
+// ログインボーナスAPI (legacy)
 exports.claimLoginBonus = functions.https.onCall(async (_data, context) => {
     if (!context.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'Auth required');
     }
     const userId = context.auth.uid;
     const userRef = admin.firestore().collection('users').doc(userId);
-    const todayKey = getJstDateKey();
-    const yesterdayKey = getYesterdayJstDateKey();
+    const todayKey = (0, dateKey_1.getJstDateKey)();
+    const yesterdayKey = (0, dateKey_1.getYesterdayJstDateKey)();
     const result = await admin.firestore().runTransaction(async (t) => {
         const userSnap = await t.get(userRef);
         const userData = userSnap.exists ? userSnap.data() : {};
-        const lastLoginDateKey = userData === null || userData === void 0 ? void 0 : userData.lastLoginDateKey;
-        if (lastLoginDateKey === todayKey) {
-            throw new functions.https.HttpsError('failed-precondition', 'Already claimed today');
-        }
+        const lastDailyClaimDateKey = typeof (userData === null || userData === void 0 ? void 0 : userData.lastDailyClaimDateKey) === "string"
+            ? userData.lastDailyClaimDateKey
+            : userData === null || userData === void 0 ? void 0 : userData.lastLoginDateKey;
         const isPremium = !!(userData === null || userData === void 0 ? void 0 : userData.isPremium);
         const bonusAmount = isPremium ? LOGIN_BONUS_CREDITS * 2 : LOGIN_BONUS_CREDITS;
-        const currentStreak = typeof (userData === null || userData === void 0 ? void 0 : userData.loginStreak) === "number" ? userData.loginStreak : 0;
-        const newStreak = lastLoginDateKey === yesterdayKey ? currentStreak + 1 : 1;
-        const credits = getUserCredits(userData);
-        const newCredits = credits + bonusAmount;
+        const resolved = (0, dailyLogin_1.resolveDailyLogin)({
+            todayKey,
+            yesterdayKey,
+            bonusAmount,
+            state: {
+                lastDailyClaimDateKey,
+                loginStreak: userData === null || userData === void 0 ? void 0 : userData.loginStreak,
+                maxLoginStreak: userData === null || userData === void 0 ? void 0 : userData.maxLoginStreak,
+                badgeIds: userData === null || userData === void 0 ? void 0 : userData.badgeIds,
+                titleId: userData === null || userData === void 0 ? void 0 : userData.titleId,
+                credits: getUserCredits(userData),
+            },
+        });
+        if (!resolved.claimed) {
+            throw new functions.https.HttpsError('failed-precondition', 'Already claimed today');
+        }
+        const serverTimestamp = admin.firestore.FieldValue.serverTimestamp();
         t.set(userRef, {
-            credits: newCredits,
-            lastLoginDateKey: todayKey,
-            loginStreak: newStreak,
-            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            credits: resolved.credits,
+            lastDailyClaimDateKey: resolved.dateKey,
+            lastLoginDateKey: resolved.dateKey,
+            loginStreak: resolved.streak,
+            maxLoginStreak: resolved.maxStreak,
+            badgeIds: resolved.badgeIds,
+            titleId: resolved.titleId,
+            updatedAt: serverTimestamp
         }, { merge: true });
-        return { streak: newStreak, credits: newCredits, bonusAmount };
+        return { streak: resolved.streak, credits: resolved.credits, bonusAmount };
     });
     return result;
 });
@@ -977,7 +1303,7 @@ exports.getDailyMissions = functions.https.onCall(async (_data, context) => {
     }
     const userId = context.auth.uid;
     const userRef = admin.firestore().collection('users').doc(userId);
-    const dateKey = getJstDateKey();
+    const dateKey = (0, dateKey_1.getJstDateKey)();
     const missionsRef = userRef.collection('missions').doc(dateKey);
     const result = await admin.firestore().runTransaction(async (t) => {
         const missionSnap = await t.get(missionsRef);
@@ -1006,7 +1332,7 @@ exports.claimMissionReward = functions.https.onCall(async (data, context) => {
     if (typeof dateKey !== "string" || typeof missionId !== "string") {
         throw new functions.https.HttpsError('invalid-argument', 'Invalid input');
     }
-    const todayKey = getJstDateKey();
+    const todayKey = (0, dateKey_1.getJstDateKey)();
     if (dateKey !== todayKey) {
         throw new functions.https.HttpsError('failed-precondition', 'Invalid mission date');
     }
@@ -1170,6 +1496,77 @@ const COSMETIC_ITEMS = ['gold_coating', 'neon_glow', 'flame_aura', 'ice_armor'];
 const isCosmeticItemId = (id) => {
     return COSMETIC_ITEMS.includes(id);
 };
+// クラフトAPI (ScanToken + Credits)
+exports.craftItem = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'Auth required');
+    }
+    const recipeId = typeof (data === null || data === void 0 ? void 0 : data.recipeId) === "string"
+        ? data.recipeId
+        : (typeof (data === null || data === void 0 ? void 0 : data.itemId) === "string" ? data.itemId : null);
+    const qty = typeof (data === null || data === void 0 ? void 0 : data.qty) === "number" ? data.qty : 1;
+    if (typeof recipeId !== "string") {
+        throw new functions.https.HttpsError('invalid-argument', 'Invalid input');
+    }
+    if (!Number.isInteger(qty) || qty < 1 || qty > 10) {
+        throw new functions.https.HttpsError('invalid-argument', 'Invalid quantity');
+    }
+    if (!(0, crafting_1.isCraftItemId)(recipeId)) {
+        throw new functions.https.HttpsError('invalid-argument', 'Unknown craft item');
+    }
+    const userId = context.auth.uid;
+    const userRef = admin.firestore().collection('users').doc(userId);
+    const inventoryRef = userRef.collection('inventory').doc(recipeId);
+    const { totalTokenCost, totalCreditCost } = (0, crafting_1.getCraftCosts)(recipeId, qty);
+    const result = await admin.firestore().runTransaction(async (t) => {
+        var _a, _b;
+        const userSnap = await t.get(userRef);
+        const userData = userSnap.exists ? userSnap.data() : {};
+        const scanTokens = typeof (userData === null || userData === void 0 ? void 0 : userData.scanTokens) === "number" ? userData.scanTokens : 0;
+        const credits = getUserCredits(userData);
+        const inventorySnap = await t.get(inventoryRef);
+        const currentQty = inventorySnap.exists && typeof ((_a = inventorySnap.data()) === null || _a === void 0 ? void 0 : _a.qty) === "number"
+            ? (_b = inventorySnap.data()) === null || _b === void 0 ? void 0 : _b.qty
+            : 0;
+        const craftResult = (0, crafting_1.applyCraftBalances)({
+            currentTokens: scanTokens,
+            currentCredits: credits,
+            currentQty,
+            itemId: recipeId,
+            qty,
+        });
+        if (!craftResult.ok) {
+            throw new functions.https.HttpsError('failed-precondition', craftResult.reason);
+        }
+        const newQty = craftResult.nextQty;
+        const newCredits = craftResult.nextCredits;
+        const newScanTokens = craftResult.nextTokens;
+        const serverTimestamp = admin.firestore.FieldValue.serverTimestamp();
+        t.set(userRef, {
+            credits: newCredits,
+            scanTokens: newScanTokens,
+            updatedAt: serverTimestamp
+        }, { merge: true });
+        t.set(inventoryRef, { itemId: recipeId, qty: newQty, updatedAt: serverTimestamp }, { merge: true });
+        const ledgerRef = userRef.collection('ledger').doc();
+        t.set(ledgerRef, Object.assign(Object.assign({}, (0, ledger_1.buildLedgerEntry)({
+            type: "CRAFT",
+            deltaCredits: -totalCreditCost,
+            deltaScanTokens: -totalTokenCost,
+            refId: `craft:${recipeId}:${qty}`
+        })), { createdAt: serverTimestamp }));
+        return {
+            ok: true,
+            recipeId,
+            credits: newCredits,
+            scanTokens: newScanTokens,
+            newBalances: { credits: newCredits, scanTokens: newScanTokens },
+            inventoryDelta: { itemId: recipeId, qty, totalQty: newQty },
+            craftCost: { tokens: totalTokenCost, credits: totalCreditCost },
+        };
+    });
+    return result;
+});
 // ロボット強化アイテム使用API
 exports.useUpgradeItem = functions.https.onCall(async (data, context) => {
     if (!context.auth) {

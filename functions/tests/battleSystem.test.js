@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { simulateBattle } = require("../lib/battleSystem");
+const { simulateBattle } = require("../lib/functions/src/battleSystem");
 
 const createRobot = (overrides) => ({
   id: "robot",
@@ -23,5 +23,5 @@ test("same battleId produces the same result", () => {
   const resultB = simulateBattle(robotA, robotB, "battle-123");
 
   assert.deepStrictEqual(resultA, resultB);
-  assert.ok(resultA.logs.length <= 30);
+  assert.ok(resultA.logs.length <= 60);
 });

@@ -1,20 +1,33 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // ユーザーデータ: 本人のみ読み取り可能。書き込みは表示名と設定のみ許可。
+    // ユーザーデータ: 本人のみ読み取り可能。書き込みは表示名と写真URLのみ許可。
     match /users/{userId} {
       allow read: if request.auth != null && request.auth.uid == userId;
-      // credits, isPremium, loginStreak などの重要データは書き込み禁止
+      // credits, xp, level などの重要データは書き込み禁止
       allow write: if request.auth != null && request.auth.uid == userId 
-                   && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'settings', 'avatarUrl']);
+                   && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'photoURL']);
       
       // ロボットデータ: 読み取りのみ (更新はFunctions経由)
       match /robots/{robotId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow write: if false; // REF: S1
       }
 
       // インベントリ: 読み取りのみ (更新はFunctions経由)
       match /inventory/{itemId} {
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow write: if false;
+      }
+
+      // スキャン日次状態: 読み取りのみ (更新はFunctions経由)
+      match /scanDaily/{dateKey} {
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow write: if false;
+      }
+
+      // 台帳ログ: 読み取りのみ (更新はFunctions経由)
+      match /ledger/{eventId} {
         allow read: if request.auth != null && request.auth.uid == userId;
         allow write: if false;
       }
@@ -27,7 +40,8 @@ service cloud.firestore {
 
       // バリアント(派生機): 読み取りのみ (更新はFunctions経由)
       match /variants/{variantId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow write: if false; // REF: S1
       }
 
       // バトル結果履歴: 読み取りのみ (更新はFunctions経由)

@@ -97,9 +97,20 @@ export interface BattleLog {
     itemSide?: 'P1' | 'P2';
     itemType?: BattleItemType;
     itemEffect?: string;
+    itemEvent?: "ITEM_USED" | "ITEM_APPLIED";
+    itemMessage?: string;
+
+    // Guard / Pursuit / Stun
+    guarded?: boolean;
+    guardMultiplier?: number;
+    pursuitDamage?: number;
+    followUpDamage?: number;
+    stunApplied?: boolean;
+    stunTargetId?: string;
+    stunned?: boolean;
 }
 
-export type BattleItemType = 'BOOST' | 'SHIELD' | 'CANCEL_CRIT';
+export type BattleItemType = 'BOOST' | 'SHIELD' | 'JAMMER' | 'DRONE' | 'DISRUPT' | 'CANCEL_CRIT';
 
 export interface BattleItemInput {
     p1?: BattleItemType | null;
@@ -492,6 +503,45 @@ const resolveSkills = (skills: BattleRobotData["skills"]): Skill[] => {
 
 const MAX_TURNS = 20;
 const toDamage = (value: number): number => Math.max(1, Math.floor(value));
+const BASE_DAMAGE_POWER = 100;
+const DEFENSE_OFFSET = 100;
+const MIN_ATK_DEF_RATIO = 0.3;
+const MAX_ATK_DEF_RATIO = 3.5;
+const MIN_DAMAGE_RATIO = 0.06;
+const MAX_DAMAGE_RATIO = 1.1;
+const CRIT_MULTIPLIER = 1.5;
+const GUARD_MULTIPLIER = 0.85;
+const PURSUIT_SPEED_THRESHOLD = 12;
+const PURSUIT_DAMAGE_RATIO = 0.35;
+const COUNTER_SPEED_THRESHOLD = 12;
+const COUNTER_DAMAGE_RATIO = 0.45;
+const COUNTER_DEFENSE_RATIO = 0.9;
+const STUN_SPEED_THRESHOLD = 10;
+const STUN_DAMAGE_RATIO = 0.18;
+
+const clampValue = (value: number, min: number, max: number): number =>
+    Math.max(min, Math.min(max, value));
+
+const normalizeStats = (attack: number, defense: number): { effectiveAtk: number; effectiveDef: number } => {
+    const ratio = attack / Math.max(1, defense);
+    let effectiveAtk = attack;
+    let effectiveDef = defense;
+
+    if (ratio > MAX_ATK_DEF_RATIO) {
+        effectiveAtk = Math.round(defense * MAX_ATK_DEF_RATIO);
+    } else if (ratio < MIN_ATK_DEF_RATIO) {
+        effectiveDef = Math.round(attack / MIN_ATK_DEF_RATIO);
+    }
+
+    return { effectiveAtk, effectiveDef };
+};
+
+const computeCoreDamage = (attack: number, defense: number): number => {
+    const raw = Math.floor((BASE_DAMAGE_POWER * attack) / (defense + DEFENSE_OFFSET));
+    const min = Math.max(1, Math.floor(attack * MIN_DAMAGE_RATIO));
+    const max = Math.floor(attack * MAX_DAMAGE_RATIO);
+    return clampValue(raw, min, max);
+};
 
 const getElementMultiplier = (attacker: BattleRobotData, defender: BattleRobotData): number => {
     const attackerType = attacker.elementType ?? 0;
@@ -543,11 +593,21 @@ export const simulateBattle = (
     let p2CheerReady = !!cheer?.p2;
     let p2CheerUsed = false;
 
+    const normalizeBattleItem = (item?: BattleItemType | null): BattleItemType | null => {
+        if (!item) return null;
+        if (item === "CANCEL_CRIT" || item === "DISRUPT") return "JAMMER";
+        return item;
+    };
+
     // Pre-Battle Item System: Initialize state
-    let p1ItemReady: BattleItemType | null = battleItems?.p1 ?? null;
+    let p1ItemReady: BattleItemType | null = normalizeBattleItem(battleItems?.p1);
     let p1ItemUsed = false;
-    let p2ItemReady: BattleItemType | null = battleItems?.p2 ?? null;
+    let p2ItemReady: BattleItemType | null = normalizeBattleItem(battleItems?.p2);
     let p2ItemUsed = false;
+
+    // Stun state (skip next action)
+    let p1Stunned = false;
+    let p2Stunned = false;
 
     // Track total damage for tiebreaker
     let totalDamageP1 = 0;
@@ -573,6 +633,42 @@ export const simulateBattle = (
         let itemSide: 'P1' | 'P2' | undefined;
         let itemType: BattleItemType | undefined;
         let itemEffect: string | undefined;
+        let itemEvent: "ITEM_USED" | "ITEM_APPLIED" | undefined;
+        let itemMessage: string | undefined;
+
+        const attackerWasStunned = attacker.id === robot1.id ? p1Stunned : p2Stunned;
+        if (attackerWasStunned) {
+            if (attacker.id === robot1.id) p1Stunned = false;
+            else p2Stunned = false;
+
+            logs.push({
+                turn,
+                attackerId: attacker.id!,
+                defenderId: defender.id!,
+                action: 'stunned',
+                damage: 0,
+                isCritical: false,
+                attackerHp: Math.max(0, attackerHp),
+                defenderHp: Math.max(0, defenderHp),
+                message: `${attacker.name}はスタン中で動けない！`,
+                attackerOverdriveGauge: Math.floor(getOverdrive(attacker.id).gauge),
+                defenderOverdriveGauge: Math.floor(getOverdrive(defender.id).gauge),
+                stunned: true,
+            });
+
+            // Swap attacker/defender
+            const tempRobot = attacker;
+            attacker = defender;
+            defender = tempRobot;
+            const tempSkills = attackerSkills;
+            attackerSkills = defenderSkills;
+            defenderSkills = tempSkills;
+            const tempHp = attackerHp;
+            attackerHp = defenderHp;
+            defenderHp = tempHp;
+            turn++;
+            continue;
+        }
 
         // Stance Resolution
         const attackerWeights = attacker.id === robot1.id ? stanceWeights1 : stanceWeights2;
@@ -605,6 +701,10 @@ export const simulateBattle = (
         let message = "";
         let passiveTriggered: PassiveTrigger | undefined;
         const elementMultiplier = getElementMultiplier(attacker, defender);
+        const speedDiff = attacker.baseSpeed - defender.baseSpeed;
+        const reasonTags: string[] = [];
+        if (elementMultiplier > 1) reasonTags.push("属性有利");
+        else if (elementMultiplier < 1) reasonTags.push("属性不利");
 
         let atk = attacker.baseAttack;
         let def = defender.baseDefense;
@@ -622,6 +722,9 @@ export const simulateBattle = (
                 def = Math.floor(def * effect.defenseMultiplier);
             }
         }
+
+        const { effectiveAtk, effectiveDef } = normalizeStats(atk, def);
+        const coreDamage = computeCoreDamage(effectiveAtk, effectiveDef);
 
         // Skill trigger check
         let skill: Skill | null = null;
@@ -646,7 +749,7 @@ export const simulateBattle = (
 
             switch (skill.type) {
                 case 'attack':
-                    const baseDamage = Math.max(1, atk - (def / 2));
+                    const baseDamage = coreDamage;
                     damage = toDamage(baseDamage * skill.power * elementMultiplier * stanceMultiplier * overdriveSkillMult);
                     message = `${attacker.name} uses ${skill.name}! Dealt ${damage} damage!`;
                     break;
@@ -663,30 +766,23 @@ export const simulateBattle = (
                     damage = 0;
                     break;
                 default:
-                    const bonusDamage = Math.floor(atk * 0.5);
+                    const bonusDamage = Math.floor(coreDamage * 0.5);
                     damage = toDamage(bonusDamage * elementMultiplier * stanceMultiplier * overdriveSkillMult);
                     message = `${attacker.name} uses ${skill.name}! Dealt ${damage} damage!`;
                     break;
             }
         } else {
             // Normal attack
-            // 通常攻撃 - New Damage Formula
-            // base = floor((atk*atk)/(atk+def))
+            // 通常攻撃 - New Damage Formula (Defense-Weighted)
+            // core = floor(BASE_DAMAGE_POWER * atk / (def + DEFENSE_OFFSET))
             // variance = 0.90..1.10
-            // damage = max(1, floor(base * variance))
-            const baseRaw = (atk * atk) / (atk + def);
-            const base = Math.floor(baseRaw);
+            // damage = max(1, floor(core * variance))
             const variance = 0.90 + rng.next() * 0.20; // 0.90 to 1.10
-            const baseDamage = Math.max(1, Math.floor(base * variance));
+            const baseDamage = Math.max(1, Math.floor(coreDamage * variance));
 
             // クリティカル判定 - Speed-based formula
             // critChance = clamp(0.05 + (spd - oppSpd)*0.002, 0.05, 0.25)
-            const speedDiff = attacker.baseSpeed - defender.baseSpeed;
             let critChance = Math.max(0.05, Math.min(0.25, 0.05 + speedDiff * 0.002));
-
-            let weaponPassive = checkPassive(rng, attacker, "weapon"); // Re-check or use existing variable? 
-            // wait, weaponPassive is already calculated above line 597. 
-            // In the viewed code (line 670), weaponPassive is used directly.
 
             if (weaponPassive) {
                 const effect = getPassiveEffect(weaponPassive);
@@ -697,33 +793,45 @@ export const simulateBattle = (
 
             isCritical = rng.next() < critChance;
 
-            // CANCEL_CRIT Item: Nullify critical (post-RNG, deterministic)
+            // JAMMER Item: Nullify critical (post-RNG, deterministic)
             if (isCritical) {
-                if (defender.id === robot1.id && p1ItemReady === 'CANCEL_CRIT' && !p1ItemUsed) {
+                if (defender.id === robot1.id && p1ItemReady === 'JAMMER' && !p1ItemUsed) {
                     isCritical = false;
                     p1ItemReady = null;
                     p1ItemUsed = true;
                     itemApplied = true;
                     itemSide = 'P1';
-                    itemType = 'CANCEL_CRIT';
+                    itemType = 'JAMMER';
                     itemEffect = 'Crit Cancelled';
-                    message += ` 🤞クリティカルをお守りが防いだ！`;
-                } else if (defender.id === robot2.id && p2ItemReady === 'CANCEL_CRIT' && !p2ItemUsed) {
+                    itemEvent = "ITEM_USED";
+                    itemMessage = " 🤞ジャマーがクリティカルを防いだ！";
+                } else if (defender.id === robot2.id && p2ItemReady === 'JAMMER' && !p2ItemUsed) {
                     isCritical = false;
                     p2ItemReady = null;
                     p2ItemUsed = true;
                     itemApplied = true;
                     itemSide = 'P2';
-                    itemType = 'CANCEL_CRIT';
+                    itemType = 'JAMMER';
                     itemEffect = 'Crit Cancelled';
-                    message += ` 🤞クリティカルをお守りが防いだ！`;
+                    itemEvent = "ITEM_USED";
+                    itemMessage = " 🤞ジャマーがクリティカルを防いだ！";
                 }
             }
 
+            if (isCritical) reasonTags.push("クリティカル");
+
             // Apply element and stance multipliers (variance already in baseDamage)
             damage = toDamage(baseDamage * elementMultiplier * stanceMultiplier);
-            if (isCritical) damage = toDamage(damage * 1.5);
+            if (isCritical) damage = toDamage(damage * CRIT_MULTIPLIER);
             message = `${attacker.name} attacks ${defender.name} for ${damage} damage!`;
+        }
+
+        // Guard stance: additional reduction when defender guards
+        let guardApplied = false;
+        if (damage > 0 && defenderStance === "GUARD") {
+            damage = toDamage(damage * GUARD_MULTIPLIER);
+            guardApplied = true;
+            reasonTags.push("ガードで軽減");
         }
 
         // Defender Passives (Accessory - damage reduction)
@@ -777,7 +885,8 @@ export const simulateBattle = (
                 itemSide = 'P1';
                 itemType = 'BOOST';
                 itemEffect = `×${BOOST_MULTIPLIER}`;
-                message += ` ⚡ブーストアイテム発動！（${itemEffect}）`;
+                itemEvent = "ITEM_APPLIED";
+                itemMessage = ` ⚡ブーストアイテム発動！（${itemEffect}）`;
             } else if (attacker.id === robot2.id && p2ItemReady === 'BOOST' && !p2ItemUsed) {
                 damage = toDamage(damage * BOOST_MULTIPLIER);
                 p2ItemReady = null;
@@ -786,7 +895,8 @@ export const simulateBattle = (
                 itemSide = 'P2';
                 itemType = 'BOOST';
                 itemEffect = `×${BOOST_MULTIPLIER}`;
-                message += ` ⚡ブーストアイテム発動！（${itemEffect}）`;
+                itemEvent = "ITEM_APPLIED";
+                itemMessage = ` ⚡ブーストアイテム発動！（${itemEffect}）`;
             }
         }
 
@@ -800,7 +910,8 @@ export const simulateBattle = (
                 itemSide = 'P1';
                 itemType = 'SHIELD';
                 itemEffect = `×${SHIELD_MULTIPLIER}`;
-                message += ` 🛡️シールドアイテム発動！（${itemEffect}）`;
+                itemEvent = "ITEM_APPLIED";
+                itemMessage = ` 🛡️シールドアイテム発動！（${itemEffect}）`;
             } else if (defender.id === robot2.id && p2ItemReady === 'SHIELD' && !p2ItemUsed) {
                 damage = toDamage(damage * SHIELD_MULTIPLIER);
                 p2ItemReady = null;
@@ -809,12 +920,18 @@ export const simulateBattle = (
                 itemSide = 'P2';
                 itemType = 'SHIELD';
                 itemEffect = `×${SHIELD_MULTIPLIER}`;
-                message += ` 🛡️シールドアイテム発動！（${itemEffect}）`;
+                itemEvent = "ITEM_APPLIED";
+                itemMessage = ` 🛡️シールドアイテム発動！（${itemEffect}）`;
             }
         }
 
         // HP reduction
         let followUpDamage = 0;
+        let pursuitDamage = 0;
+        let stunApplied = false;
+        let counterDamage = 0;
+        let counterMessage = "";
+
         if (damage > 0) {
             if (attacker.id === robot1.id) {
                 hp2 -= damage;
@@ -834,6 +951,23 @@ export const simulateBattle = (
                 setOverdrive(defender.id, addOverdrive(defOverdrive, damage, robot1.baseHp, stanceLost));
             }
 
+            // Speed-based pursuit (追撃)
+            if (speedDiff >= PURSUIT_SPEED_THRESHOLD) {
+                pursuitDamage = toDamage(damage * PURSUIT_DAMAGE_RATIO);
+                followUpDamage += pursuitDamage;
+                if (attacker.id === robot1.id) {
+                    hp2 -= pursuitDamage;
+                    defenderHp = hp2;
+                    totalDamageP1 += pursuitDamage;
+                } else {
+                    hp1 -= pursuitDamage;
+                    defenderHp = hp1;
+                    totalDamageP2 += pursuitDamage;
+                }
+                reasonTags.push("速度差で追撃");
+                message += ` 追撃で${pursuitDamage}ダメージ！`;
+            }
+
             // Post-attack Passives (Backpack)
             if (!passiveTriggered) {
                 const backpackPassive = checkPassive(rng, attacker, "backpack");
@@ -842,17 +976,18 @@ export const simulateBattle = (
                     const effect = getPassiveEffect(backpackPassive);
 
                     if (effect.followUpDamage) {
-                        followUpDamage = toDamage(atk * effect.followUpDamage);
+                        const passiveFollowUpDamage = toDamage(effectiveAtk * effect.followUpDamage);
+                        followUpDamage += passiveFollowUpDamage;
                         if (attacker.id === robot1.id) {
-                            hp2 -= followUpDamage;
+                            hp2 -= passiveFollowUpDamage;
                             defenderHp = hp2;
-                            totalDamageP1 += followUpDamage; // Track P1's followup damage
+                            totalDamageP1 += passiveFollowUpDamage; // Track P1's followup damage
                         } else {
-                            hp1 -= followUpDamage;
+                            hp1 -= passiveFollowUpDamage;
                             defenderHp = hp1;
-                            totalDamageP2 += followUpDamage; // Track P2's followup damage
+                            totalDamageP2 += passiveFollowUpDamage; // Track P2's followup damage
                         }
-                        message += ` ${backpackPassive.effectName} deals ${followUpDamage} extra!`;
+                        message += ` ${backpackPassive.effectName}で${passiveFollowUpDamage}追撃！`;
                     }
 
                     if (effect.healRatio) {
@@ -870,12 +1005,46 @@ export const simulateBattle = (
             }
         }
 
-        const stanceInfo = stanceOutcome === "WIN" ? `[Stance WIN: ${attackerStance}>${defenderStance}]`
-            : stanceOutcome === "LOSE" ? `[Stance LOSE: ${attackerStance}<${defenderStance}]`
-                : `[Stance DRAW: ${attackerStance}]`;
+        const totalHitDamage = damage + followUpDamage;
+        if (damage > 0 && defenderHp > 0 && speedDiff >= STUN_SPEED_THRESHOLD) {
+            if (totalHitDamage >= defender.baseHp * STUN_DAMAGE_RATIO) {
+                stunApplied = true;
+                if (defender.id === robot1.id) p1Stunned = true;
+                else p2Stunned = true;
+                reasonTags.push("スタン");
+                message += ` スタン！次のターン行動不能`;
+            }
+        }
+
+        if (damage > 0 && defenderHp > 0 && !stunApplied) {
+            const defenderFaster = speedDiff <= -COUNTER_SPEED_THRESHOLD;
+            const defenderTanky = def >= atk * COUNTER_DEFENSE_RATIO;
+            if (defenderFaster && defenderTanky) {
+                const counterAtk = defender.baseAttack;
+                const counterDef = attacker.baseDefense;
+                const { effectiveAtk: counterEffectiveAtk, effectiveDef: counterEffectiveDef } = normalizeStats(counterAtk, counterDef);
+                const counterCoreDamage = computeCoreDamage(counterEffectiveAtk, counterEffectiveDef);
+                const counterElementMultiplier = getElementMultiplier(defender, attacker);
+                counterDamage = toDamage(counterCoreDamage * COUNTER_DAMAGE_RATIO * counterElementMultiplier);
+                if (counterDamage > 0) {
+                    counterMessage = `${defender.name}の反撃！ ${counterDamage}ダメージ！`;
+                }
+            }
+        }
+
+        const stanceInfo = stanceOutcome === "WIN"
+            ? `[読み勝ち:${attackerStance}>${defenderStance}]`
+            : stanceOutcome === "LOSE"
+                ? `[読み負け:${attackerStance}<${defenderStance}]`
+                : `[読み合い:${attackerStance}]`;
+
+        const reasonNote = reasonTags.length ? `（${reasonTags.join("・")}）` : "";
+        const messageWithReasons = reasonNote ? `${message} ${reasonNote}` : message;
 
         if (overdriveTriggered) {
-            message = `🔥 OVERDRIVE! ` + message;
+            message = `🔥 OVERDRIVE! ` + messageWithReasons;
+        } else {
+            message = messageWithReasons;
         }
 
         logs.push({
@@ -888,7 +1057,7 @@ export const simulateBattle = (
             isCritical,
             attackerHp: Math.max(0, attackerHp),
             defenderHp: Math.max(0, defenderHp),
-            message: `${stanceInfo} ${message}`,
+            message: `${stanceInfo} ${message}`.trim(),
             stanceAttacker: attackerStance,
             stanceDefender: defenderStance,
             stanceOutcome,
@@ -898,6 +1067,12 @@ export const simulateBattle = (
             attackerOverdriveGauge: Math.floor(getOverdrive(attacker.id).gauge),
             defenderOverdriveGauge: Math.floor(getOverdrive(defender.id).gauge),
             passiveTriggered,
+            guarded: guardApplied || undefined,
+            guardMultiplier: guardApplied ? GUARD_MULTIPLIER : undefined,
+            pursuitDamage: pursuitDamage || undefined,
+            followUpDamage: followUpDamage || undefined,
+            stunApplied: stunApplied || undefined,
+            stunTargetId: stunApplied ? defender.id : undefined,
             cheerApplied: cheerApplied || undefined,
             cheerSide: cheerSide,
             cheerMultiplier: cheerApplied ? cheerMultiplier : undefined,
@@ -906,7 +1081,38 @@ export const simulateBattle = (
             itemSide: itemSide,
             itemType: itemType,
             itemEffect: itemEffect,
+            itemEvent: itemEvent,
+            itemMessage: itemMessage,
         });
+
+        if (counterDamage > 0) {
+            const counterAttackerHp = defenderHp;
+            if (attacker.id === robot1.id) {
+                hp1 -= counterDamage;
+                attackerHp = hp1;
+                totalDamageP2 += counterDamage;
+            } else {
+                hp2 -= counterDamage;
+                attackerHp = hp2;
+                totalDamageP1 += counterDamage;
+            }
+
+            const damagedOverdrive = getOverdrive(attacker.id);
+            const damagedMaxHp = attacker.id === robot1.id ? robot1.baseHp : robot2.baseHp;
+            setOverdrive(attacker.id, addOverdrive(damagedOverdrive, counterDamage, damagedMaxHp, false));
+
+            logs.push({
+                turn,
+                attackerId: defender.id!,
+                defenderId: attacker.id!,
+                action: 'counter',
+                damage: counterDamage,
+                isCritical: false,
+                attackerHp: Math.max(0, counterAttackerHp),
+                defenderHp: Math.max(0, attackerHp),
+                message: counterMessage,
+            });
+        }
 
         if (hp1 <= 0 || hp2 <= 0) break;
 
@@ -1044,4 +1250,3 @@ export const normalizeTrainingInput = <T extends { id?: string }>(
         normalizedCheer: cheer ? { p1: cheer.p2, p2: cheer.p1 } : undefined
     };
 };
-

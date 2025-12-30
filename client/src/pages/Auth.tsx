@@ -55,14 +55,14 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen relative flex items-center justify-center overflow-hidden bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900 via-[#000] to-black font-sans text-white">
+    <div className="min-h-screen relative flex items-center justify-center overflow-hidden bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-[#121a26] via-[#0b1118] to-[#070a10] font-sans text-text">
       {/* ... backgrounds ... */}
       <div className="absolute inset-0 bg-[url('/noise.svg')] opacity-20 pointer-events-none"></div>
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
 
       {/* ... orbs ... */}
-      <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-purple-500/20 rounded-full blur-[100px] animate-pulse-slow font-orbitron"></div>
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-[120px] animate-pulse-slow delay-1000"></div>
+      <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-accent2/20 rounded-full blur-[100px] animate-pulse-slow font-orbitron"></div>
+      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-accent/10 rounded-full blur-[120px] animate-pulse-slow delay-1000"></div>
 
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
@@ -71,15 +71,15 @@ export default function Auth() {
         className="relative z-10 w-full max-w-md p-6"
       >
         {/* Terminal Window Frame */}
-        <div className="relative bg-black/80 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.5)]">
+        <div className="relative bg-panel/80 backdrop-blur-xl border border-border/60 rounded-2xl overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.5)]">
           {/* Header Bar */}
-          <div className="h-10 bg-white/5 border-b border-white/10 flex items-center px-4 justify-between">
+          <div className="h-10 bg-panel/60 border-b border-border/60 flex items-center px-4 justify-between">
             <div className="flex gap-2">
               <div className="w-3 h-3 rounded-full bg-red-500/50"></div>
               <div className="w-3 h-3 rounded-full bg-yellow-500/50"></div>
               <div className="w-3 h-3 rounded-full bg-green-500/50"></div>
             </div>
-            <div className="text-[10px] font-mono text-white/30 tracking-widest uppercase">
+            <div className="text-[10px] font-mono text-muted tracking-[0.12em]">
               Secure Access Protocol v9.2
             </div>
           </div>
@@ -93,7 +93,7 @@ export default function Auth() {
               className="relative w-24 h-24 bg-gradient-to-br from-cyan-500/20 to-purple-500/20 rounded-full flex items-center justify-center border border-white/10 group"
             >
               <div className="absolute inset-0 bg-cyan-500/20 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-              <Cpu className="w-10 h-10 text-cyan-400 drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]" />
+              <Cpu className="w-10 h-10 text-accent drop-shadow-[0_0_10px_rgba(62,208,240,0.4)]" />
               <div className="absolute inset-0 border border-cyan-500/30 rounded-full border-t-transparent animate-[spin_3s_linear_infinite]"></div>
             </motion.div>
 
@@ -104,10 +104,10 @@ export default function Auth() {
               transition={{ delay: 0.3 }}
               className="space-y-2"
             >
-              <h1 className="text-3xl font-black font-orbitron tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-white via-white to-white/70">
-                SYSTEM LOGIN
+              <h1 className="text-3xl font-semibold font-orbitron tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-white to-white/70">
+                System Login
               </h1>
-              <p className="text-sm text-slate-400 font-mono">
+              <p className="text-sm text-muted font-mono">
                 Identity verification required for Genesis Layer access.
               </p>
             </motion.div>
@@ -121,14 +121,14 @@ export default function Auth() {
             >
               <Button
                 size="lg"
-                className="w-full h-14 relative group overflow-hidden bg-white/5 hover:bg-white/10 border border-white/10 hover:border-cyan-500/50 transition-all duration-300"
+                className="w-full h-14 relative group overflow-hidden bg-panel/70 hover:bg-panel border border-border/60 hover:border-accent/50 transition-all duration-300"
                 onClick={handleLogin}
                 disabled={isLoading}
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
                 <div className="flex items-center justify-center gap-3">
                   {isLoading ? (
-                    <Loader2 className="h-5 w-5 animate-spin text-cyan-400" />
+                    <Loader2 className="h-5 w-5 animate-spin text-accent" />
                   ) : (
                     <div className="p-1 bg-white rounded-full">
                       <svg className="w-4 h-4" viewBox="0 0 24 24">
@@ -139,7 +139,7 @@ export default function Auth() {
                       </svg>
                     </div>
                   )}
-                  <span className="font-orbitron tracking-widest text-sm font-bold">
+                  <span className="font-orbitron tracking-[0.12em] text-sm font-semibold">
                     {isLoading ? "AUTHENTICATING..." : "SSO ACCESS"}
                   </span>
                 </div>
@@ -149,7 +149,7 @@ export default function Auth() {
             {/* Divider */}
             <div className="flex items-center w-full gap-2">
               <div className="h-[1px] bg-white/10 flex-1"></div>
-              <span className="text-[10px] text-white/30 font-mono">MANUAL OVERRIDE</span>
+              <span className="text-[10px] text-muted font-mono">MANUAL OVERRIDE</span>
               <div className="h-[1px] bg-white/10 flex-1"></div>
             </div>
 
@@ -163,7 +163,7 @@ export default function Auth() {
               <Input
                 type="email"
                 placeholder="OPERATOR ID (EMAIL)"
-                className="bg-black/40 border-white/10 text-center font-mono text-sm h-10 focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/50 transition-all placeholder:text-white/20"
+                className="bg-panel/60 border-border/60 text-center font-mono text-sm h-10 focus:border-accent/50 focus:ring-1 focus:ring-accent/50 transition-all placeholder:text-muted/60"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={isLoading}
@@ -172,7 +172,7 @@ export default function Auth() {
               <Input
                 type="password"
                 placeholder="ACCESS CODE (PASSWORD)"
-                className="bg-black/40 border-white/10 text-center font-mono text-sm h-10 focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/50 transition-all placeholder:text-white/20"
+                className="bg-panel/60 border-border/60 text-center font-mono text-sm h-10 focus:border-accent/50 focus:ring-1 focus:ring-accent/50 transition-all placeholder:text-muted/60"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={isLoading}
@@ -181,7 +181,7 @@ export default function Auth() {
               <div className="flex gap-2 pt-2">
                 <Button
                   variant="outline"
-                  className="flex-1 h-10 bg-white/5 border-white/10 hover:bg-white/10 hover:text-cyan-400 font-mono text-xs"
+                  className="flex-1 h-10 bg-panel/60 border-border/60 hover:bg-panel hover:text-accent font-mono text-xs"
                   onClick={() => handleEmailAuth(false)}
                   disabled={isLoading}
                   data-testid="login-button"
@@ -190,7 +190,7 @@ export default function Auth() {
                 </Button>
                 <Button
                   variant="outline"
-                  className="flex-1 h-10 bg-white/5 border-white/10 hover:bg-white/10 hover:text-cyan-400 font-mono text-xs"
+                  className="flex-1 h-10 bg-panel/60 border-border/60 hover:bg-panel hover:text-accent font-mono text-xs"
                   onClick={() => handleEmailAuth(true)}
                   disabled={isLoading}
                   data-testid="signup-button"
@@ -205,7 +205,7 @@ export default function Auth() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.6 }}
-              className="flex items-center gap-2 text-[10px] text-emerald-500/70 font-mono bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20"
+              className="flex items-center gap-2 text-[10px] text-emerald-300/80 font-mono bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20"
             >
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
               SERVER STATUS: ONLINE
@@ -215,7 +215,7 @@ export default function Auth() {
         </div>
 
         {/* Disclaimer */}
-        <p className="mt-6 text-center text-[10px] text-slate-600 font-mono">
+        <p className="mt-6 text-center text-[10px] text-muted font-mono">
           UNAUTHORIZED ACCESS IS PROHIBITED BY PROTOCOL 7734.<br />
           ALL ACTIVITIES ARE MONITORED.
         </p>
@@ -223,4 +223,3 @@ export default function Auth() {
     </div>
   );
 }
-

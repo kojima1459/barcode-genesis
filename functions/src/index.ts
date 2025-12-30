@@ -3,13 +3,20 @@ import * as admin from "firebase-admin";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { onDocumentUpdated } from "firebase-functions/v2/firestore";
 import { randomInt } from "crypto";
-import { assertRobotNotExists, DuplicateRobotError, generateRobotFromBarcode, InvalidBarcodeError } from "./robotGenerator";
+import { assertRobotNotExists, assertValidBarcode, DuplicateRobotError, generateRobotFromBarcode, InvalidBarcodeError } from "./robotGenerator";
 import { simulateBattle } from "./battleSystem";
 import { GenerateRobotRequest, GenerateRobotResponse, VariantData, FighterRef } from "./types";
 import { getRandomSkill, normalizeSkillIds } from "./skills";
 import { SeededRandom } from "./seededRandom";
-import { applyUserXp } from "./levelSystem";
+import { getWorkshopLines } from "./levelSystem";
 import { generateVariantRecipe, resolveVariantStats, resolveVariantAppearance } from "./variantSystem";
+import { applyBattleRewards, DAILY_CREDITS_CAP, levelFromXp } from "./battleRewards";
+import { applyScanDailyAward, normalizeScanDaily, normalizeScanTokens, SCAN_TOKEN_PER_SCAN } from "./scanTokens";
+import { applyCraftBalances, getCraftCosts, isCraftItemId } from "./crafting";
+import { resolveEntryFee } from "./battleEntryFee";
+import { buildLedgerEntry } from "./ledger";
+import { getJstDateKey, getYesterdayJstDateKey } from "./dateKey";
+import { resolveDailyLogin } from "./dailyLogin";
 // Node.js 20 has native fetch - no need for node-fetch
 
 
@@ -76,24 +83,12 @@ const isItemId = (itemId: string): itemId is ItemId => {
   return Object.prototype.hasOwnProperty.call(ITEM_CATALOG, itemId);
 };
 
-const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const LOGIN_BONUS_CREDITS = 50;
 const DAILY_MISSIONS = [
   { id: "scan_barcode", title: "Scan 1 barcode", target: 1, rewardCredits: 30 },
   { id: "win_battle", title: "Win 1 battle", target: 1, rewardCredits: 40 },
   { id: "synthesize", title: "Synthesize 1 robot", target: 1, rewardCredits: 50 }
 ];
-
-const getJstDateKey = (date: Date = new Date()): string => {
-  const jst = new Date(date.getTime() + JST_OFFSET_MS);
-  return jst.toISOString().slice(0, 10);
-};
-
-const getYesterdayJstDateKey = (): string => {
-  const jst = new Date(Date.now() + JST_OFFSET_MS);
-  jst.setUTCDate(jst.getUTCDate() - 1);
-  return jst.toISOString().slice(0, 10);
-};
 
 const buildDailyMissions = () => {
   return DAILY_MISSIONS.map((mission) => ({
@@ -169,12 +164,16 @@ export const generateRobot = functions.https.onCall(async (data: GenerateRobotRe
     const userRef = db.collection('users').doc(userId);
     const robotRef = userRef.collection('robots').doc(barcode);
     const todayKey = getJstDateKey();
+    const scanDailyRef = userRef.collection('scanDaily').doc(todayKey);
 
     // ロボットデータ生成
     const robotData = generateRobotFromBarcode(barcode, userId);
 
     await db.runTransaction(async (t) => {
-      const userSnap = await t.get(userRef);
+      const [userSnap, scanDailySnap] = await Promise.all([
+        t.get(userRef),
+        t.get(scanDailyRef)
+      ]);
       const userData = userSnap.exists ? userSnap.data() : {};
 
       const isPremium = !!userData?.isPremium;
@@ -195,6 +194,9 @@ export const generateRobot = functions.https.onCall(async (data: GenerateRobotRe
       assertRobotNotExists(existing.exists);
 
       const serverTimestamp = admin.firestore.FieldValue.serverTimestamp();
+      const scanDailyState = normalizeScanDaily(scanDailySnap.exists ? scanDailySnap.data() : {});
+      const scanAward = applyScanDailyAward(scanDailyState, barcode);
+      const scanTokenIncrement = scanAward.awarded ? SCAN_TOKEN_PER_SCAN : 0;
 
       t.set(robotRef, {
         ...robotData,
@@ -206,10 +208,30 @@ export const generateRobot = functions.https.onCall(async (data: GenerateRobotRe
       t.set(userRef, {
         totalRobots: admin.firestore.FieldValue.increment(1),
         credits: admin.firestore.FieldValue.increment(0),
+        scanTokens: admin.firestore.FieldValue.increment(scanTokenIncrement),
         lastGenerationDateKey: todayKey,
         dailyGenerationCount: currentDailyCount + 1,
         updatedAt: serverTimestamp
       }, { merge: true });
+
+      if (scanAward.awarded) {
+        t.set(scanDailyRef, {
+          dateKey: todayKey,
+          issuedCount: scanAward.nextState.issuedCount,
+          updatedAt: serverTimestamp,
+          [`barcodes.${barcode}`]: true
+        }, { merge: true });
+
+        const ledgerRef = userRef.collection('ledger').doc();
+        t.set(ledgerRef, {
+          ...buildLedgerEntry({
+            type: "SCAN",
+            deltaScanTokens: scanTokenIncrement,
+            refId: `${todayKey}:${barcode}`
+          }),
+          createdAt: serverTimestamp
+        });
+      }
 
       // Daily Mission: Scan Barcode
       await updateMissionProgressInternal(t, userRef, todayKey, "scan_barcode");
@@ -245,6 +267,92 @@ export const generateRobot = functions.https.onCall(async (data: GenerateRobotRe
       'internal',
       'An error occurred while generating the robot.'
     );
+  }
+});
+
+// ScanToken issuance (daily per barcode)
+export const awardScanToken = functions.https.onCall(async (data: any, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Auth required');
+  }
+
+  const barcode = data?.barcode;
+  if (typeof barcode !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid barcode');
+  }
+
+  try {
+    assertValidBarcode(barcode);
+  } catch (_error) {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid barcode');
+  }
+
+  const userId = context.auth.uid;
+  const db = admin.firestore();
+  const userRef = db.collection('users').doc(userId);
+  const dateKey = getJstDateKey();
+  const scanDailyRef = userRef.collection('scanDaily').doc(dateKey);
+
+  try {
+    const result = await db.runTransaction(async (t) => {
+      const [userSnap, scanDailySnap] = await Promise.all([
+        t.get(userRef),
+        t.get(scanDailyRef)
+      ]);
+
+      if (!userSnap.exists) {
+        throw new functions.https.HttpsError('failed-precondition', 'User not found');
+      }
+
+      const userData = userSnap.data() || {};
+      const scanDailyState = normalizeScanDaily(scanDailySnap.exists ? scanDailySnap.data() : {});
+      const scanAward = applyScanDailyAward(scanDailyState, barcode);
+
+      if (!scanAward.awarded) {
+        throw new functions.https.HttpsError('already-exists', 'Scan token already issued');
+      }
+
+      const currentTokens = normalizeScanTokens(userData.scanTokens);
+      const nextTokens = currentTokens + SCAN_TOKEN_PER_SCAN;
+      const serverTimestamp = admin.firestore.FieldValue.serverTimestamp();
+
+      t.set(scanDailyRef, {
+        dateKey,
+        issuedCount: scanAward.nextState.issuedCount,
+        updatedAt: serverTimestamp,
+        [`barcodes.${barcode}`]: true
+      }, { merge: true });
+
+      t.set(userRef, {
+        scanTokens: nextTokens,
+        updatedAt: serverTimestamp
+      }, { merge: true });
+
+      const ledgerRef = userRef.collection('ledger').doc();
+      t.set(ledgerRef, {
+        ...buildLedgerEntry({
+          type: "SCAN",
+          deltaScanTokens: SCAN_TOKEN_PER_SCAN,
+          refId: `${dateKey}:${barcode}`
+        }),
+        createdAt: serverTimestamp
+      });
+
+      return {
+        awarded: true,
+        dateKey,
+        barcode,
+        scanTokensBalance: nextTokens
+      };
+    });
+
+    return result;
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    console.error("awardScanToken error:", error);
+    throw new functions.https.HttpsError('internal', 'Failed to award scan token');
   }
 });
 
@@ -559,15 +667,19 @@ const findOpponent = async (db: admin.firestore.Firestore, playerId: string, pla
 };
 
 const BATTLE_ITEM_IDS = ['repair_kit', 'attack_boost', 'defense_boost', 'critical_lens'];
+const PRE_BATTLE_ITEM_TYPES = ['BOOST', 'SHIELD', 'JAMMER', 'DISRUPT', 'CANCEL_CRIT'] as const;
+type PreBattleItemType = typeof PRE_BATTLE_ITEM_TYPES[number];
 
-const calculateReward = (result: 'win' | 'loss' | 'draw') => {
-  switch (result) {
-    case 'win': return { credits: 2, xp: 10 };
-    case 'loss': return { credits: 0, xp: 3 };
-    case 'draw': return { credits: 1, xp: 5 };
-  }
+const normalizePreBattleItem = (item?: string | null): PreBattleItemType | null => {
+  if (!item) return null;
+  if (item === 'CANCEL_CRIT' || item === 'DISRUPT') return 'JAMMER';
+  return PRE_BATTLE_ITEM_TYPES.includes(item as PreBattleItemType) ? (item as PreBattleItemType) : null;
 };
-const DAILY_CREDIT_CAP = 20;
+
+const stripItemFields = (log: Record<string, any>) => {
+  const { itemApplied, itemSide, itemType, itemEffect, itemEvent, itemMessage, ...rest } = log;
+  return rest;
+};
 
 export const matchBattle = functions.https.onCall(async (data: any, context) => {
   if (!context.auth) {
@@ -584,9 +696,8 @@ export const matchBattle = functions.https.onCall(async (data: any, context) => 
     throw new functions.https.HttpsError('invalid-argument', 'Invalid battle item');
   }
 
-  // Pre-battle item validation
-  const validBattleItemTypes = ['BOOST', 'SHIELD', 'CANCEL_CRIT'];
-  if (battleItems?.p1 && !validBattleItemTypes.includes(battleItems.p1)) {
+  const normalizedBattleItem = normalizePreBattleItem(battleItems?.p1);
+  if (battleItems?.p1 && !normalizedBattleItem) {
     throw new functions.https.HttpsError('invalid-argument', 'Invalid P1 battle item type');
   }
 
@@ -599,6 +710,13 @@ export const matchBattle = functions.https.onCall(async (data: any, context) => 
     const player = playerSnap.data() || {};
     const playerRating = typeof player.rankingPoints === 'number' ? player.rankingPoints : 1000;
     const currentWinStreak = typeof player.currentWinStreak === 'number' ? player.currentWinStreak : 0;
+    const playerLevel = typeof player.level === "number"
+      ? player.level
+      : levelFromXp(typeof player.xp === "number" ? player.xp : 0);
+
+    if (normalizedBattleItem && playerLevel < 5) {
+      throw new functions.https.HttpsError('failed-precondition', 'item-slots-locked');
+    }
 
     // アイテム所持事前チェック（UXのため。厳密なチェックはトランザクション内で）
     if (useItemId) {
@@ -609,13 +727,29 @@ export const matchBattle = functions.https.onCall(async (data: any, context) => 
       }
     }
 
-    // Pre-battle item credit check (1 credit per item)
-    const BATTLE_ITEM_CREDIT_COST = 1;
-    const battleItemCost = battleItems?.p1 ? BATTLE_ITEM_CREDIT_COST : 0;
-    if (battleItemCost > 0) {
-      const credits = getUserCredits(player);
-      if (credits < battleItemCost) {
-        throw new functions.https.HttpsError('resource-exhausted', 'クレジットが不足しています（アイテム使用）');
+    // Pre-battle item inventory check (UX only; strict check in transaction)
+    if (normalizedBattleItem) {
+      const inventoryCollection = db.collection('users').doc(userId).collection('inventory');
+      if (normalizedBattleItem === 'JAMMER') {
+        const jammerSnap = await inventoryCollection.doc('JAMMER').get();
+        const jammerQty = jammerSnap.data()?.qty ?? 0;
+        if (jammerQty < 1) {
+          const disruptSnap = await inventoryCollection.doc('DISRUPT').get();
+          const disruptQty = disruptSnap.data()?.qty ?? 0;
+          if (disruptQty < 1) {
+            const legacySnap = await inventoryCollection.doc('CANCEL_CRIT').get();
+            const legacyQty = legacySnap.data()?.qty ?? 0;
+            if (legacyQty < 1) {
+              throw new functions.https.HttpsError('failed-precondition', 'Item not in inventory');
+            }
+          }
+        }
+      } else {
+        const itemSnap = await inventoryCollection.doc(normalizedBattleItem).get();
+        const qty = itemSnap.data()?.qty ?? 0;
+        if (qty < 1) {
+          throw new functions.https.HttpsError('failed-precondition', 'Item not in inventory');
+        }
       }
     }
 
@@ -629,8 +763,9 @@ export const matchBattle = functions.https.onCall(async (data: any, context) => 
     // Pass cheer input: p1 = player, p2 = opponent
     const cheerInput = cheer ? { p1: !!cheer.p1, p2: !!cheer.p2 } : undefined;
     // Pass battle items: p1 = player, p2 = opponent (opponent doesn't use items in PvE)
-    const battleItemInput = battleItems?.p1 ? { p1: battleItems.p1, p2: null } : undefined;
+    const battleItemInput = normalizedBattleItem ? { p1: normalizedBattleItem, p2: null } : undefined;
     const battleResult = simulateBattle(playerRobot as any, opponentRobot as any, battleId, playerItems, cheerInput, battleItemInput);
+    const publicLogs = battleResult.logs.map(stripItemFields);
 
     // 勝敗判定
     const winnerIsPlayer = battleResult.winnerId === playerRobot.id;
@@ -653,44 +788,115 @@ export const matchBattle = functions.https.onCall(async (data: any, context) => 
     }
 
     // 6. 報酬計算
-    const baseRewards = calculateReward(resultType);
-    const earnedXp = baseRewards.xp;
+    const winnerUid = winnerIsPlayer ? userId : null;
 
     // 7. Firestore更新（トランザクション）
     const txnReward = await db.runTransaction(async (transaction) => {
-      // ユーザーデータ再取得（クレジット/DailyCapの整合性確保）
       const userRef = db.collection('users').doc(userId);
-      const userSnap = await transaction.get(userRef);
+      const battleRef = db.collection('battles').doc(battleId);
+      const battleResultRef = userRef.collection('battleResults').doc(battleId);
+
+      const [userSnap, battleSnap, battleResultSnap] = await Promise.all([
+        transaction.get(userRef),
+        transaction.get(battleRef),
+        transaction.get(battleResultRef)
+      ]);
       if (!userSnap.exists) throw new functions.https.HttpsError('not-found', 'User not found in transaction');
       const userData = userSnap.data() || {};
+      const userLevel = typeof userData.level === "number"
+        ? userData.level
+        : levelFromXp(typeof userData.xp === "number" ? userData.xp : 0);
 
-      // Idempotency: 既に処理済みの場合はスキップ
-      const battleResultRef = userRef.collection('battleResults').doc(battleId);
-      const battleResultSnap = await transaction.get(battleResultRef);
-      if (battleResultSnap.exists) {
-        return null;
+      if (normalizedBattleItem && userLevel < 5) {
+        throw new functions.https.HttpsError('failed-precondition', 'item-slots-locked');
       }
 
-      // Calculate Credits with Daily Cap
+      if (battleResultSnap.exists || (battleSnap.exists && battleSnap.data()?.rewardGranted)) {
+        const fallbackXp = typeof userData.xp === "number" ? userData.xp : 0;
+        const fallbackLevel = typeof userData.level === "number" ? userData.level : 1;
+        const battleData = battleSnap.exists ? (battleSnap.data() as Record<string, any>) : {};
+        const existingReward = battleData?.reward ?? {
+          creditsReward: 0,
+          xpReward: 0,
+          scanTokensGained: 0,
+          xpBefore: fallbackXp,
+          xpAfter: fallbackXp,
+          levelBefore: fallbackLevel,
+          levelAfter: fallbackLevel,
+          dailyCapApplied: false,
+          dailyCreditsCapApplied: false,
+          capped: false,
+          capRemaining: DAILY_CREDITS_CAP,
+          reason: null,
+        };
+        const resolvedLevelAfter = typeof existingReward.levelAfter === "number" ? existingReward.levelAfter : fallbackLevel;
+        const resolvedLevelBefore = typeof existingReward.levelBefore === "number" ? existingReward.levelBefore : fallbackLevel;
+        return {
+          reward: existingReward,
+          earnedCredits: existingReward.creditsReward ?? 0,
+          earnedXp: existingReward.xpReward ?? 0,
+          scanTokensGained: existingReward.scanTokensGained ?? 0,
+          leveledUp: resolvedLevelAfter > resolvedLevelBefore,
+          newWorkshopLines: getWorkshopLines(resolvedLevelAfter),
+        };
+      }
+
+      const entryFeeState = resolveEntryFee({
+        credits: getUserCredits(userData),
+        entryFeeCharged: battleSnap.exists && battleSnap.data()?.entryFeeCharged === true,
+      });
+      if (entryFeeState.insufficient) {
+        throw new functions.https.HttpsError('failed-precondition', 'insufficient-credits');
+      }
+      const entryFeeCharged = entryFeeState.charged;
+      const entryFeeAmount = entryFeeCharged ? entryFeeState.fee : 0;
+
       const todayKey = getJstDateKey();
-      const lastDateKey = userData.dailyEarnedDateKey;
-      let currentDailyCredits = 0;
-      if (lastDateKey === todayKey) {
-        currentDailyCredits = userData.dailyEarnedCredits || 0;
-      }
+      const rewardResult = applyBattleRewards({
+        battleData: { status: "completed", winner: resultType },
+        userData,
+        userId,
+        winnerUid,
+        todayKey,
+        dailyCreditsCap: DAILY_CREDITS_CAP,
+      });
 
-      let earnedCredits = baseRewards.credits;
-      let dailyCapApplied = false;
-      if (currentDailyCredits + earnedCredits > DAILY_CREDIT_CAP) {
-        earnedCredits = Math.max(0, DAILY_CREDIT_CAP - currentDailyCredits);
-        dailyCapApplied = true;
-      }
-      const newDailyCredits = (lastDateKey === todayKey ? currentDailyCredits : 0) + earnedCredits;
+      const earnedCredits = rewardResult.reward.creditsReward;
+      const earnedXp = rewardResult.reward.xpReward;
+      const scanTokensGained = rewardResult.reward.scanTokensGained ?? 0;
+      const leveledUp = rewardResult.reward.levelAfter > rewardResult.reward.levelBefore;
+      const newWorkshopLines = getWorkshopLines(rewardResult.levelAfter);
 
-      // User Level Update
-      const currentUserLevel = userData.level || 1;
-      const currentUserXp = userData.xp || 0;
-      const lvlResult = applyUserXp(currentUserLevel, currentUserXp, earnedXp);
+      // Pre-battle item consumption (inventory only)
+      if (normalizedBattleItem) {
+        const inventoryCollection = userRef.collection('inventory');
+        let consumeRef = inventoryCollection.doc(normalizedBattleItem);
+        const itemDoc = await transaction.get(consumeRef);
+        let availableQty = itemDoc.data()?.qty ?? 0;
+
+        if (availableQty < 1 && normalizedBattleItem === 'JAMMER') {
+          const fallbackIds = ['DISRUPT', 'CANCEL_CRIT'];
+          for (const fallbackId of fallbackIds) {
+            const fallbackRef = inventoryCollection.doc(fallbackId);
+            const fallbackDoc = await transaction.get(fallbackRef);
+            const fallbackQty = fallbackDoc.data()?.qty ?? 0;
+            if (fallbackQty > 0) {
+              consumeRef = fallbackRef;
+              availableQty = fallbackQty;
+              break;
+            }
+          }
+        }
+
+        if (availableQty < 1) {
+          throw new functions.https.HttpsError('failed-precondition', 'Item not in inventory');
+        }
+
+        transaction.update(consumeRef, {
+          qty: admin.firestore.FieldValue.increment(-1),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+      }
 
       // アイテム消費
       if (useItemId) {
@@ -708,7 +914,7 @@ export const matchBattle = functions.https.onCall(async (data: any, context) => 
       }
 
       // バトル結果保存
-      transaction.set(db.collection('battles').doc(battleId), {
+      transaction.set(battleRef, {
         id: battleId,
         playerId: userId,
         playerUsername: player.username || 'Unknown',
@@ -725,11 +931,32 @@ export const matchBattle = functions.https.onCall(async (data: any, context) => 
         opponentFinalHp: 0,
         experienceGained: earnedXp,
         rankingPointsChange: ratingChange,
-        battleLog: battleResult.logs,
+        battleLog: publicLogs,
         rewards: {
-          credits: earnedCredits, xp: earnedXp, dailyCapApplied,
-          levelUp: lvlResult.leveledUp, newLevel: lvlResult.newLevel, newWorkshopLines: lvlResult.workshopLines
+          credits: earnedCredits,
+          xp: earnedXp,
+          exp: earnedXp,
+          coins: earnedCredits,
+          dailyCapApplied: rewardResult.reward.dailyCapApplied,
+          dailyCreditsCapApplied: rewardResult.reward.dailyCreditsCapApplied,
+          levelUp: leveledUp,
+          newLevel: rewardResult.reward.levelAfter,
+          newWorkshopLines,
+          capped: rewardResult.reward.capped,
+          capRemaining: rewardResult.reward.capRemaining,
+          reason: rewardResult.reward.reason,
+          creditsReward: rewardResult.reward.creditsReward,
+          xpReward: rewardResult.reward.xpReward,
+          scanTokensGained: rewardResult.reward.scanTokensGained ?? 0,
+          xpBefore: rewardResult.reward.xpBefore,
+          xpAfter: rewardResult.reward.xpAfter,
+          levelBefore: rewardResult.reward.levelBefore,
+          levelAfter: rewardResult.reward.levelAfter
         },
+        entryFeeCharged,
+        rewardGranted: rewardResult.granted,
+        reward: rewardResult.reward,
+        rewardGrantedAt: admin.firestore.FieldValue.serverTimestamp(),
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         duration: 0
       });
@@ -741,28 +968,37 @@ export const matchBattle = functions.https.onCall(async (data: any, context) => 
         result: resultType,
         creditsEarned: earnedCredits,
         xpEarned: earnedXp,
+        scanTokensGained,
+        battleLog: battleResult.logs,
+        battleItems: battleItemInput ?? null,
+        entryFeeCharged,
+        reward: rewardResult.reward,
         createdAt: admin.firestore.FieldValue.serverTimestamp()
       });
 
       // プレイヤー統計更新
       const playerUpdates: any = {
-        level: lvlResult.newLevel,
-        xp: lvlResult.newXp,
-        workshopLines: lvlResult.workshopLines,
+        level: rewardResult.levelAfter,
+        xp: rewardResult.xpAfter,
+        workshopLines: newWorkshopLines,
         totalBattles: admin.firestore.FieldValue.increment(1),
         rankingPoints: admin.firestore.FieldValue.increment(ratingChange),
-        credits: admin.firestore.FieldValue.increment(earnedCredits - battleItemCost),
-        dailyEarnedCredits: newDailyCredits,
-        dailyEarnedDateKey: todayKey,
+        credits: admin.firestore.FieldValue.increment(earnedCredits - entryFeeAmount),
+        scanTokens: admin.firestore.FieldValue.increment(scanTokensGained),
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       };
+      if (rewardResult.dailyBattleDateKey) {
+        playerUpdates.dailyBattleDateKey = rewardResult.dailyBattleDateKey;
+        playerUpdates.dailyBattleCreditsEarned = rewardResult.dailyBattleCreditsEarned ?? 0;
+        playerUpdates.dailyBattleXpEarned = rewardResult.dailyBattleXpEarned ?? 0;
+      }
 
       if (winnerIsPlayer) {
         playerUpdates.totalWins = admin.firestore.FieldValue.increment(1);
         playerUpdates.currentWinStreak = admin.firestore.FieldValue.increment(1);
 
         // Daily Mission: Win Battle
-        await updateMissionProgressInternal(transaction, db.collection("users").doc(userId), todayKey, "win_battle");
+        await updateMissionProgressInternal(transaction, userRef, todayKey, "win_battle");
       } else if (winnerIsOpponent) {
         playerUpdates.totalLosses = admin.firestore.FieldValue.increment(1);
         playerUpdates.currentWinStreak = 0;
@@ -770,7 +1006,7 @@ export const matchBattle = functions.https.onCall(async (data: any, context) => 
         playerUpdates.totalDraws = admin.firestore.FieldValue.increment(1);
       }
 
-      transaction.update(db.collection('users').doc(userId), playerUpdates);
+      transaction.update(userRef, playerUpdates);
 
       // ロボット統計更新
       const currentExp = getRobotXp(playerRobot) + earnedXp;
@@ -819,7 +1055,14 @@ export const matchBattle = functions.https.onCall(async (data: any, context) => 
         );
       }
 
-      return { earnedCredits, earnedXp, dailyCapApplied, lvlResult };
+      return {
+        reward: rewardResult.reward,
+        earnedCredits,
+        earnedXp,
+        scanTokensGained,
+        leveledUp,
+        newWorkshopLines
+      };
     });
 
     return {
@@ -834,11 +1077,23 @@ export const matchBattle = functions.https.onCall(async (data: any, context) => 
       rewards: {
         exp: txnReward?.earnedXp ?? 0,
         credits: txnReward?.earnedCredits ?? 0,
+        xp: txnReward?.earnedXp ?? 0,
         coins: txnReward?.earnedCredits ?? 0,
-        dailyCapApplied: txnReward?.dailyCapApplied ?? false,
-        levelUp: txnReward?.lvlResult?.leveledUp,
-        newLevel: txnReward?.lvlResult?.newLevel,
-        newWorkshopLines: txnReward?.lvlResult?.workshopLines
+        creditsReward: txnReward?.reward?.creditsReward ?? 0,
+        xpReward: txnReward?.reward?.xpReward ?? 0,
+        scanTokensGained: txnReward?.reward?.scanTokensGained ?? 0,
+        xpBefore: txnReward?.reward?.xpBefore ?? 0,
+        xpAfter: txnReward?.reward?.xpAfter ?? 0,
+        levelBefore: txnReward?.reward?.levelBefore ?? 1,
+        levelAfter: txnReward?.reward?.levelAfter ?? 1,
+        capped: txnReward?.reward?.capped ?? false,
+        capRemaining: txnReward?.reward?.capRemaining,
+        reason: txnReward?.reward?.reason ?? null,
+        dailyCapApplied: txnReward?.reward?.dailyCapApplied ?? false,
+        dailyCreditsCapApplied: txnReward?.reward?.dailyCreditsCapApplied ?? false,
+        levelUp: txnReward?.leveledUp ?? false,
+        newLevel: txnReward?.reward?.levelAfter ?? 1,
+        newWorkshopLines: txnReward?.newWorkshopLines
       }
     };
 
@@ -1028,6 +1283,7 @@ export const purchaseItem = functions.https.onCall(async (data: any, context) =>
     const userSnap = await t.get(userRef);
     const userData = userSnap.exists ? userSnap.data() : {};
     const credits = getUserCredits(userData);
+    const serverTimestamp = admin.firestore.FieldValue.serverTimestamp();
 
     if (credits < cost) {
       throw new functions.https.HttpsError('failed-precondition', 'insufficient-funds');
@@ -1040,8 +1296,8 @@ export const purchaseItem = functions.https.onCall(async (data: any, context) =>
     const newQty = currentQty + qty;
     const newCredits = credits - cost;
 
-    t.set(userRef, { credits: newCredits }, { merge: true });
-    t.set(inventoryRef, { itemId, qty: newQty }, { merge: true });
+    t.set(userRef, { credits: newCredits, updatedAt: serverTimestamp }, { merge: true });
+    t.set(inventoryRef, { itemId, qty: newQty, updatedAt: serverTimestamp }, { merge: true });
 
     return {
       credits: newCredits,
@@ -1085,6 +1341,7 @@ export const equipItem = functions.https.onCall(async (data: any, context) => {
       throw new functions.https.HttpsError('not-found', 'Robot not found');
     }
 
+    const serverTimestamp = admin.firestore.FieldValue.serverTimestamp();
     const robotData = robotSnap.data() as any;
     const equipped = (robotData.equipped ?? {}) as { slot1?: string | null; slot2?: string | null };
     const currentItem = equipped[slotKey] ?? null;
@@ -1102,10 +1359,10 @@ export const equipItem = functions.https.onCall(async (data: any, context) => {
         : 0;
       const newReturnQty = returnQty + 1;
 
-      t.set(returnRef, { itemId: currentItem, qty: newReturnQty }, { merge: true });
+      t.set(returnRef, { itemId: currentItem, qty: newReturnQty, updatedAt: serverTimestamp }, { merge: true });
       t.update(robotRef, {
         [`equipped.${slotKey}`]: null,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        updatedAt: serverTimestamp
       });
 
       inventoryUpdates[currentItem] = newReturnQty;
@@ -1128,7 +1385,7 @@ export const equipItem = functions.https.onCall(async (data: any, context) => {
     }
 
     const newEquipQty = equipQty - 1;
-    t.set(equipRef, { itemId, qty: newEquipQty }, { merge: true });
+    t.set(equipRef, { itemId, qty: newEquipQty, updatedAt: serverTimestamp }, { merge: true });
     inventoryUpdates[itemId] = newEquipQty;
 
     if (currentItem) {
@@ -1138,14 +1395,14 @@ export const equipItem = functions.https.onCall(async (data: any, context) => {
         ? returnSnap.data()?.qty
         : 0;
       const newReturnQty = returnQty + 1;
-      t.set(returnRef, { itemId: currentItem, qty: newReturnQty }, { merge: true });
+      t.set(returnRef, { itemId: currentItem, qty: newReturnQty, updatedAt: serverTimestamp }, { merge: true });
       inventoryUpdates[currentItem] = newReturnQty;
     }
 
     const nextEquipped = { ...equipped, [slotKey]: itemId };
     t.update(robotRef, {
       [`equipped.${slotKey}`]: itemId,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      updatedAt: serverTimestamp
     });
 
     return { equipped: nextEquipped, inventory: inventoryUpdates };
@@ -1155,6 +1412,80 @@ export const equipItem = functions.https.onCall(async (data: any, context) => {
 });
 
 // ログインボーナスAPI
+// 日次ログイン請求API (称号/バッジ)
+export const claimDailyLogin = functions.https.onCall(async (_data: any, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Auth required');
+  }
+
+  const userId = context.auth.uid;
+  const userRef = admin.firestore().collection('users').doc(userId);
+  const todayKey = getJstDateKey();
+  const yesterdayKey = getYesterdayJstDateKey();
+
+  const result = await admin.firestore().runTransaction(async (t) => {
+    const userSnap = await t.get(userRef);
+    if (!userSnap.exists) {
+      throw new functions.https.HttpsError('failed-precondition', 'User not found');
+    }
+    const userData = userSnap.data() || {};
+    const lastDailyClaimDateKey = typeof userData?.lastDailyClaimDateKey === "string"
+      ? userData.lastDailyClaimDateKey
+      : userData?.lastLoginDateKey;
+    const isPremium = !!userData?.isPremium;
+    const bonusAmount = isPremium ? LOGIN_BONUS_CREDITS * 2 : LOGIN_BONUS_CREDITS;
+
+    const resolved = resolveDailyLogin({
+      todayKey,
+      yesterdayKey,
+      bonusAmount,
+      state: {
+        lastDailyClaimDateKey,
+        loginStreak: userData?.loginStreak,
+        maxLoginStreak: userData?.maxLoginStreak,
+        badgeIds: userData?.badgeIds,
+        titleId: userData?.titleId,
+        credits: getUserCredits(userData),
+      },
+    });
+
+    if (!resolved.claimed) {
+      return {
+        claimed: false,
+        dateKey: resolved.dateKey,
+        streak: resolved.streak,
+        newBadges: [],
+        titleId: resolved.titleId,
+        creditsGained: 0,
+      };
+    }
+
+    const serverTimestamp = admin.firestore.FieldValue.serverTimestamp();
+    t.set(userRef, {
+      credits: resolved.credits,
+      lastDailyClaimDateKey: resolved.dateKey,
+      lastLoginDateKey: resolved.dateKey,
+      loginStreak: resolved.streak,
+      maxLoginStreak: resolved.maxStreak,
+      badgeIds: resolved.badgeIds,
+      titleId: resolved.titleId,
+      updatedAt: serverTimestamp,
+    }, { merge: true });
+
+    return {
+      claimed: true,
+      dateKey: resolved.dateKey,
+      streak: resolved.streak,
+      newBadges: resolved.newBadges,
+      titleId: resolved.titleId,
+      creditsGained: resolved.creditsGained,
+    };
+  });
+
+  return result;
+});
+
+// ログインボーナスAPI (legacy)
 export const claimLoginBonus = functions.https.onCall(async (_data: any, context) => {
   if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'Auth required');
@@ -1168,28 +1499,43 @@ export const claimLoginBonus = functions.https.onCall(async (_data: any, context
   const result = await admin.firestore().runTransaction(async (t) => {
     const userSnap = await t.get(userRef);
     const userData = userSnap.exists ? userSnap.data() : {};
-    const lastLoginDateKey = userData?.lastLoginDateKey;
-
-    if (lastLoginDateKey === todayKey) {
-      throw new functions.https.HttpsError('failed-precondition', 'Already claimed today');
-    }
-
+    const lastDailyClaimDateKey = typeof userData?.lastDailyClaimDateKey === "string"
+      ? userData.lastDailyClaimDateKey
+      : userData?.lastLoginDateKey;
     const isPremium = !!userData?.isPremium;
     const bonusAmount = isPremium ? LOGIN_BONUS_CREDITS * 2 : LOGIN_BONUS_CREDITS;
 
-    const currentStreak = typeof userData?.loginStreak === "number" ? userData.loginStreak : 0;
-    const newStreak = lastLoginDateKey === yesterdayKey ? currentStreak + 1 : 1;
-    const credits = getUserCredits(userData);
-    const newCredits = credits + bonusAmount;
+    const resolved = resolveDailyLogin({
+      todayKey,
+      yesterdayKey,
+      bonusAmount,
+      state: {
+        lastDailyClaimDateKey,
+        loginStreak: userData?.loginStreak,
+        maxLoginStreak: userData?.maxLoginStreak,
+        badgeIds: userData?.badgeIds,
+        titleId: userData?.titleId,
+        credits: getUserCredits(userData),
+      },
+    });
 
+    if (!resolved.claimed) {
+      throw new functions.https.HttpsError('failed-precondition', 'Already claimed today');
+    }
+
+    const serverTimestamp = admin.firestore.FieldValue.serverTimestamp();
     t.set(userRef, {
-      credits: newCredits,
-      lastLoginDateKey: todayKey,
-      loginStreak: newStreak,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      credits: resolved.credits,
+      lastDailyClaimDateKey: resolved.dateKey,
+      lastLoginDateKey: resolved.dateKey,
+      loginStreak: resolved.streak,
+      maxLoginStreak: resolved.maxStreak,
+      badgeIds: resolved.badgeIds,
+      titleId: resolved.titleId,
+      updatedAt: serverTimestamp
     }, { merge: true });
 
-    return { streak: newStreak, credits: newCredits, bonusAmount };
+    return { streak: resolved.streak, credits: resolved.credits, bonusAmount };
   });
 
   return result;
@@ -1445,6 +1791,92 @@ type CosmeticItemId = typeof COSMETIC_ITEMS[number];
 const isCosmeticItemId = (id: string): id is CosmeticItemId => {
   return COSMETIC_ITEMS.includes(id as CosmeticItemId);
 };
+
+// クラフトAPI (ScanToken + Credits)
+export const craftItem = functions.https.onCall(async (data: any, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Auth required');
+  }
+
+  const recipeId = typeof data?.recipeId === "string"
+    ? data.recipeId
+    : (typeof data?.itemId === "string" ? data.itemId : null);
+  const qty = typeof data?.qty === "number" ? data.qty : 1;
+
+  if (typeof recipeId !== "string") {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid input');
+  }
+
+  if (!Number.isInteger(qty) || qty < 1 || qty > 10) {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid quantity');
+  }
+
+  if (!isCraftItemId(recipeId)) {
+    throw new functions.https.HttpsError('invalid-argument', 'Unknown craft item');
+  }
+
+  const userId = context.auth.uid;
+  const userRef = admin.firestore().collection('users').doc(userId);
+  const inventoryRef = userRef.collection('inventory').doc(recipeId);
+  const { totalTokenCost, totalCreditCost } = getCraftCosts(recipeId, qty);
+
+  const result = await admin.firestore().runTransaction(async (t) => {
+    const userSnap = await t.get(userRef);
+    const userData = userSnap.exists ? userSnap.data() : {};
+    const scanTokens = typeof userData?.scanTokens === "number" ? userData.scanTokens : 0;
+    const credits = getUserCredits(userData);
+
+    const inventorySnap = await t.get(inventoryRef);
+    const currentQty = inventorySnap.exists && typeof inventorySnap.data()?.qty === "number"
+      ? inventorySnap.data()?.qty
+      : 0;
+    const craftResult = applyCraftBalances({
+      currentTokens: scanTokens,
+      currentCredits: credits,
+      currentQty,
+      itemId: recipeId,
+      qty,
+    });
+    if (!craftResult.ok) {
+      throw new functions.https.HttpsError('failed-precondition', craftResult.reason);
+    }
+
+    const newQty = craftResult.nextQty;
+    const newCredits = craftResult.nextCredits;
+    const newScanTokens = craftResult.nextTokens;
+    const serverTimestamp = admin.firestore.FieldValue.serverTimestamp();
+
+    t.set(userRef, {
+      credits: newCredits,
+      scanTokens: newScanTokens,
+      updatedAt: serverTimestamp
+    }, { merge: true });
+    t.set(inventoryRef, { itemId: recipeId, qty: newQty, updatedAt: serverTimestamp }, { merge: true });
+
+    const ledgerRef = userRef.collection('ledger').doc();
+    t.set(ledgerRef, {
+      ...buildLedgerEntry({
+        type: "CRAFT",
+        deltaCredits: -totalCreditCost,
+        deltaScanTokens: -totalTokenCost,
+        refId: `craft:${recipeId}:${qty}`
+      }),
+      createdAt: serverTimestamp
+    });
+
+    return {
+      ok: true,
+      recipeId,
+      credits: newCredits,
+      scanTokens: newScanTokens,
+      newBalances: { credits: newCredits, scanTokens: newScanTokens },
+      inventoryDelta: { itemId: recipeId, qty, totalQty: newQty },
+      craftCost: { tokens: totalTokenCost, credits: totalCreditCost },
+    };
+  });
+
+  return result;
+});
 
 // ロボット強化アイテム使用API
 export const useUpgradeItem = functions.https.onCall(async (data: any, context) => {
@@ -2287,4 +2719,3 @@ export async function resolveFighterData(
     };
   }
 }
-

@@ -103,9 +103,20 @@ export interface BattleLog {
     itemSide?: 'P1' | 'P2';
     itemType?: BattleItemType;
     itemEffect?: string;
+    itemEvent?: "ITEM_USED" | "ITEM_APPLIED";
+    itemMessage?: string;
+
+    // Guard / Pursuit / Stun
+    guarded?: boolean;
+    guardMultiplier?: number;
+    pursuitDamage?: number;
+    followUpDamage?: number;
+    stunApplied?: boolean;
+    stunTargetId?: string;
+    stunned?: boolean;
 }
 
-export type BattleItemType = 'BOOST' | 'SHIELD' | 'CANCEL_CRIT';
+export type BattleItemType = 'BOOST' | 'SHIELD' | 'JAMMER' | 'DRONE' | 'DISRUPT' | 'CANCEL_CRIT';
 
 export interface BattleItemInput {
     p1?: BattleItemType | null;
@@ -123,6 +134,18 @@ export interface BattleResult {
         upgradedSkill?: string;
         credits?: number; // Server uses credits
         dailyCapApplied?: boolean;
+        dailyCreditsCapApplied?: boolean;
+        creditsReward?: number;
+        xpReward?: number;
+        scanTokensGained?: number;
+        xp?: number;
+        xpBefore?: number;
+        xpAfter?: number;
+        levelBefore?: number;
+        levelAfter?: number;
+        capped?: boolean;
+        capRemaining?: number;
+        reason?: "DAILY_CAP" | null;
     };
     totalDamageP1?: number;
     totalDamageP2?: number;
@@ -140,13 +163,25 @@ export interface MatchBattleResponse {
         exp: number;
         coins: number;
         credits?: number;
+        xp?: number;
         newSkill?: string;
         upgradedSkill?: string;
         dailyCapApplied?: boolean;
+        dailyCreditsCapApplied?: boolean;
         levelUp?: boolean;
         newLevel?: number;
         newWorkshopLines?: number;
         lastFreeVariantDate?: any; // Timestamp or string
+        creditsReward?: number;
+        xpReward?: number;
+        scanTokensGained?: number;
+        xpBefore?: number;
+        xpAfter?: number;
+        levelBefore?: number;
+        levelAfter?: number;
+        capped?: boolean;
+        capRemaining?: number;
+        reason?: "DAILY_CAP" | null;
     };
     resolvedPlayerRobot?: RobotData;
     experienceGained?: number;

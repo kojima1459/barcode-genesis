@@ -5,7 +5,7 @@ const {
   DuplicateRobotError,
   generateRobotFromBarcode,
   InvalidBarcodeError
-} = require("../lib/robotGenerator");
+} = require("../lib/functions/src/robotGenerator");
 
 const BARCODE = "4901234567890";
 const USER_ID = "test-user";

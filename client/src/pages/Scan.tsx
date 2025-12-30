@@ -15,6 +15,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import GenerationAnimation from "@/components/GenerationAnimation";
 import ShareCardModal from "@/components/ShareCardModal";
 import { useRobotFx } from "@/hooks/useRobotFx";
+import { httpsCallable } from "firebase/functions";
+import { functions } from "@/lib/firebase";
+
+const getCallableErrorCode = (error: unknown) => {
+    if (error && typeof error === "object" && "code" in error) {
+        const raw = String((error as { code?: unknown }).code);
+        return raw.replace("functions/", "");
+    }
+    return "";
+};
 
 export default function Scan() {
     const { t } = useLanguage();
@@ -44,6 +54,31 @@ export default function Scan() {
         const animationPromise = new Promise(resolve => setTimeout(resolve, 6500));
 
         try {
+            let shouldAbort = false;
+            try {
+                const awardScanToken = httpsCallable(functions, "awardScanToken");
+                await awardScanToken({ barcode, source: "camera" });
+            } catch (error: any) {
+                const code = getCallableErrorCode(error);
+                if (code === "already-exists") {
+                    toast("今日はそのバーコードはもう素材化済みやで");
+                } else if (code === "invalid-argument") {
+                    toast.error("バーコード形式が不正です");
+                    shouldAbort = true;
+                } else if (code === "unauthenticated") {
+                    toast.error("認証エラーです。再度ログインしてください。");
+                    shouldAbort = true;
+                } else {
+                    console.warn("awardScanToken error:", error);
+                }
+            }
+
+            if (shouldAbort) {
+                await animationPromise;
+                setMode('scan');
+                return;
+            }
+
             // Run API and Animation in parallel
             const [data] = await Promise.all([
                 callGenerateRobot(barcode),
@@ -84,7 +119,7 @@ export default function Scan() {
             if (code === 'internal') {
                 userMessage = 'サーバーエラーが発生しました。時間を置いて再度お試しください。';
             } else if (code === 'invalid-argument') {
-                userMessage = '無効なバーコードです。';
+                userMessage = 'バーコード形式が不正です。';
             } else if (code === 'unauthenticated') {
                 userMessage = '認証エラーです。再度ログインしてください。';
             } else if (code === 'already-exists') {
@@ -99,9 +134,9 @@ export default function Scan() {
     };
 
     return (
-        <div className="min-h-screen bg-dark-bg p-4 flex flex-col pb-24 relative overflow-hidden text-foreground">
+        <div className="min-h-screen bg-bg p-4 flex flex-col pb-24 relative overflow-hidden text-text">
             <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-20 pointer-events-none" />
-            <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/80 pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent to-bg/90 pointer-events-none" />
 
             <header className="flex items-center mb-8 max-w-4xl mx-auto w-full relative z-10">
                 <Link href="/">
@@ -110,10 +145,13 @@ export default function Scan() {
                         {t('back') || "戻る"}
                     </Button>
                 </Link>
-                <h1 className="text-2xl font-bold text-neon-cyan font-orbitron">GENERATE</h1>
+                <h1 className="text-2xl font-semibold text-accent font-orbitron">GENERATE</h1>
             </header>
 
             <main className="flex-1 max-w-4xl mx-auto w-full flex flex-col items-center justify-center relative z-10">
+                {mode === "generating" && (
+                    <div className="build-overlay" data-testid="scan-build-overlay" aria-hidden="true" />
+                )}
                 {mode === 'scan' && (
                     <div className="w-full space-y-6" id="tutorial-scanner-area">
                         <div className="text-center mb-6">
@@ -133,13 +171,13 @@ export default function Scan() {
                 )}
 
                 {mode === 'result' && robot && (
-                    <div className="flex flex-col items-center gap-8 py-8 w-full" id="tutorial-scan-result">
-                        <div className="glass-panel p-8 rounded-2xl border-neon-cyan shadow-[0_0_20px_rgba(0,243,255,0.3)]">
+                    <div className="flex flex-col items-center gap-8 py-8 w-full pop-in" id="tutorial-scan-result">
+                        <div className="glass-panel p-8 rounded-2xl border-neon-cyan shadow-[0_0_20px_rgba(62,208,240,0.3)] pop-glow">
                             <RobotSVG parts={robot.parts} colors={robot.colors} size={200} animate={true} fx={fx} />
                         </div>
 
-                        <div className="text-center space-y-4">
-                            <h2 className="text-3xl font-black font-orbitron text-white">{robot.name}</h2>
+                        <div className="text-center space-y-4 pop-in">
+                            <h2 className="text-3xl font-semibold font-orbitron text-white">{robot.name}</h2>
                             <div className="flex gap-3 justify-center">
                                 <span className="px-3 py-1 rounded-full bg-neon-cyan/20 text-neon-cyan text-sm font-bold border border-neon-cyan/50">
                                     {robot.rarityName}

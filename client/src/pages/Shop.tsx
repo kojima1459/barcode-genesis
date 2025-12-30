@@ -14,9 +14,26 @@ import { toast } from "sonner";
 
 type InventoryMap = Record<string, number>;
 
-const getErrorMessage = (error: unknown) => {
-  if (error && typeof error === "object" && "message" in error) {
-    return String((error as { message?: unknown }).message);
+const getErrorMessage = (error: unknown, isCraftItem: boolean) => {
+  if (error && typeof error === "object") {
+    const code = typeof (error as { code?: unknown }).code === "string"
+      ? String((error as { code?: unknown }).code)
+      : "";
+    const message = typeof (error as { message?: unknown }).message === "string"
+      ? String((error as { message?: unknown }).message)
+      : "";
+    const normalizedCode = code.replace("functions/", "");
+
+    if (isCraftItem) {
+      if (normalizedCode.includes("invalid-argument")) return "レシピ指定が不正です";
+      if (normalizedCode.includes("failed-precondition")) return "素材 or クレジットが足りません";
+    } else if (normalizedCode.includes("failed-precondition")) {
+      return "クレジットが不足しています";
+    }
+
+    if (message.includes("insufficient-tokens")) return "ScanTokenが不足しています";
+    if (message.includes("insufficient-credits")) return "クレジットが不足しています";
+    if (message) return message;
   }
   return "購入に失敗しました";
 };
@@ -32,6 +49,9 @@ const CategoryIcon = ({ category }: { category: ShopItemCategory }) => {
 export default function Shop() {
   const { user } = useAuth();
   const [credits, setCredits] = useState(0);
+  const [scanTokens, setScanTokens] = useState(0);
+  const [xp, setXp] = useState(0);
+  const [level, setLevel] = useState(1);
   const [inventory, setInventory] = useState<InventoryMap>({});
   const [loading, setLoading] = useState(true);
   const [purchaseQty, setPurchaseQty] = useState<Record<string, number>>({});
@@ -51,8 +71,14 @@ export default function Shop() {
         if (userDoc.exists()) {
           const data = userDoc.data();
           setCredits(typeof data.credits === "number" ? data.credits : 0);
+          setScanTokens(typeof data.scanTokens === "number" ? data.scanTokens : 0);
+          setXp(typeof data.xp === "number" ? data.xp : 0);
+          setLevel(typeof data.level === "number" ? data.level : 1);
         } else {
           setCredits(0);
+          setScanTokens(0);
+          setXp(0);
+          setLevel(1);
         }
 
         const inventorySnap = await getDocs(collection(db, "users", user.uid, "inventory"));
@@ -101,19 +127,31 @@ export default function Shop() {
     setPurchasingItemId(itemId);
     try {
       const qty = purchaseQty[itemId] ?? 1;
-      const purchase = httpsCallable(functions, "purchaseItem");
-      const result = await purchase({ itemId, qty });
-      const data = result.data as { credits: number; inventoryDelta: { itemId: string; qty: number; totalQty: number } };
+      const item = SHOP_ITEMS.find((entry) => entry.id === itemId);
+      const isCraftItem = typeof item?.tokenCost === "number";
+      const action = httpsCallable(functions, isCraftItem ? "craftItem" : "purchaseItem");
+      const payload = isCraftItem ? { recipeId: itemId, qty } : { itemId, qty };
+      const result = await action(payload);
+      const data = result.data as {
+        credits: number;
+        scanTokens?: number;
+        inventoryDelta: { itemId: string; qty: number; totalQty: number };
+      };
 
       setCredits(data.credits);
+      if (typeof data.scanTokens === "number") {
+        setScanTokens(data.scanTokens);
+      }
       setInventory((prev) => ({
         ...prev,
         [data.inventoryDelta.itemId]: data.inventoryDelta.totalQty
       }));
-      toast.success("購入完了！");
+      toast.success(isCraftItem ? "クラフト完了！" : "購入完了！");
     } catch (error) {
       console.error("Purchase failed:", error);
-      const message = getErrorMessage(error);
+      const item = SHOP_ITEMS.find((entry) => entry.id === itemId);
+      const isCraftItem = typeof item?.tokenCost === "number";
+      const message = getErrorMessage(error, isCraftItem);
       setErrorMessage(message);
     } finally {
       setPurchasingItemId(null);
@@ -137,7 +175,11 @@ export default function Shop() {
             <CardContent className="space-y-3">
               <p className="text-sm text-muted-foreground">{item.descriptionJa}</p>
               <div className="flex justify-between items-center text-sm">
-                <span className="font-bold text-primary">{item.price} クレジット</span>
+                <span className="font-bold text-primary">
+                  {typeof item.tokenCost === "number"
+                    ? `素材: Token ${item.tokenCost} + ${item.price} クレジット`
+                    : `${item.price} クレジット`}
+                </span>
                 <span className="text-muted-foreground">所持: {inventory[item.id] ?? 0}</span>
               </div>
               <div className="flex items-center gap-2">
@@ -159,11 +201,15 @@ export default function Shop() {
                 </select>
                 <Button
                   onClick={() => handlePurchase(item.id)}
-                  disabled={purchasingItemId === item.id || credits < item.price * (purchaseQty[item.id] ?? 1)}
+                  disabled={
+                    purchasingItemId === item.id ||
+                    credits < item.price * (purchaseQty[item.id] ?? 1) ||
+                    (typeof item.tokenCost === "number" && scanTokens < item.tokenCost * (purchaseQty[item.id] ?? 1))
+                  }
                   size="sm"
                 >
                   {purchasingItemId === item.id && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
-                  購入
+                  {typeof item.tokenCost === "number" ? "クラフト" : "購入"}
                 </Button>
               </div>
             </CardContent>
@@ -191,8 +237,11 @@ export default function Shop() {
           </Button>
         </Link>
         <h1 className="text-2xl font-bold text-primary">ショップ</h1>
-        <div className="ml-auto text-sm font-bold bg-primary/10 text-primary px-3 py-1 rounded-full">
-          💰 {credits} クレジット
+        <div className="ml-auto text-xs font-bold bg-primary/10 text-primary px-3 py-1 rounded-full flex flex-wrap items-center gap-3">
+          <span>Lv {level}</span>
+          <span>XP {xp}</span>
+          <span>💰 {credits} クレジット</span>
+          <span>🧩 {scanTokens} ScanToken</span>
         </div>
       </header>
 

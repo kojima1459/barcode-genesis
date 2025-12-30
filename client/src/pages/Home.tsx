@@ -1,16 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { useTutorial } from "@/contexts/TutorialContext";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
-import { db, functions, auth } from "@/lib/firebase";
+import { db, functions } from "@/lib/firebase";
 import { callGenerateRobot } from "@/lib/functions";
 import { httpsCallable } from "firebase/functions";
-import { collection, doc, getDoc, getDocs } from "firebase/firestore";
-import { Loader2, LogOut, Scan, ShoppingCart, Sword, Trophy, Zap, ScanBarcode, Swords, HelpCircle } from "lucide-react";
-import BarcodeScanner from "@/components/BarcodeScanner";
+import { collection, doc, getDocs, onSnapshot } from "firebase/firestore";
+import { Factory, Loader2, Trophy, Zap, ScanBarcode, Swords } from "lucide-react";
 import RobotSVG from "@/components/RobotSVG";
 import { toast } from "sonner";
 import { Link } from "wouter";
@@ -70,18 +68,12 @@ export default function Home() {
 
   useEffect(() => {
     if (!user) return;
-    const loadData = async () => {
-      try {
-        const userDoc = await getDoc(doc(db, "users", user.uid));
-        if (userDoc.exists()) {
-          const data = userDoc.data();
-          setCredits(typeof data.credits === "number" ? data.credits : 0);
-          setLoginStreak(typeof data.loginStreak === "number" ? data.loginStreak : null);
-        }
-      } catch (error) {
-        console.error("Failed to load user data:", error);
-      }
-    };
+    const unsubUser = onSnapshot(doc(db, "users", user.uid), (snap) => {
+      if (!snap.exists()) return;
+      const data = snap.data();
+      setCredits(typeof data.credits === "number" ? data.credits : 0);
+      setLoginStreak(typeof data.loginStreak === "number" ? data.loginStreak : null);
+    });
 
     const loadMissions = async () => {
       setMissionsLoading(true);
@@ -127,10 +119,12 @@ export default function Home() {
       }
     };
 
-    loadData();
     loadMissions();
     loadFollowing();
     loadRobots();
+    return () => {
+      unsubUser();
+    };
   }, [user]);
 
   const handleScan = async (barcode: string) => {
@@ -181,22 +175,22 @@ export default function Home() {
     setLoginError(null);
     setIsClaimingLogin(true);
     try {
-      const claim = httpsCallable(functions, "claimLoginBonus");
+      const claim = httpsCallable(functions, "claimDailyLogin");
       const result = await claim();
-      const data = result.data as { streak: number; credits: number };
-      setLoginStreak(data.streak);
-      setCredits(data.credits);
-      toast.success("Login bonus claimed");
-    } catch (error: any) {
-      const message = error.message || "Login bonus failed";
-
-      // すでに受け取り済みの場合はエラーログを出さずにスキップ
-      if (message.includes("Already claimed today")) {
-        console.log("Login bonus already claimed today.");
-        toast("Login bonus already claimed", { icon: "✅" }); // 通知はするが成功風に
-        return;
+      const data = result.data as { claimed?: boolean; streak?: number; creditsGained?: number; newBadges?: string[] };
+      if (data?.claimed) {
+        if (typeof data.streak === "number") {
+          setLoginStreak(data.streak);
+        }
+        toast.success("ログインボーナス獲得！");
+        if (Array.isArray(data.newBadges) && data.newBadges.length > 0) {
+          toast(`新バッジ獲得: ${data.newBadges.length}個`, { icon: "🏅" });
+        }
+      } else {
+        toast("Login bonus already claimed", { icon: "✅" });
       }
-
+    } catch (error: any) {
+      const message = error?.message || "Login bonus failed";
       console.error("Login bonus failed:", error);
       setLoginError(message);
     } finally {
@@ -248,32 +242,25 @@ export default function Home() {
     }
   };
 
-  // Assuming 'loading' is a state variable that indicates overall page loading
-  // For example, you might have: const [loading, setLoading] = useState(true);
-  // and set it to false after all initial data (user, missions, following) is loaded.
-  // For this change, we'll assume 'loading' is defined elsewhere or needs to be added.
-  const loading = missionsLoading || robotsLoading; // Placeholder, replace with actual loading state
+  const loading = missionsLoading || robotsLoading;
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-dark-bg p-4 flex flex-col pb-24 relative overflow-hidden text-foreground">
-        <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-20 pointer-events-none" />
-        <main className="flex-1 w-full max-w-4xl mx-auto space-y-8 relative z-10">
-          <div className="flex justify-between items-center py-4">
-            <Skeleton className="h-16 w-40" />
+      <div className="min-h-[100dvh] p-4 flex flex-col text-text">
+        <main className="flex-1 w-full max-w-4xl mx-auto space-y-4">
+          <div className="flex justify-between items-center py-2">
+            <Skeleton className="h-14 w-40" />
             <Skeleton className="h-10 w-24" />
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <Skeleton className="h-32 w-full" />
-            <Skeleton className="h-32 w-full" />
+          <div className="grid grid-cols-3 gap-3">
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
           </div>
-          <div className="space-y-4">
-            <Skeleton className="h-8 w-32" />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {[1, 2, 3, 4].map(i => (
-                <Skeleton key={i} className="h-24 w-full" />
-              ))}
-            </div>
+          <div className="space-y-3">
+            <Skeleton className="h-6 w-32" />
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-32 w-full" />
           </div>
         </main>
       </div>
@@ -281,24 +268,20 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-dark-bg p-4 flex flex-col pb-24 relative overflow-hidden text-foreground">
-      <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-20 pointer-events-none" />
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/80 pointer-events-none" />
-
-      <main className="flex-1 w-full max-w-4xl mx-auto space-y-8 relative z-10">
-
+    <div className="min-h-[100dvh] p-4 flex flex-col text-text">
+      <main className="flex-1 w-full max-w-4xl mx-auto space-y-4">
         {/* Header Section */}
-        <section className="flex justify-between items-center py-4">
+        <section className="flex justify-between items-center py-2">
           <div>
-            <h1 className="text-3xl font-black italic tracking-tighter text-neon-cyan neon-text-cyan">
+            <h1 className="text-3xl font-semibold tracking-tight text-primary">
               BARCODE<br />GENESIS
             </h1>
-            <p className="text-xs text-muted-foreground tracking-widest font-orbitron">SYSTEM ONLINE</p>
+            <p className="text-xs text-muted-foreground tracking-[0.12em] font-orbitron">SYSTEM ONLINE</p>
           </div>
           <div className="flex items-center gap-4">
             <div className="text-right">
               <div className="text-xs text-muted-foreground font-mono">CREDITS</div>
-              <div className="text-xl font-bold font-orbitron text-neon-yellow">{credits.toLocaleString()}</div>
+              <div className="text-xl font-bold font-orbitron text-primary">{credits.toLocaleString()}</div>
             </div>
             {/* User Avatar or something could go here */}
             <div className="flex gap-2">
@@ -309,132 +292,157 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Action Buttons */}
-        <section className="grid grid-cols-2 gap-4">
-
+        {/* Quick Actions */}
+        <section className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h2 className="text-[11px] font-semibold text-muted-foreground tracking-[0.12em]">Quick Actions</h2>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
           <Link href="/scan">
             <Button
               id="tutorial-generate-btn"
               onClick={() => completeStep('HOME_GENERATE')}
-              className="h-32 w-full flex flex-col gap-2 glass-panel border-neon-cyan hover:bg-neon-cyan/10 transition-all group"
+              className="h-20 w-full flex flex-col gap-2 glass-panel hover:bg-surface2/60 transition-all group"
             >
-              <ScanBarcode className="w-12 h-12 text-neon-cyan group-hover:drop-shadow-[0_0_10px_rgba(0,243,255,0.8)] transition-all" />
-              <span className="font-bold text-lg tracking-wider">GENERATE</span>
+              <ScanBarcode className="w-7 h-7 text-primary transition-all" />
+              <span className="font-bold text-sm tracking-wider">SCAN</span>
             </Button>
           </Link>
           <Link href="/battle">
-            <Button className="h-32 w-full flex flex-col gap-2 glass-panel border-neon-pink hover:bg-neon-pink/10 transition-all group">
-              <Swords className="w-12 h-12 text-neon-pink group-hover:drop-shadow-[0_0_10px_rgba(255,0,85,0.8)] transition-all" />
-              <span className="font-bold text-lg tracking-wider">BATTLE</span>
+            <Button className="h-20 w-full flex flex-col gap-2 glass-panel hover:bg-surface2/60 transition-all group">
+              <Swords className="w-7 h-7 text-primary transition-all" />
+              <span className="font-bold text-sm tracking-wider">BATTLE</span>
             </Button>
           </Link>
+          <Link href="/workshop">
+            <Button className="h-20 w-full flex flex-col gap-2 glass-panel hover:bg-surface2/60 transition-all group">
+              <Factory className="w-7 h-7 text-primary transition-all" />
+              <span className="font-bold text-sm tracking-wider">WORKSHOP</span>
+            </Button>
+          </Link>
+          </div>
         </section>
 
-        {/* Mission Center & Login Bonus */}
-        <section className="glass-panel p-4 rounded-lg border-neon-cyan/30 relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-1 bg-neon-cyan/10 border-b border-l border-neon-cyan/30 text-[10px] text-neon-cyan font-mono tracking-tighter">MISSION_CENTER</div>
-
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+        {/* Daily Bonus */}
+        <section className="glass-panel p-4 rounded-lg border-border/70 space-y-3">
+          <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded bg-neon-yellow/10 border border-neon-yellow/30 flex items-center justify-center text-neon-yellow">
-                <Trophy className="w-6 h-6" />
+              <div className="w-11 h-11 rounded bg-surface2 border border-border flex items-center justify-center text-primary">
+                <Trophy className="w-5 h-5" />
               </div>
               <div>
-                <h2 className="text-xl font-bold font-orbitron tracking-wide text-white">DAILY BONUS</h2>
+                <h2 className="text-lg font-semibold font-orbitron tracking-[0.08em]">DAILY BONUS</h2>
                 <div className="text-xs text-muted-foreground font-mono">STREAK: {loginStreak || 0} DAYS</div>
+                <div className="text-[11px] text-muted-foreground">1日1回受け取れます</div>
               </div>
             </div>
-
             <Button
               onClick={handleClaimLoginBonus}
               disabled={isClaimingLogin}
-              className="bg-neon-yellow text-black hover:bg-neon-yellow/80 font-bold px-8 h-10 shadow-[0_0_15px_rgba(255,215,0,0.3)]"
+              className="bg-primary text-black hover:bg-primary/80 font-bold px-5 h-10"
             >
-              {isClaimingLogin ? <Loader2 className="w-4 h-4 animate-spin" /> : "CLAIM BONUS"}
+              {isClaimingLogin ? <Loader2 className="w-4 h-4 animate-spin" /> : "CLAIM"}
             </Button>
           </div>
+        </section>
 
-          <div className="space-y-3">
-            <h3 className="text-xs font-bold text-muted-foreground tracking-widest uppercase mb-2">Active Missions</h3>
-            {missionsLoading ? (
-              <div className="py-4 flex items-center justify-center">
-                <Loader2 className="w-6 h-6 animate-spin text-neon-cyan" />
-              </div>
-            ) : missionsError ? (
-              <div className="py-4 text-xs text-red-400 font-mono">{missionsError}</div>
-            ) : missions.length === 0 ? (
-              <div className="py-4 text-xs text-muted-foreground font-mono">No missions available today.</div>
-            ) : (
-              <div className="grid grid-cols-1 gap-2">
-                {missions.map(mission => (
-                  <div key={mission.id} className="flex items-center justify-between p-3 bg-white/5 border border-white/10 rounded group/mission hover:border-neon-cyan/40 transition-all">
-                    <div className="flex-1">
-                      <div className="text-sm font-bold text-white mb-1">{mission.title || "Daily Mission"}</div>
-                      <div className="w-full h-1.5 bg-black/40 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-neon-cyan transition-all duration-1000"
-                          style={{ width: `${Math.min(100, ((mission.progress || 0) / (mission.target || 1)) * 100)}%` }}
-                        />
-                      </div>
-                      <div className="mt-1 text-[10px] text-muted-foreground font-mono flex justify-between">
-                        <span>PROGRESS: {mission.progress || 0}/{mission.target || 1}</span>
-                        <span className="text-neon-yellow">REWARD: {mission.rewardCredits} CR</span>
-                      </div>
-                    </div>
-
-                    <Button
-                      size="sm"
-                      disabled={mission.claimed || (mission.progress || 0) < (mission.target || 1) || claimingMissionId === mission.id}
-                      onClick={() => handleClaimMission(mission.id)}
-                      className={`ml-4 text-[10px] font-black tracking-tighter ${mission.claimed ? 'bg-white/10 text-white/30' : (mission.progress || 0) >= (mission.target || 1) ? 'bg-neon-cyan text-black hover:bg-neon-cyan/80' : 'bg-black/40 text-white/50 border border-white/10 hover:bg-white/10'}`}
-                    >
-                      {claimingMissionId === mission.id ? <Loader2 className="w-3 h-3 animate-spin" /> : mission.claimed ? "CLAIMED" : "CLAIM"}
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
+        {/* Active Missions */}
+        <section className="glass-panel p-4 rounded-lg border-border/70 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-semibold text-muted-foreground tracking-[0.12em]">Active Missions</h3>
+            <Button variant="link" className="text-primary h-auto p-0 text-xs" disabled>
+              VIEW ALL
+            </Button>
           </div>
+          {missionsLoading ? (
+            <div className="py-4 flex items-center justify-center">
+              <Loader2 className="w-5 h-5 animate-spin text-primary" />
+            </div>
+          ) : missionsError ? (
+            <div className="py-4 text-xs text-danger font-mono">{missionsError}</div>
+          ) : missions.length === 0 ? (
+            <div className="py-3 text-xs text-muted-foreground font-mono">No missions available today.</div>
+          ) : (
+            <div className="grid grid-cols-1 gap-2">
+              {missions.slice(0, 3).map(mission => (
+                <div key={mission.id} className="flex items-center justify-between p-3 bg-surface2/70 border border-border/60 rounded group/mission transition-all">
+                  <div className="flex-1">
+                    <div className="text-sm font-bold text-text mb-1">{mission.title || "Daily Mission"}</div>
+                    <div className="w-full h-1.5 bg-bg/60 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-primary transition-all duration-1000"
+                        style={{ width: `${Math.min(100, ((mission.progress || 0) / (mission.target || 1)) * 100)}%` }}
+                      />
+                    </div>
+                    <div className="mt-1 text-[10px] text-muted-foreground font-mono flex justify-between">
+                      <span>PROGRESS: {mission.progress || 0}/{mission.target || 1}</span>
+                      <span className="text-primary">REWARD: {mission.rewardCredits} CR</span>
+                    </div>
+                  </div>
+
+                  <Button
+                    size="sm"
+                    disabled={mission.claimed || (mission.progress || 0) < (mission.target || 1) || claimingMissionId === mission.id}
+                    onClick={() => handleClaimMission(mission.id)}
+                    className={`ml-3 text-[10px] font-black tracking-tighter ${
+                      mission.claimed
+                        ? 'bg-surface2 text-muted'
+                        : (mission.progress || 0) >= (mission.target || 1)
+                          ? 'bg-primary text-black hover:bg-primary/80'
+                          : 'bg-bg/60 text-muted border border-border/60 hover:bg-surface2/80'
+                    }`}
+                  >
+                    {claimingMissionId === mission.id ? <Loader2 className="w-3 h-3 animate-spin" /> : mission.claimed ? "CLAIMED" : "CLAIM"}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
 
         {/* Robot List Preview */}
-        <section>
-          <div className="flex justify-between items-end mb-4 border-b border-white/10 pb-2">
+        <section className="space-y-2">
+          <div className="flex justify-between items-center">
             <h2 className="text-xl font-bold font-orbitron flex items-center gap-2">
-              <Zap className="w-5 h-5 text-neon-yellow" />
+              <Zap className="w-5 h-5 text-primary" />
               YOUR UNIT
             </h2>
             <Link href="/collection">
-              <Button variant="link" className="text-neon-cyan h-auto p-0 text-xs">VIEW ALL &gt;</Button>
+              <Button variant="link" className="text-primary h-auto p-0 text-xs">VIEW ALL &gt;</Button>
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="w-full">
             {loading ? (
-              <div className="col-span-2 py-8 text-center text-muted-foreground animate-pulse">Scanning database...</div>
+              <div className="py-8 text-center text-muted-foreground animate-pulse">Scanning database...</div>
             ) : robots.length === 0 ? (
-              <div className="col-span-2 py-12 text-center glass-panel rounded-lg border-dashed border-white/20">
+              <div className="py-8 text-center glass-panel rounded-lg border-dashed border-border/60">
                 <p className="text-muted-foreground mb-4">No Units Found</p>
                 <Link href="/scan"><Button variant="secondary">Generate First Robot</Button></Link>
               </div>
             ) : (
-              robots.slice(0, 4).map(robot => (
-                <Link key={robot.id} href={'/robots/' + robot.id}>
-                  <div className="glass-panel p-3 rounded-lg flex items-center gap-4 hover:border-white/50 transition-all cursor-pointer group">
-                    <RobotSVG parts={robot.parts} colors={robot.colors} size={60} />
-                    <div className="flex-1 min-w-0">
-                      <div className="font-bold truncate text-white group-hover:text-neon-cyan transition-colors">{robot.name}</div>
-                      <div className="text-xs text-muted-foreground font-mono">
-                        Lv.{robot.level || 1} • <span style={{ color: robot.rarityName === 'Legendary' ? '#ffd700' : 'inherit' }}>{robot.rarityName}</span>
+              <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x snap-mandatory">
+                {robots.slice(0, 8).map((robot, index) => (
+                  <Link key={robot.id} href={'/robots/' + robot.id} className="snap-start">
+                    <div
+                      className="glass-panel p-3 rounded-lg flex items-center gap-3 hover:border-border transition-all cursor-pointer group min-w-[220px] card-in"
+                      style={{ "--delay": `${index * 60}ms` } as CSSProperties}
+                    >
+                      <RobotSVG parts={robot.parts} colors={robot.colors} size={56} />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-bold truncate text-text group-hover:text-primary transition-colors">{robot.name}</div>
+                        <div className="text-xs text-muted-foreground font-mono">
+                          Lv.{robot.level || 1} • <span className="text-muted-foreground">{robot.rarityName}</span>
+                        </div>
+                      </div>
+                      <div className="text-[10px] font-mono text-muted-foreground">
+                        HP {robot.baseHp}
                       </div>
                     </div>
-                    <div className="text-xs font-mono text-white/50">
-                      HP {robot.baseHp}
-                    </div>
-                  </div>
-                </Link>
-              ))
+                  </Link>
+                ))}
+              </div>
             )}
           </div>
         </section>
@@ -492,5 +500,3 @@ export default function Home() {
 
 
 }
-
-

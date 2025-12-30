@@ -7,7 +7,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { simulateBattle, CheerInput } from './battleSystem';
-import { RobotData, BattleLog, BattleResult } from './types';
+import { RobotData, BattleResult, BattleItemInput } from './types';
 
 // Helper: Create test robot
 const createTestRobot = (id: string, overrides: Partial<RobotData> = {}): RobotData => ({
@@ -61,6 +61,17 @@ describe('simulateBattle: Seed Determinism', () => {
                 expect(results[i].logs[j].defenderHp).toBe(results[0].logs[j].defenderHp);
             }
         }
+    });
+
+    it('should deepEqual for identical inputs', () => {
+        const robot1 = createTestRobot('robot-1', { baseAttack: 120, baseDefense: 80, baseSpeed: 20 });
+        const robot2 = createTestRobot('robot-2', { baseAttack: 95, baseDefense: 110, baseSpeed: 25 });
+        const battleId = 'determinism-deep-equal';
+
+        const result1 = simulateBattle(robot1, robot2, battleId);
+        const result2 = simulateBattle(robot1, robot2, battleId);
+
+        expect(result1).toEqual(result2);
     });
 
     it('should produce identical results with same cheer input', () => {
@@ -193,8 +204,6 @@ describe('simulateBattle: HP Transition Integrity', () => {
 // Pre-Battle Item Tests
 // ============================================
 
-import { BattleItemInput } from './types';
-
 describe('simulateBattle: Pre-Battle Item Determinism', () => {
     it('should produce identical results with same battleItems input', () => {
         const robot1 = createTestRobot('robot-1');
@@ -236,6 +245,7 @@ describe('simulateBattle: BOOST Item Application', () => {
         expect(boostLogs.length).toBe(1);
         expect(boostLogs[0].itemSide).toBe('P1');
         expect(boostLogs[0].itemEffect).toBe('×1.15');
+        expect(boostLogs[0].itemEvent).toBe('ITEM_APPLIED');
     });
 
     it('should apply 1.15x damage for BOOST attack', () => {
@@ -278,6 +288,60 @@ describe('simulateBattle: SHIELD Item Application', () => {
         expect(shieldLogs.length).toBe(1);
         expect(shieldLogs[0].itemSide).toBe('P1');
         expect(shieldLogs[0].itemEffect).toBe('×0.85');
+        expect(shieldLogs[0].itemEvent).toBe('ITEM_APPLIED');
+    });
+
+    it('should reduce incoming damage by 0.85x for SHIELD', () => {
+        const robot1 = createTestRobot('robot-1', { baseSpeed: 5 });
+        const robot2 = createTestRobot('robot-2', { baseSpeed: 20 });
+        const battleId = 'shield-damage-test';
+
+        const baseline = simulateBattle(robot1, robot2, battleId, [], undefined, undefined);
+        const withShield = simulateBattle(robot1, robot2, battleId, [], undefined, { p1: 'SHIELD', p2: null });
+
+        const shieldLog = withShield.logs.find(log => log.itemApplied && log.itemType === 'SHIELD');
+        expect(shieldLog).toBeDefined();
+
+        const baselineLog = baseline.logs.find(log =>
+            log.turn === shieldLog!.turn && log.attackerId === shieldLog!.attackerId
+        );
+        expect(baselineLog).toBeDefined();
+
+        const expectedDamage = Math.floor(baselineLog!.damage * 0.85);
+        expect(shieldLog!.damage).toBe(expectedDamage);
+    });
+});
+
+describe('simulateBattle: JAMMER Item Application', () => {
+    it('should cancel the next critical hit and only trigger once', () => {
+        const defender = createTestRobot('r1', { baseAttack: 80, baseDefense: 90, baseSpeed: 20, baseHp: 300 });
+        const attacker = createTestRobot('r2', { baseAttack: 90, baseDefense: 60, baseSpeed: 80, baseHp: 300 });
+
+        let chosenId: string | null = null;
+        let critTurn: number | null = null;
+
+        for (let i = 0; i < 500; i++) {
+            const battleId = `disrupt-crit-${i}`;
+            const baseline = simulateBattle(defender, attacker, battleId);
+            const critLog = baseline.logs.find(log => log.isCritical && log.attackerId === 'r2');
+            if (critLog) {
+                chosenId = battleId;
+                critTurn = critLog.turn;
+                break;
+            }
+        }
+
+        expect(chosenId).toBeTruthy();
+
+        const disrupted = simulateBattle(defender, attacker, chosenId!, [], undefined, { p1: 'JAMMER', p2: null });
+        const disruptLogs = disrupted.logs.filter(log => log.itemType === 'JAMMER');
+
+        expect(disruptLogs.length).toBe(1);
+        expect(disruptLogs[0].itemEvent).toBe('ITEM_USED');
+        expect(disruptLogs[0].isCritical).toBe(false);
+        if (critTurn !== null) {
+            expect(disruptLogs[0].turn).toBe(critTurn);
+        }
     });
 });
 
@@ -331,6 +395,37 @@ describe('simulateBattle: Item + Cheer Stacking', () => {
     });
 });
 
+describe('simulateBattle: New Mechanics', () => {
+    it('should trigger pursuit when speed advantage is large', () => {
+        const fast = createTestRobot('fast', { baseAttack: 120, baseDefense: 60, baseSpeed: 80, baseHp: 500 });
+        const slow = createTestRobot('slow', { baseAttack: 90, baseDefense: 80, baseSpeed: 40, baseHp: 500 });
+        const res = simulateBattle(fast, slow, 'pursuit-test');
+
+        const pursuitLog = res.logs.find(log => (log.pursuitDamage ?? 0) > 0);
+        expect(pursuitLog).toBeDefined();
+    });
+
+    it('should trigger counter when defender is faster and tanky', () => {
+        const slow = createTestRobot('slow', { baseAttack: 90, baseDefense: 60, baseSpeed: 30, baseHp: 800 });
+        const fastTank = createTestRobot('tank', { baseAttack: 70, baseDefense: 140, baseSpeed: 60, baseHp: 700 });
+        const res = simulateBattle(slow, fastTank, 'counter-test');
+
+        const counterLog = res.logs.find(log => log.action === 'counter');
+        expect(counterLog).toBeDefined();
+    });
+
+    it('should apply stun and skip next action on heavy hits', () => {
+        const stunner = createTestRobot('stunner', { baseAttack: 220, baseDefense: 60, baseSpeed: 80, baseHp: 600 });
+        const target = createTestRobot('target', { baseAttack: 60, baseDefense: 40, baseSpeed: 30, baseHp: 600 });
+        const res = simulateBattle(stunner, target, 'stun-test');
+
+        const stunIndex = res.logs.findIndex(log => log.stunApplied);
+        expect(stunIndex).toBeGreaterThanOrEqual(0);
+        const nextLog = res.logs[stunIndex + 1];
+        expect(nextLog?.action).toBe('stunned');
+    });
+});
+
 describe('simulateBattle v2 Updates', () => {
     it('should respect MAX_TURNS = 20', () => {
         const r1 = createTestRobot('r1', { baseHp: 5000, baseAttack: 20, baseDefense: 20 });
@@ -345,13 +440,23 @@ describe('simulateBattle v2 Updates', () => {
     it('should produce damage within new formula range', () => {
         const r1 = createTestRobot('atker', { baseAttack: 20, baseDefense: 10 });
         const r2 = createTestRobot('defer', { baseAttack: 20, baseDefense: 10 });
-        // Base = 400/30 = 13.
-        // Variance 0.9-1.1 -> Range 11 to 14.
+        // Core = floor(100 * 20 / (10 + 100)) = 18.
+        // Variance 0.9-1.1 -> Range 16 to 19 (before stance multipliers).
         const res = simulateBattle(r1, r2, 'dmg-test-v2');
-        const firstHit = res.logs.find(l => l.damage > 0 && !l.isCritical && !l.itemApplied && !l.cheerApplied);
+        const firstHit = res.logs.find(l =>
+            l.damage > 0 &&
+            !l.isCritical &&
+            !l.itemApplied &&
+            !l.cheerApplied &&
+            !l.guarded &&
+            !l.passiveTriggered
+        );
         if (firstHit) {
-            expect(firstHit.damage).toBeGreaterThanOrEqual(11);
-            expect(firstHit.damage).toBeLessThanOrEqual(14);
+            const stanceMult = firstHit.stanceMultiplier ?? 1;
+            const min = Math.floor(18 * 0.9 * stanceMult);
+            const max = Math.floor(18 * 1.1 * stanceMult);
+            expect(firstHit.damage).toBeGreaterThanOrEqual(min);
+            expect(firstHit.damage).toBeLessThanOrEqual(max);
         }
     });
 });

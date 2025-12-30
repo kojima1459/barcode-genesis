@@ -7,6 +7,7 @@ export type ShopItem = {
   description: string;
   descriptionJa: string;
   price: number;
+  tokenCost?: number;
   category: ShopItemCategory;
   effect?: {
     stat?: 'hp' | 'attack' | 'defense' | 'speed';
@@ -96,6 +97,46 @@ export const SHOP_ITEMS: ShopItem[] = [
     description: "Doubles critical hit chance for one battle",
     descriptionJa: "1バトルの間、クリティカル率2倍",
     price: 70,
+    category: 'battle'
+  },
+  {
+    id: "BOOST",
+    name: "Boost Drink",
+    nameJa: "ブーストドリンク",
+    description: "Boosts the next attack damage by 15%",
+    descriptionJa: "次の攻撃ダメージを15%強化",
+    price: 10,
+    tokenCost: 1,
+    category: 'battle'
+  },
+  {
+    id: "SHIELD",
+    name: "Shield Projector",
+    nameJa: "シールド投射器",
+    description: "Reduces the next incoming damage by 15%",
+    descriptionJa: "次に受けるダメージを15%軽減",
+    price: 10,
+    tokenCost: 1,
+    category: 'battle'
+  },
+  {
+    id: "JAMMER",
+    name: "Jammer Charm",
+    nameJa: "ジャマーチャーム",
+    description: "Cancels the opponent's next critical hit",
+    descriptionJa: "相手の次のクリティカルを無効化",
+    price: 25,
+    tokenCost: 2,
+    category: 'battle'
+  },
+  {
+    id: "DRONE",
+    name: "Support Drone",
+    nameJa: "サポートドローン",
+    description: "Token-only craft item",
+    descriptionJa: "トークンのみでクラフト可能",
+    price: 0,
+    tokenCost: 3,
     category: 'battle'
   },
 

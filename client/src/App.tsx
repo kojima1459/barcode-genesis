@@ -10,18 +10,19 @@ import { HapticProvider } from "@/contexts/HapticContext";
 import { TutorialProvider } from "@/contexts/TutorialContext";
 import TutorialOverlay from "@/components/TutorialOverlay";
 import { SoundProvider, useSound } from "@/contexts/SoundContext";
-import BottomNav from "@/components/BottomNav";
-import { useEffect, lazy, Suspense } from "react";
+import { useEffect, lazy, Suspense, type ComponentType } from "react";
 import { AnimatePresence } from "framer-motion";
 import PageTransition from "@/components/PageTransition";
 import OfflineBanner from "@/components/OfflineBanner";
 import { Loader2 } from "lucide-react";
+import AppShell from "@/components/AppShell";
 
 // Lazy load pages for better performance
 const Home = lazy(() => import("@/pages/Home"));
 const Auth = lazy(() => import("@/pages/Auth"));
 const Battle = lazy(() => import("@/pages/Battle"));
 const Collection = lazy(() => import("@/pages/Collection"));
+const Dex = lazy(() => import("@/pages/Dex"));
 const Leaderboard = lazy(() => import("@/pages/Leaderboard"));
 const Profile = lazy(() => import("@/pages/Profile"));
 const RobotDetail = lazy(() => import("@/pages/RobotDetail"));
@@ -29,6 +30,7 @@ const Shop = lazy(() => import("@/pages/Shop"));
 const Achievements = lazy(() => import("@/pages/Achievements"));
 const Premium = lazy(() => import("@/pages/Premium"));
 const Guide = lazy(() => import("@/pages/Guide"));
+const HowTo = lazy(() => import("@/pages/HowTo"));
 const LandingPage = lazy(() => import("@/pages/LandingPage"));
 const Privacy = lazy(() => import("@/pages/legal/Privacy"));
 const Terms = lazy(() => import("@/pages/legal/Terms"));
@@ -63,6 +65,12 @@ function GlobalSoundManager() {
 function Router() {
   const [location] = useLocation();
 
+  const withShell = (Component: ComponentType) => () => (
+    <AppShell>
+      <Component />
+    </AppShell>
+  );
+
   return (
     <>
       <AnimatePresence mode="wait">
@@ -76,42 +84,48 @@ function Router() {
               <Route path="/auth" component={Auth} />
 
               <Route path="/">
-                <ProtectedRoute component={Home} />
+                <ProtectedRoute component={withShell(Home)} />
+              </Route>
+              <Route path="/dex">
+                <ProtectedRoute component={withShell(Dex)} />
               </Route>
               <Route path="/battle">
-                <ProtectedRoute component={Battle} />
+                <ProtectedRoute component={withShell(Battle)} />
               </Route>
               <Route path="/collection">
-                <ProtectedRoute component={Collection} />
+                <ProtectedRoute component={withShell(Collection)} />
               </Route>
               <Route path="/shop">
-                <ProtectedRoute component={Shop} />
+                <ProtectedRoute component={withShell(Shop)} />
               </Route>
               <Route path="/scan">
-                <ProtectedRoute component={Scan} />
+                <ProtectedRoute component={withShell(Scan)} />
               </Route>
               <Route path="/robots/:robotId">
                 {(params) => (
-                  <ProtectedRoute component={() => <RobotDetail robotId={params.robotId} />} />
+                  <ProtectedRoute component={withShell(() => <RobotDetail robotId={params.robotId} />)} />
                 )}
               </Route>
               <Route path="/leaderboard">
-                <ProtectedRoute component={Leaderboard} />
+                <ProtectedRoute component={withShell(Leaderboard)} />
               </Route>
               <Route path="/achievements">
-                <ProtectedRoute component={Achievements} />
+                <ProtectedRoute component={withShell(Achievements)} />
               </Route>
               <Route path="/premium">
-                <ProtectedRoute component={Premium} />
+                <ProtectedRoute component={withShell(Premium)} />
               </Route>
               <Route path="/profile">
-                <ProtectedRoute component={Profile} />
+                <ProtectedRoute component={withShell(Profile)} />
               </Route>
               <Route path="/guide">
-                <ProtectedRoute component={Guide} />
+                <ProtectedRoute component={withShell(Guide)} />
+              </Route>
+              <Route path="/how-to">
+                <ProtectedRoute component={withShell(HowTo)} />
               </Route>
               <Route path="/workshop">
-                <ProtectedRoute component={Workshop} />
+                <ProtectedRoute component={withShell(Workshop)} />
               </Route>
               <Route path="/404" component={NotFound} />
               {/* Final fallback route */}
@@ -120,7 +134,6 @@ function Router() {
           </Suspense>
         </PageTransition>
       </AnimatePresence>
-      <BottomNav />
     </>
   );
 }
@@ -144,7 +157,7 @@ function App() {
                 <TooltipProvider delayDuration={0}>
                   <AuthProvider>
                     <TutorialProvider>
-                      <div className="min-h-screen bg-background text-foreground font-sans selection:bg-neon-cyan/30">
+                      <div className="min-h-screen bg-bg text-text font-sans selection:bg-neon-cyan/30">
                         <OfflineBanner />
                         <TutorialOverlay />
                         <Toaster />

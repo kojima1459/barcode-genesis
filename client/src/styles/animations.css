@@ -1,0 +1,211 @@
+:root {
+  --anim-fast: 200ms;
+  --anim-med: 420ms;
+}
+
+.build-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: url("/scanline.png"), url("/grid.svg");
+  background-size: 320px 320px, 120px 120px;
+  background-position: 0 0, 0 0;
+  opacity: 0.22;
+  mix-blend-mode: screen;
+  animation: scan-sweep 1.2s linear infinite;
+}
+
+.build-overlay::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 30%, rgba(62, 208, 240, 0.18), transparent 55%);
+  animation: build-pulse 1.6s ease-in-out infinite;
+}
+
+.pop-in {
+  animation: pop-in 360ms ease-out both;
+}
+
+.pop-glow {
+  box-shadow: 0 0 24px color-mix(in oklab, var(--accent) 35%, transparent);
+}
+
+.card-in {
+  animation: card-in var(--anim-med) ease-out both;
+  animation-delay: var(--delay, 0ms);
+}
+
+.lunge-right {
+  animation: lunge-right 220ms ease-out;
+}
+
+.lunge-left {
+  animation: lunge-left 220ms ease-out;
+}
+
+.hit-shake {
+  animation: hit-shake var(--anim-fast) ease-out;
+}
+
+.hit-flash {
+  animation: hit-flash 260ms ease-out;
+}
+
+.impact-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 30;
+}
+
+.impact-overlay.impact-critical {
+  background: radial-gradient(circle at center, rgba(255, 106, 106, 0.2), transparent 55%);
+}
+
+.impact-overlay.impact-cheer {
+  background: radial-gradient(circle at center, rgba(62, 208, 240, 0.2), transparent 55%);
+}
+
+.impact-text {
+  font-family: var(--font-display);
+  font-size: clamp(1.6rem, 4vw, 3rem);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: #f8fbff;
+  text-shadow: 0 0 18px color-mix(in oklab, var(--accent) 40%, transparent);
+  animation: impact-pop 280ms ease-out;
+}
+
+.hp-delayed {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  background: color-mix(in oklab, #ff6a6a 40%, transparent);
+  transition: width 200ms linear;
+  opacity: 0.75;
+}
+
+@keyframes scan-sweep {
+  0% {
+    background-position: 0 0, 0 0;
+  }
+  100% {
+    background-position: 0 -320px, 120px 120px;
+  }
+}
+
+@keyframes build-pulse {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes card-in {
+  0% {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes lunge-right {
+  0% {
+    transform: translateX(0) scale(1);
+  }
+  60% {
+    transform: translateX(12px) scale(1.02);
+  }
+  100% {
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes lunge-left {
+  0% {
+    transform: translateX(0) scale(1);
+  }
+  60% {
+    transform: translateX(-12px) scale(1.02);
+  }
+  100% {
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes hit-shake {
+  0% {
+    transform: translateX(0);
+  }
+  35% {
+    transform: translateX(-6px);
+  }
+  70% {
+    transform: translateX(6px);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+@keyframes hit-flash {
+  0% {
+    box-shadow: 0 0 0 rgba(255, 255, 255, 0);
+  }
+  50% {
+    box-shadow: 0 0 24px color-mix(in oklab, var(--accent) 45%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 rgba(255, 255, 255, 0);
+  }
+}
+
+@keyframes impact-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .build-overlay,
+  .build-overlay::after,
+  .pop-in,
+  .card-in,
+  .lunge-right,
+  .lunge-left,
+  .hit-shake,
+  .hit-flash,
+  .impact-text {
+    animation: none !important;
+  }
+
+  .hp-delayed {
+    transition: none !important;
+  }
+}

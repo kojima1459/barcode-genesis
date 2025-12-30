@@ -149,13 +149,24 @@ export interface BattleLog {
   itemSide?: 'P1' | 'P2';
   itemType?: BattleItemType;
   itemEffect?: string;  // e.g., "×1.15", "×0.85", "CRIT BLOCKED"
+  itemEvent?: "ITEM_USED" | "ITEM_APPLIED";
+  itemMessage?: string;
+
+  // BattleEngine v2: Guard / Pursuit / Stun
+  guarded?: boolean;
+  guardMultiplier?: number;
+  pursuitDamage?: number;
+  followUpDamage?: number;
+  stunApplied?: boolean;
+  stunTargetId?: string;
+  stunned?: boolean;
 }
 
 // ============================================
 // Pre-Battle Item Types
 // ============================================
 
-export type BattleItemType = 'BOOST' | 'SHIELD' | 'CANCEL_CRIT';
+export type BattleItemType = 'BOOST' | 'SHIELD' | 'JAMMER' | 'DRONE' | 'DISRUPT' | 'CANCEL_CRIT';
 
 export interface BattleItemInput {
   p1?: BattleItemType | null;
@@ -171,6 +182,20 @@ export interface BattleResult {
     coins: number;
     newSkill?: string;
     upgradedSkill?: string;
+    credits?: number;
+    dailyCapApplied?: boolean;
+    dailyCreditsCapApplied?: boolean;
+    creditsReward?: number;
+    xpReward?: number;
+    scanTokensGained?: number;
+    xp?: number;
+    xpBefore?: number;
+    xpAfter?: number;
+    levelBefore?: number;
+    levelAfter?: number;
+    capped?: boolean;
+    capRemaining?: number;
+    reason?: "DAILY_CAP" | null;
   };
   totalDamageP1?: number;
   totalDamageP2?: number;
