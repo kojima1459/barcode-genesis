@@ -19,6 +19,9 @@ interface UserProfile {
   photoURL?: string;
   wins?: number;
   battles?: number;
+  level?: number;
+  xp?: number;
+  workshopLines?: number;
 }
 
 export default function Profile() {
@@ -241,6 +244,22 @@ export default function Profile() {
                   <div className="text-center p-4 bg-secondary/10 rounded-lg">
                     <div className="text-2xl font-bold text-green-500">{winRate}%</div>
                     <div className="text-xs text-muted-foreground">Win Rate</div>
+                  </div>
+                </div>
+
+                {/* Level / XP / Lines */}
+                <div className="grid grid-cols-3 gap-4 pt-2">
+                  <div className="text-center p-4 bg-secondary/10 rounded-lg">
+                    <div className="text-2xl font-bold text-blue-500">{profile.level || 1}</div>
+                    <div className="text-xs text-muted-foreground">Level</div>
+                  </div>
+                  <div className="text-center p-4 bg-secondary/10 rounded-lg">
+                    <div className="text-2xl font-bold text-purple-500">{profile.xp || 0}</div>
+                    <div className="text-xs text-muted-foreground">XP</div>
+                  </div>
+                  <div className="text-center p-4 bg-secondary/10 rounded-lg">
+                    <div className="text-2xl font-bold text-orange-500">{profile.workshopLines || 1}</div>
+                    <div className="text-xs text-muted-foreground">Factory Lines</div>
                   </div>
                 </div>
               </div>

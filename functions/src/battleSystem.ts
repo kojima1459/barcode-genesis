@@ -26,7 +26,7 @@ const resolveSkills = (skills: RobotData["skills"]): Skill[] => {
   return resolved;
 };
 
-const MAX_TURNS = 30;
+const MAX_TURNS = 20;
 const toDamage = (value: number): number => Math.max(1, Math.floor(value));
 
 const getElementMultiplier = (attacker: RobotData, defender: RobotData): number => {
@@ -48,12 +48,15 @@ export interface CheerInput {
   p2: boolean;  // P2 (robot2) has cheer reserved
 }
 
+import { BattleItemType, BattleItemInput } from "./types";
+
 export const simulateBattle = (
   robot1: RobotData,
   robot2: RobotData,
   battleId?: string,
   robot1Items: string[] = [],
-  cheer?: CheerInput
+  cheer?: CheerInput,
+  battleItems?: BattleItemInput  // NEW: Pre-battle items (optional, backward compatible)
 ): BattleResult => {
   let hp1 = robot1.baseHp;
   let hp2 = robot2.baseHp;
@@ -71,7 +74,7 @@ export const simulateBattle = (
   const stanceWeights1 = getStanceWeights(robot1);
   const stanceWeights2 = getStanceWeights(robot2);
 
-  // アイテム使用フラグ
+  // アイテム使用フラグ (legacy items)
   let usedRepairKit = false;
 
   // Cheer System: Initialize state
@@ -79,6 +82,16 @@ export const simulateBattle = (
   let p1CheerUsed = false;
   let p2CheerReady = !!cheer?.p2;
   let p2CheerUsed = false;
+
+  // Pre-Battle Item System: Initialize state
+  let p1ItemReady: BattleItemType | null = battleItems?.p1 ?? null;
+  let p1ItemUsed = false;
+  let p2ItemReady: BattleItemType | null = battleItems?.p2 ?? null;
+  let p2ItemUsed = false;
+
+  // Track total damage for tiebreaker
+  let totalDamageP1 = 0;
+  let totalDamageP2 = 0;
 
   // ステータス補正関数
   const getStat = (robot: RobotData, stat: 'baseAttack' | 'baseDefense') => {
@@ -110,6 +123,12 @@ export const simulateBattle = (
     // ============================================
     // BattleEngine v2: STANCE RESOLUTION
     // ============================================
+    // Pre-Battle Item System: Initialize turn item state
+    let itemApplied = false;
+    let itemSide: 'P1' | 'P2' | undefined;
+    let itemType: BattleItemType | undefined;
+    let itemEffect: string | undefined;
+
     const attackerWeights = attacker.id === robot1.id ? stanceWeights1 : stanceWeights2;
     const defenderWeights = defender.id === robot1.id ? stanceWeights1 : stanceWeights2;
 
@@ -236,24 +255,64 @@ export const simulateBattle = (
           break;
       }
     } else {
-      // 通常攻撃
-      const baseDamage = Math.max(1, atk - (def / 2));
-      const multiplier = 0.8 + rng.next() * 0.4;
+      // 通常攻撃 - New Damage Formula
+      // base = floor((atk*atk)/(atk+def))
+      // variance = 0.90..1.10
+      // damage = max(1, floor(base * variance))
+      const baseRaw = (atk * atk) / (atk + def);
+      const base = Math.floor(baseRaw);
+      const variance = 0.90 + rng.next() * 0.20; // 0.90 to 1.10
+      const baseDamage = Math.max(1, Math.floor(base * variance));
 
-      // クリティカル判定 (with passive bonus)
-      let critChance = 0.1;
+      // クリティカル判定 - Speed-based formula
+      // critChance = clamp(0.05 + (spd - oppSpd)*0.002, 0.05, 0.25)
+      const speedDiff = attacker.baseSpeed - defender.baseSpeed;
+      let critChance = Math.max(0.05, Math.min(0.25, 0.05 + speedDiff * 0.002));
+
+      // Legacy critical_lens item bonus
       if (attacker.id === robot1.id && robot1Items.includes('critical_lens')) {
-        critChance = 0.2;
+        critChance = Math.min(0.25, critChance + 0.10);
       }
       // Add passive crit bonus
       if (weaponPassive) {
         const effect = getPassiveEffect(weaponPassive);
-        if (effect.critBonus) critChance += effect.critBonus;
+        if (effect.critBonus) {
+          critChance = Math.min(0.25, critChance + effect.critBonus);
+        }
       }
 
       isCritical = rng.next() < critChance;
 
-      damage = toDamage(baseDamage * multiplier * elementMultiplier * stanceMultiplier);
+      // ============================================
+      // CANCEL_CRIT Item: Nullify critical (post-RNG, deterministic)
+      // ============================================
+      if (isCritical) {
+        // Defender is P1 (robot1) and has CANCEL_CRIT ready
+        if (defender.id === robot1.id && p1ItemReady === 'CANCEL_CRIT' && !p1ItemUsed) {
+          isCritical = false;
+          p1ItemReady = null;
+          p1ItemUsed = true;
+          itemApplied = true;
+          itemSide = 'P1';
+          itemType = 'CANCEL_CRIT';
+          itemEffect = 'Crit Cancelled';
+          message += ` 🤞クリティカルをお守りが防いだ！`;
+        }
+        // Defender is P2 (robot2) and has CANCEL_CRIT ready
+        else if (defender.id === robot2.id && p2ItemReady === 'CANCEL_CRIT' && !p2ItemUsed) {
+          isCritical = false;
+          p2ItemReady = null;
+          p2ItemUsed = true;
+          itemApplied = true;
+          itemSide = 'P2';
+          itemType = 'CANCEL_CRIT';
+          itemEffect = 'Crit Cancelled';
+          message += ` 🤞クリティカルをお守りが防いだ！`;
+        }
+      }
+
+      // Apply element and stance multipliers (variance already in baseDamage)
+      damage = toDamage(baseDamage * elementMultiplier * stanceMultiplier);
       if (isCritical) damage = toDamage(damage * 1.5);
       message = `${attacker.name} attacks ${defender.name} for ${damage} damage!`;
     }
@@ -298,12 +357,81 @@ export const simulateBattle = (
       message += ` 🎉声援が刃になった（×${cheerMultiplier}）`;
     }
 
+    // ============================================
+    // PRE-BATTLE ITEM SYSTEM: Apply items (AFTER cheer)
+    // ============================================
+    // ============================================
+    // PRE-BATTLE ITEM SYSTEM: Apply items (AFTER cheer)
+    // ============================================
+    // Variables initialized at loop start
+
+    const BOOST_MULTIPLIER = 1.15;
+    const SHIELD_MULTIPLIER = 0.85;
+
+    // BOOST: Attacker's first attack ×1.15
+    if (damage > 0) {
+      if (attacker.id === robot1.id && p1ItemReady === 'BOOST' && !p1ItemUsed) {
+        damage = toDamage(damage * BOOST_MULTIPLIER);
+        p1ItemReady = null;
+        p1ItemUsed = true;
+        itemApplied = true;
+        itemSide = 'P1';
+        itemType = 'BOOST';
+        itemEffect = `×${BOOST_MULTIPLIER}`;
+        message += ` ⚡ブーストアイテム発動！（${itemEffect}）`;
+      } else if (attacker.id === robot2.id && p2ItemReady === 'BOOST' && !p2ItemUsed) {
+        damage = toDamage(damage * BOOST_MULTIPLIER);
+        p2ItemReady = null;
+        p2ItemUsed = true;
+        itemApplied = true;
+        itemSide = 'P2';
+        itemType = 'BOOST';
+        itemEffect = `×${BOOST_MULTIPLIER}`;
+        message += ` ⚡ブーストアイテム発動！（${itemEffect}）`;
+      }
+    }
+
+    // SHIELD: Defender's first damage ×0.85
+    if (damage > 0 && !itemApplied) {
+      if (defender.id === robot1.id && p1ItemReady === 'SHIELD' && !p1ItemUsed) {
+        damage = toDamage(damage * SHIELD_MULTIPLIER);
+        p1ItemReady = null;
+        p1ItemUsed = true;
+        itemApplied = true;
+        itemSide = 'P1';
+        itemType = 'SHIELD';
+        itemEffect = `×${SHIELD_MULTIPLIER}`;
+        message += ` 🛡️シールドアイテム発動！（${itemEffect}）`;
+      } else if (defender.id === robot2.id && p2ItemReady === 'SHIELD' && !p2ItemUsed) {
+        damage = toDamage(damage * SHIELD_MULTIPLIER);
+        p2ItemReady = null;
+        p2ItemUsed = true;
+        itemApplied = true;
+        itemSide = 'P2';
+        itemType = 'SHIELD';
+        itemEffect = `×${SHIELD_MULTIPLIER}`;
+        message += ` 🛡️シールドアイテム発動！（${itemEffect}）`;
+      }
+    }
+
+    // CANCEL_CRIT already applied above (during normal attack critical check)
+    // Log if it was used
+    if (!itemApplied) {
+      if (attacker.id === robot2.id && p1ItemUsed && itemType === undefined) {
+        // Check if P1's CANCEL_CRIT was used this turn (defender blocked crit)
+      }
+      if (attacker.id === robot1.id && p2ItemUsed && itemType === undefined) {
+        // Check if P2's CANCEL_CRIT was used this turn
+      }
+    }
+
     // HP減少（回復以外）
     let followUpDamage = 0;
     if (damage > 0) {
       if (attacker.id === robot1.id) {
         hp2 -= damage;
         defenderHp = hp2;
+        totalDamageP1 += damage; // Track P1's damage
 
         // Update defender overdrive (took damage)
         const defOverdrive = getOverdrive(defender.id);
@@ -312,6 +440,7 @@ export const simulateBattle = (
       } else {
         hp1 -= damage;
         defenderHp = hp1;
+        totalDamageP2 += damage; // Track P2's damage
 
         // Update defender overdrive (took damage)
         const defOverdrive = getOverdrive(defender.id);
@@ -334,9 +463,11 @@ export const simulateBattle = (
             if (attacker.id === robot1.id) {
               hp2 -= followUpDamage;
               defenderHp = hp2;
+              totalDamageP1 += followUpDamage; // Track P1's followup damage
             } else {
               hp1 -= followUpDamage;
               defenderHp = hp1;
+              totalDamageP2 += followUpDamage; // Track P2's followup damage
             }
             message += ` ${backpackPassive.effectName} deals ${followUpDamage} extra!`;
           }
@@ -391,6 +522,11 @@ export const simulateBattle = (
       cheerApplied: cheerApplied || undefined,
       cheerSide: cheerSide,
       cheerMultiplier: cheerApplied ? cheerMultiplier : undefined,
+      // Pre-Battle Item System
+      itemApplied: itemApplied || undefined,
+      itemSide: itemSide,
+      itemType: itemType,
+      itemEffect: itemEffect,
     });
 
     if (hp1 <= 0 || hp2 <= 0) break;
@@ -412,22 +548,40 @@ export const simulateBattle = (
   let loserId: string;
 
   if (hp1 <= 0 || hp2 <= 0) {
+    // One robot is KO'd
     winnerId = (hp1 > 0 ? robot1.id : robot2.id)!;
     loserId = (hp1 > 0 ? robot2.id : robot1.id)!;
   } else {
-    const ratio1 = hp1 / robot1.baseHp;
-    const ratio2 = hp2 / robot2.baseHp;
-    if (ratio1 === ratio2) {
-      if (hp1 === hp2) {
+    // Turn limit reached - apply tiebreaker logic
+    // 1. Higher remaining HP
+    if (hp1 > hp2) {
+      winnerId = robot1.id!;
+      loserId = robot2.id!;
+    } else if (hp2 > hp1) {
+      winnerId = robot2.id!;
+      loserId = robot1.id!;
+    } else {
+      // 2. Equal HP - check total damage dealt
+      if (totalDamageP1 > totalDamageP2) {
         winnerId = robot1.id!;
         loserId = robot2.id!;
+      } else if (totalDamageP2 > totalDamageP1) {
+        winnerId = robot2.id!;
+        loserId = robot1.id!;
       } else {
-        winnerId = (hp1 > hp2 ? robot1.id : robot2.id)!;
-        loserId = (hp1 > hp2 ? robot2.id : robot1.id)!;
+        // 3. Equal damage - check speed
+        if (robot1.baseSpeed > robot2.baseSpeed) {
+          winnerId = robot1.id!;
+          loserId = robot2.id!;
+        } else if (robot2.baseSpeed > robot1.baseSpeed) {
+          winnerId = robot2.id!;
+          loserId = robot1.id!;
+        } else {
+          // 4. All equal - P1 wins (deterministic)
+          winnerId = robot1.id!;
+          loserId = robot2.id!;
+        }
       }
-    } else {
-      winnerId = (ratio1 > ratio2 ? robot1.id : robot2.id)!;
-      loserId = (ratio1 > ratio2 ? robot2.id : robot1.id)!;
     }
   }
 
@@ -438,6 +592,9 @@ export const simulateBattle = (
     rewards: {
       exp: 100,
       coins: 50
-    }
+    },
+    totalDamageP1,
+    totalDamageP2,
+    turnCount: turn - 1,
   };
 };

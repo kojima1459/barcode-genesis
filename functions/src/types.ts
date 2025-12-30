@@ -143,6 +143,23 @@ export interface BattleLog {
   cheerApplied?: boolean;
   cheerSide?: 'P1' | 'P2';
   cheerMultiplier?: number;  // 1.2
+
+  // Pre-Battle Item System
+  itemApplied?: boolean;
+  itemSide?: 'P1' | 'P2';
+  itemType?: BattleItemType;
+  itemEffect?: string;  // e.g., "×1.15", "×0.85", "CRIT BLOCKED"
+}
+
+// ============================================
+// Pre-Battle Item Types
+// ============================================
+
+export type BattleItemType = 'BOOST' | 'SHIELD' | 'CANCEL_CRIT';
+
+export interface BattleItemInput {
+  p1?: BattleItemType | null;
+  p2?: BattleItemType | null;
 }
 
 export interface BattleResult {
@@ -155,4 +172,49 @@ export interface BattleResult {
     newSkill?: string;
     upgradedSkill?: string;
   };
+  totalDamageP1?: number;
+  totalDamageP2?: number;
+  turnCount?: number;
 }
+
+export interface BattleRewardData {
+  battleId: string;
+  userId: string;
+  result: 'win' | 'loss' | 'draw';
+  creditsEarned: number;
+  xpEarned: number;
+  createdAt: any; // Firestore Timestamp
+}
+
+// ============================================
+// ============================================
+// Variant (Cosmetic Synthesis) Types
+// ============================================
+
+export type VariantSource = 'A' | 'B';
+export type VariantPaletteMode = 'A' | 'B' | 'HALF';
+
+export interface AppearanceRecipe {
+  headSource: VariantSource;
+  bodySource: VariantSource;
+  armsSource: VariantSource;
+  legsSource: VariantSource;
+  accessorySource: VariantSource | 'NONE';
+  paletteMode: VariantPaletteMode;
+  overlayKey?: string;
+}
+
+export interface VariantData {
+  id?: string;
+  name?: string;
+  parentRobotIds: [string, string]; // [A, B]
+  appearanceRecipe: AppearanceRecipe;
+  parts: RobotParts;
+  colors: RobotColors;
+  createdAt?: any;
+  updatedAt?: any;
+}
+
+export type FighterRef =
+  | { kind: 'robot'; id: string }
+  | { kind: 'variant'; id: string };

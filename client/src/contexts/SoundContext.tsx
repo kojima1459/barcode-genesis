@@ -1,11 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 
-type SoundType = 'bgm_menu' | 'bgm_battle' | 'se_click' | 'se_scan' | 'se_attack' | 'se_win' | 'se_lose' | 'se_levelup';
+type SoundType = 'bgm_menu' | 'bgm_battle' | 'se_click' | 'se_scan' | 'se_attack' | 'se_win' | 'se_lose' | 'se_levelup' | 'se_equip';
 
 interface SoundContextType {
   playBGM: (type: 'bgm_menu' | 'bgm_battle') => void;
   stopBGM: () => void;
-  playSE: (type: 'se_click' | 'se_scan' | 'se_attack' | 'se_win' | 'se_lose' | 'se_levelup') => void;
+  playSE: (type: 'se_click' | 'se_scan' | 'se_attack' | 'se_win' | 'se_lose' | 'se_levelup' | 'se_equip') => void;
   volume: number;
   setVolume: (volume: number) => void;
   isMuted: boolean;
@@ -32,6 +32,7 @@ export function SoundProvider({ children }: { children: React.ReactNode }) {
     se_win: '/sounds/se_win.mp3',
     se_lose: '/sounds/se_lose.mp3',
     se_levelup: '/sounds/se_levelup.mp3',
+    se_equip: '/sounds/se_click.mp3',
   };
 
   // 初期化時にSEをプリロード
@@ -79,7 +80,7 @@ export function SoundProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const playSE = (type: 'se_click' | 'se_scan' | 'se_attack' | 'se_win' | 'se_lose' | 'se_levelup') => {
+  const playSE = (type: 'se_click' | 'se_scan' | 'se_attack' | 'se_win' | 'se_lose' | 'se_levelup' | 'se_equip') => {
     const audio = seRefs.current.get(type);
     if (audio) {
       audio.currentTime = 0;

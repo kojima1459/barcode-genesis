@@ -87,20 +87,9 @@ export default function Home() {
       setMissionsLoading(true);
       setMissionsError(null);
       try {
-        const idToken = await auth.currentUser?.getIdToken();
-        const response = await fetch('/api/getDailyMissions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': idToken ? `Bearer ${idToken}` : '',
-          },
-          body: JSON.stringify({ data: {} }), // Callable format
-        });
-
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-        const result = await response.json();
-        const data = result.result as { dateKey: string; missions: Mission[] };
+        const getMissions = httpsCallable(functions, "getDailyMissions");
+        const result = await getMissions();
+        const data = result.data as { dateKey: string; missions: Mission[] };
         setMissionDateKey(data.dateKey);
         setMissions(Array.isArray(data.missions) ? data.missions : []);
       } catch (error) {

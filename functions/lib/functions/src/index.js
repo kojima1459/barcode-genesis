@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.scanBarcodeFromImage = exports.checkMatchStatus = exports.leaveMatchmaking = exports.joinMatchmaking = exports.stripeWebhook = exports.createPortalSession = exports.createSubscriptionSession = exports.createCheckoutSession = exports.applyCosmeticItem = exports.useUpgradeItem = exports.checkAchievements = exports.updateRanking = exports.followUser = exports.claimMissionReward = exports.getDailyMissions = exports.claimLoginBonus = exports.equipItem = exports.purchaseItem = exports.inheritSkill = exports.synthesizeRobots = exports.matchBattle = exports.evolveRobot = exports.batchDisassemble = exports.generateRobot = exports.ping = exports.debugPing = exports.testFunctionHealth = void 0;
+exports.resolveFighterData = exports.createVariant = exports.scanBarcodeFromImage = exports.checkMatchStatus = exports.leaveMatchmaking = exports.joinMatchmaking = exports.stripeWebhook = exports.createPortalSession = exports.createSubscriptionSession = exports.createCheckoutSession = exports.applyCosmeticItem = exports.useUpgradeItem = exports.checkAchievements = exports.updateRanking = exports.followUser = exports.claimMissionReward = exports.getDailyMissions = exports.claimLoginBonus = exports.equipItem = exports.purchaseItem = exports.inheritSkill = exports.synthesizeRobots = exports.matchBattle = exports.evolveRobot = exports.batchDisassemble = exports.generateRobot = exports.ping = exports.debugPing = exports.testFunctionHealth = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
@@ -10,6 +10,8 @@ const robotGenerator_1 = require("./robotGenerator");
 const battleSystem_1 = require("./battleSystem");
 const skills_1 = require("./skills");
 const seededRandom_1 = require("./seededRandom");
+const levelSystem_1 = require("./levelSystem");
+const variantSystem_1 = require("./variantSystem");
 // Node.js 20 has native fetch - no need for node-fetch
 // Use a version constant to help track deployments and identify cache issues
 const VERSION = "2.1.0-fixed-cors-v3";
@@ -84,6 +86,30 @@ const getYesterdayJstDateKey = () => {
 const buildDailyMissions = () => {
     return DAILY_MISSIONS.map((mission) => (Object.assign(Object.assign({}, mission), { progress: 0, claimed: false })));
 };
+const updateMissionProgressInternal = async (t, userRef, dateKey, missionId, increment = 1) => {
+    const missionsRef = userRef.collection("missions").doc(dateKey);
+    const missionSnap = await t.get(missionsRef);
+    let missions;
+    if (!missionSnap.exists) {
+        missions = buildDailyMissions();
+    }
+    else {
+        const data = missionSnap.data();
+        missions = (data && Array.isArray(data.missions)) ? data.missions : buildDailyMissions();
+    }
+    const updatedMissions = missions.map((m) => {
+        if (m.id === missionId && !m.claimed) {
+            const currentProgress = typeof m.progress === "number" ? m.progress : 0;
+            return Object.assign(Object.assign({}, m), { progress: Math.min(m.target || 1, currentProgress + increment) });
+        }
+        return m;
+    });
+    t.set(missionsRef, {
+        missions: updatedMissions,
+        dateKey,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+};
 const getUserCredits = (user) => {
     var _a;
     const credits = (_a = user === null || user === void 0 ? void 0 : user.credits) !== null && _a !== void 0 ? _a : 0;
@@ -133,6 +159,8 @@ exports.generateRobot = functions.https.onCall(async (data, context) => {
                 dailyGenerationCount: currentDailyCount + 1,
                 updatedAt: serverTimestamp
             }, { merge: true });
+            // Daily Mission: Scan Barcode
+            await updateMissionProgressInternal(t, userRef, todayKey, "scan_barcode");
         });
         return {
             robotId: robotRef.id,
@@ -417,28 +445,35 @@ const findOpponent = async (db, playerId, playerRating) => {
     };
 };
 const BATTLE_ITEM_IDS = ['repair_kit', 'attack_boost', 'defense_boost', 'critical_lens'];
+const calculateReward = (result) => {
+    switch (result) {
+        case 'win': return { credits: 2, xp: 10 };
+        case 'loss': return { credits: 0, xp: 3 };
+        case 'draw': return { credits: 1, xp: 5 };
+    }
+};
+const DAILY_CREDIT_CAP = 20;
 exports.matchBattle = functions.https.onCall(async (data, context) => {
-    var _a, _b;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
     if (!context.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'Auth required');
     }
-    const { playerRobotId, useItemId, cheer } = data;
+    const { playerRobotId, useItemId, cheer, battleItems, fighterRef } = data;
+    const pFighterRef = fighterRef || { kind: 'robot', id: playerRobotId };
     const userId = context.auth.uid;
     const db = admin.firestore();
     // アイテムID検証
     if (useItemId && !BATTLE_ITEM_IDS.includes(useItemId)) {
         throw new functions.https.HttpsError('invalid-argument', 'Invalid battle item');
     }
+    // Pre-battle item validation
+    const validBattleItemTypes = ['BOOST', 'SHIELD', 'CANCEL_CRIT'];
+    if ((battleItems === null || battleItems === void 0 ? void 0 : battleItems.p1) && !validBattleItemTypes.includes(battleItems.p1)) {
+        throw new functions.https.HttpsError('invalid-argument', 'Invalid P1 battle item type');
+    }
     try {
         // 1. プレイヤーロボット取得
-        const playerRobotSnap = await db
-            .collection('users').doc(userId)
-            .collection('robots').doc(playerRobotId)
-            .get();
-        if (!playerRobotSnap.exists) {
-            throw new functions.https.HttpsError('not-found', 'Robot not found');
-        }
-        const playerRobot = Object.assign({ id: playerRobotSnap.id }, playerRobotSnap.data());
+        const playerRobot = await resolveFighterData(userId, pFighterRef);
         // 2. プレイヤー情報取得（ランキングポイント）
         const playerSnap = await db.collection('users').doc(userId).get();
         const player = playerSnap.data() || {};
@@ -452,6 +487,15 @@ exports.matchBattle = functions.https.onCall(async (data, context) => {
                 throw new functions.https.HttpsError('failed-precondition', 'Item not in inventory');
             }
         }
+        // Pre-battle item credit check (1 credit per item)
+        const BATTLE_ITEM_CREDIT_COST = 1;
+        const battleItemCost = (battleItems === null || battleItems === void 0 ? void 0 : battleItems.p1) ? BATTLE_ITEM_CREDIT_COST : 0;
+        if (battleItemCost > 0) {
+            const credits = getUserCredits(player);
+            if (credits < battleItemCost) {
+                throw new functions.https.HttpsError('resource-exhausted', 'クレジットが不足しています（アイテム使用）');
+            }
+        }
         // 3. 対戦相手選択
         const opponent = await findOpponent(db, userId, playerRating);
         const opponentRobot = Object.assign(Object.assign({}, opponent.robot), { id: opponent.robot.id || 'opponent_robot' });
@@ -460,7 +504,9 @@ exports.matchBattle = functions.https.onCall(async (data, context) => {
         const playerItems = useItemId ? [useItemId] : [];
         // Pass cheer input: p1 = player, p2 = opponent
         const cheerInput = cheer ? { p1: !!cheer.p1, p2: !!cheer.p2 } : undefined;
-        const battleResult = (0, battleSystem_1.simulateBattle)(playerRobot, opponentRobot, battleId, playerItems, cheerInput);
+        // Pass battle items: p1 = player, p2 = opponent (opponent doesn't use items in PvE)
+        const battleItemInput = (battleItems === null || battleItems === void 0 ? void 0 : battleItems.p1) ? { p1: battleItems.p1, p2: null } : undefined;
+        const battleResult = (0, battleSystem_1.simulateBattle)(playerRobot, opponentRobot, battleId, playerItems, cheerInput, battleItemInput);
         // 勝敗判定
         const winnerIsPlayer = battleResult.winnerId === playerRobot.id;
         const winnerIsOpponent = battleResult.winnerId === opponentRobot.id;
@@ -477,11 +523,42 @@ exports.matchBattle = functions.https.onCall(async (data, context) => {
         if (opponent.isCPU) {
             ratingChange = Math.round(ratingChange * 0.5);
         }
-        // 6. 経験値計算
-        const experienceGained = battleResult.rewards.exp;
+        // 6. 報酬計算
+        const baseRewards = calculateReward(resultType);
+        const earnedXp = baseRewards.xp;
         // 7. Firestore更新（トランザクション）
-        await db.runTransaction(async (transaction) => {
+        const txnReward = await db.runTransaction(async (transaction) => {
             var _a, _b;
+            // ユーザーデータ再取得（クレジット/DailyCapの整合性確保）
+            const userRef = db.collection('users').doc(userId);
+            const userSnap = await transaction.get(userRef);
+            if (!userSnap.exists)
+                throw new functions.https.HttpsError('not-found', 'User not found in transaction');
+            const userData = userSnap.data() || {};
+            // Idempotency: 既に処理済みの場合はスキップ
+            const battleResultRef = userRef.collection('battleResults').doc(battleId);
+            const battleResultSnap = await transaction.get(battleResultRef);
+            if (battleResultSnap.exists) {
+                return null;
+            }
+            // Calculate Credits with Daily Cap
+            const todayKey = getJstDateKey();
+            const lastDateKey = userData.dailyEarnedDateKey;
+            let currentDailyCredits = 0;
+            if (lastDateKey === todayKey) {
+                currentDailyCredits = userData.dailyEarnedCredits || 0;
+            }
+            let earnedCredits = baseRewards.credits;
+            let dailyCapApplied = false;
+            if (currentDailyCredits + earnedCredits > DAILY_CREDIT_CAP) {
+                earnedCredits = Math.max(0, DAILY_CREDIT_CAP - currentDailyCredits);
+                dailyCapApplied = true;
+            }
+            const newDailyCredits = (lastDateKey === todayKey ? currentDailyCredits : 0) + earnedCredits;
+            // User Level Update
+            const currentUserLevel = userData.level || 1;
+            const currentUserXp = userData.xp || 0;
+            const lvlResult = (0, levelSystem_1.applyUserXp)(currentUserLevel, currentUserXp, earnedXp);
             // アイテム消費
             if (useItemId) {
                 const itemRef = db.collection('users').doc(userId).collection('inventory').doc(useItemId);
@@ -499,30 +576,53 @@ exports.matchBattle = functions.https.onCall(async (data, context) => {
                 id: battleId,
                 playerId: userId,
                 playerUsername: player.username || 'Unknown',
-                playerRobotId: playerRobotId,
+                playerRobotId: playerRobot.id,
                 playerRobotSnapshot: playerRobot,
                 opponentId: opponent.user.uid,
                 opponentUsername: opponentUser.username,
                 opponentRobotSnapshot: opponentRobot,
                 winner: resultType === 'win' ? 'player' : resultType === 'loss' ? 'opponent' : 'draw',
-                turnCount: battleResult.logs.length,
+                turnCount: battleResult.turnCount || battleResult.logs.length,
+                totalDamageP1: battleResult.totalDamageP1,
+                totalDamageP2: battleResult.totalDamageP2,
                 playerFinalHp: 0,
                 opponentFinalHp: 0,
-                experienceGained,
+                experienceGained: earnedXp,
                 rankingPointsChange: ratingChange,
                 battleLog: battleResult.logs,
+                rewards: {
+                    credits: earnedCredits, xp: earnedXp, dailyCapApplied,
+                    levelUp: lvlResult.leveledUp, newLevel: lvlResult.newLevel, newWorkshopLines: lvlResult.workshopLines
+                },
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                duration: 0 // placeholder
+                duration: 0
+            });
+            // User Battle Result (Idempotency)
+            transaction.set(battleResultRef, {
+                battleId,
+                userId,
+                result: resultType,
+                creditsEarned: earnedCredits,
+                xpEarned: earnedXp,
+                createdAt: admin.firestore.FieldValue.serverTimestamp()
             });
             // プレイヤー統計更新
             const playerUpdates = {
+                level: lvlResult.newLevel,
+                xp: lvlResult.newXp,
+                workshopLines: lvlResult.workshopLines,
                 totalBattles: admin.firestore.FieldValue.increment(1),
                 rankingPoints: admin.firestore.FieldValue.increment(ratingChange),
+                credits: admin.firestore.FieldValue.increment(earnedCredits - battleItemCost),
+                dailyEarnedCredits: newDailyCredits,
+                dailyEarnedDateKey: todayKey,
                 updatedAt: admin.firestore.FieldValue.serverTimestamp()
             };
             if (winnerIsPlayer) {
                 playerUpdates.totalWins = admin.firestore.FieldValue.increment(1);
                 playerUpdates.currentWinStreak = admin.firestore.FieldValue.increment(1);
+                // Daily Mission: Win Battle
+                await updateMissionProgressInternal(transaction, db.collection("users").doc(userId), todayKey, "win_battle");
             }
             else if (winnerIsOpponent) {
                 playerUpdates.totalLosses = admin.firestore.FieldValue.increment(1);
@@ -533,10 +633,7 @@ exports.matchBattle = functions.https.onCall(async (data, context) => {
             }
             transaction.update(db.collection('users').doc(userId), playerUpdates);
             // ロボット統計更新
-            // simulateBattle handles level up logic, we need to adapt it here or keep it.
-            // The original startBattle had leveling logic inside transaction.
-            // We should replicate that.
-            const currentExp = getRobotXp(playerRobot) + experienceGained;
+            const currentExp = getRobotXp(playerRobot) + earnedXp;
             const currentLevel = playerRobot.level || 1;
             const expToNextLevel = currentLevel * 100;
             let robotUpdates = {
@@ -545,12 +642,12 @@ exports.matchBattle = functions.https.onCall(async (data, context) => {
                 updatedAt: admin.firestore.FieldValue.serverTimestamp()
             };
             if (winnerIsPlayer) {
-                robotUpdates.wins = admin.firestore.FieldValue.increment(1); // Using wins as per previous implementation
-                robotUpdates.totalWins = admin.firestore.FieldValue.increment(1); // Added for spec
+                robotUpdates.wins = admin.firestore.FieldValue.increment(1);
+                robotUpdates.totalWins = admin.firestore.FieldValue.increment(1);
             }
             else if (winnerIsOpponent) {
-                robotUpdates.losses = admin.firestore.FieldValue.increment(1); // Using losses
-                robotUpdates.totalLosses = admin.firestore.FieldValue.increment(1); // Added for spec
+                robotUpdates.losses = admin.firestore.FieldValue.increment(1);
+                robotUpdates.totalLosses = admin.firestore.FieldValue.increment(1);
             }
             // Level Up Logic
             if (currentExp >= expToNextLevel) {
@@ -571,18 +668,29 @@ exports.matchBattle = functions.https.onCall(async (data, context) => {
                     }
                 }
             }
-            transaction.update(db.collection('users').doc(userId).collection('robots').doc(playerRobotId), robotUpdates);
+            if (!playerRobot.isVariant) {
+                transaction.update(db.collection('users').doc(userId).collection('robots').doc(playerRobot.id), robotUpdates);
+            }
+            return { earnedCredits, earnedXp, dailyCapApplied, lvlResult };
         });
         return {
             battleId,
+            resolvedPlayerRobot: playerRobot,
             result: {
                 winner: resultType === 'win' ? 'player' : resultType === 'loss' ? 'opponent' : 'draw',
                 log: battleResult.logs,
-                // Adapt to frontend expectations if necessary
             },
-            experienceGained,
+            experienceGained: (_c = txnReward === null || txnReward === void 0 ? void 0 : txnReward.earnedXp) !== null && _c !== void 0 ? _c : 0,
             rankingPointsChange: ratingChange,
-            rewards: battleResult.rewards // Pass rewards for UI
+            rewards: {
+                exp: (_d = txnReward === null || txnReward === void 0 ? void 0 : txnReward.earnedXp) !== null && _d !== void 0 ? _d : 0,
+                credits: (_e = txnReward === null || txnReward === void 0 ? void 0 : txnReward.earnedCredits) !== null && _e !== void 0 ? _e : 0,
+                coins: (_f = txnReward === null || txnReward === void 0 ? void 0 : txnReward.earnedCredits) !== null && _f !== void 0 ? _f : 0,
+                dailyCapApplied: (_g = txnReward === null || txnReward === void 0 ? void 0 : txnReward.dailyCapApplied) !== null && _g !== void 0 ? _g : false,
+                levelUp: (_h = txnReward === null || txnReward === void 0 ? void 0 : txnReward.lvlResult) === null || _h === void 0 ? void 0 : _h.leveledUp,
+                newLevel: (_j = txnReward === null || txnReward === void 0 ? void 0 : txnReward.lvlResult) === null || _j === void 0 ? void 0 : _j.newLevel,
+                newWorkshopLines: (_k = txnReward === null || txnReward === void 0 ? void 0 : txnReward.lvlResult) === null || _k === void 0 ? void 0 : _k.workshopLines
+            }
         };
     }
     catch (error) {
@@ -644,6 +752,10 @@ exports.synthesizeRobots = functions.https.onCall(async (data, context) => {
             level: newLevel,
             updatedAt: admin.firestore.FieldValue.serverTimestamp()
         });
+        // Daily Mission: Synthesize
+        const todayKey = getJstDateKey();
+        const userRef = admin.firestore().collection("users").doc(userId);
+        await updateMissionProgressInternal(t, userRef, todayKey, "synthesize");
         materialRefs.forEach((ref) => t.delete(ref));
         return { baseRobotId: baseRef.id, newLevel, newXp };
     });
@@ -1640,4 +1752,128 @@ exports.checkMatchStatus = functions.https.onCall(async (data, context) => {
 // Gemini API Barcode Scanner
 var geminiScanner_1 = require("./geminiScanner");
 Object.defineProperty(exports, "scanBarcodeFromImage", { enumerable: true, get: function () { return geminiScanner_1.scanBarcodeFromImage; } });
+// ============================================
+// Variant System Functions
+// ============================================
+exports.createVariant = functions.https.onCall(async (data, context) => {
+    const db = admin.firestore();
+    if (!context.auth)
+        throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
+    const uid = context.auth.uid;
+    const { robotIdA, robotIdB, name } = data;
+    if (!robotIdA || !robotIdB)
+        throw new functions.https.HttpsError('invalid-argument', 'Missing parents');
+    // Transaction for safety (Credits & Limit)
+    return db.runTransaction(async (t) => {
+        // 1. Fetch User & Robots
+        const userRef = db.collection('users').doc(uid);
+        const rARef = db.collection('users').doc(uid).collection('robots').doc(robotIdA);
+        const rBRef = db.collection('users').doc(uid).collection('robots').doc(robotIdB);
+        const [userDoc, rA, rB] = await Promise.all([
+            t.get(userRef),
+            t.get(rARef),
+            t.get(rBRef)
+        ]);
+        if (!rA.exists || !rB.exists)
+            throw new functions.https.HttpsError('not-found', 'Parent not found');
+        const userData = userDoc.data() || {};
+        const limit = userData.workshopLines || 0;
+        // 2. Check Capacity (Count variants)
+        // Note: Transactional count of collection is strict. 
+        // Optimization: Store 'variantCount' on userDoc if scale is high. For now, reading all keys is barely OK if limit is small (e.g. 10).
+        // Or just count() query (requires aggregation query which is not transactional in older SDKs? Modern Firebase supports it).
+        // Simple approach: trust existing count or just allow slight overage.
+        // User requirement: "Strict". I'll use `get()` size if small. Default limit starts at 3. Max likely 20.
+        const vSnap = await t.get(db.collection('users').doc(uid).collection('variants'));
+        if (vSnap.size >= limit) {
+            throw new functions.https.HttpsError('resource-exhausted', `Workshop full`);
+        }
+        // 3. Check Cost / Daily Free
+        const VARIANT_COST = 5;
+        const nowJST = new Date().toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
+        const lastFree = userData.lastFreeVariantDate; // "YYYY-M-D" string expected
+        let isFree = false;
+        let chargedCredits = 0;
+        if (lastFree !== nowJST) {
+            isFree = true;
+        }
+        else {
+            if ((userData.credits || 0) < VARIANT_COST) {
+                throw new functions.https.HttpsError('failed-precondition', 'Insufficient credits');
+            }
+            chargedCredits = VARIANT_COST;
+        }
+        // 4. Generate Recipe
+        const recipe = (0, variantSystem_1.generateVariantRecipe)(uid, robotIdA, robotIdB);
+        const sortedIds = [robotIdA, robotIdB].sort();
+        const pA = sortedIds[0] === robotIdA ? rA : rB;
+        const pB = sortedIds[1] === robotIdA ? rA : rB;
+        const appearance = (0, variantSystem_1.resolveVariantAppearance)(recipe, pA.data(), pB.data());
+        const variantRef = db.collection('users').doc(uid).collection('variants').doc();
+        const variantData = {
+            id: variantRef.id,
+            name: (name === null || name === void 0 ? void 0 : name.slice(0, 20)) || `Variant ${variantRef.id.slice(0, 4)}`,
+            parentRobotIds: [sortedIds[0], sortedIds[1]],
+            appearanceRecipe: recipe,
+            parts: appearance.parts,
+            colors: appearance.colors,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        };
+        // 5. Writes
+        t.set(variantRef, variantData);
+        const userUpdates = {
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        };
+        if (isFree) {
+            userUpdates.lastFreeVariantDate = nowJST;
+        }
+        else {
+            userUpdates.credits = (userData.credits || 0) - chargedCredits;
+        }
+        t.update(userRef, userUpdates);
+        // Return extended info
+        return {
+            variantId: variantRef.id,
+            variant: variantData,
+            chargedCredits,
+            usedFreeToday: isFree,
+            remainingLines: limit - (vSnap.size + 1)
+        };
+    });
+});
+async function resolveFighterData(uid, ref, transaction) {
+    var _a;
+    const db = admin.firestore();
+    const id = typeof ref === 'string' ? ref : ref.id;
+    const kind = typeof ref === 'string' ? 'robot' : ref.kind;
+    if (kind === 'robot') {
+        const docRef = db.collection('users').doc(uid).collection('robots').doc(id);
+        const doc = transaction ? await transaction.get(docRef) : await docRef.get();
+        if (!doc.exists)
+            throw new functions.https.HttpsError('not-found', 'Robot not found');
+        return Object.assign(Object.assign({}, doc.data()), { id: doc.id });
+    }
+    else {
+        const docRef = db.collection('users').doc(uid).collection('variants').doc(id);
+        const vDoc = transaction ? await transaction.get(docRef) : await docRef.get();
+        if (!vDoc.exists)
+            throw new functions.https.HttpsError('not-found', 'Variant not found');
+        const vData = vDoc.data();
+        const p1Ref = db.collection('users').doc(uid).collection('robots').doc(vData.parentRobotIds[0]);
+        const p2Ref = db.collection('users').doc(uid).collection('robots').doc(vData.parentRobotIds[1]);
+        const [p1, p2] = await Promise.all([
+            transaction ? transaction.get(p1Ref) : p1Ref.get(),
+            transaction ? transaction.get(p2Ref) : p2Ref.get()
+        ]);
+        if (!p1.exists || !p2.exists)
+            throw new functions.https.HttpsError('failed-precondition', 'Parent robot missing');
+        const rA = Object.assign(Object.assign({}, p1.data()), { id: p1.id });
+        const rB = Object.assign(Object.assign({}, p2.data()), { id: p2.id });
+        const stats = (0, variantSystem_1.resolveVariantStats)(rA, rB);
+        const appearance = (0, variantSystem_1.resolveVariantAppearance)(vData.appearanceRecipe, rA, rB);
+        return Object.assign(Object.assign({ id: vData.id, userId: uid, name: `Variant ${(_a = vData.id) === null || _a === void 0 ? void 0 : _a.slice(0, 4)}`, sourceBarcode: 'FUSION' }, stats), { parts: appearance.parts, colors: appearance.colors, skills: rA.skills, isVariant: true, variantId: vData.id, totalBattles: 0, totalWins: 0, isFavorite: false, level: rA.level || 1, xp: 0 });
+    }
+}
+exports.resolveFighterData = resolveFighterData;
 //# sourceMappingURL=index.js.map

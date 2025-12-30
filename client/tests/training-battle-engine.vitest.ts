@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { simulateBattle, getTrainingBattleId, BattleRobotData, CheerInput, BattleLog } from '../src/lib/battleEngine';
+import { simulateBattle, getTrainingBattleId, BattleRobotData, CheerInput, BattleLog, normalizePair, normalizeTrainingInput } from '../src/lib/battleEngine';
 
 const createTestRobot = (id: string, name: string, attack: number, defense: number, speed: number): BattleRobotData => ({
     id,
@@ -235,7 +235,6 @@ describe('Training Battle Engine: getTrainingBattleId (Normalized Order)', () =>
 
 describe('Training Battle Engine: normalizeTrainingInput', () => {
     it('should normalize robots to lexicographic order', () => {
-        const { normalizePair, normalizeTrainingInput } = require('../src/lib/battleEngine');
 
         // Already in order
         const pair1 = normalizePair('robot-a', 'robot-b');
@@ -249,7 +248,6 @@ describe('Training Battle Engine: normalizeTrainingInput', () => {
     });
 
     it('should swap cheer when robots are swapped', () => {
-        const { normalizeTrainingInput } = require('../src/lib/battleEngine');
 
         const robot1 = createTestRobot('robot-z', 'Zeta', 30, 10, 20);
         const robot2 = createTestRobot('robot-a', 'Alpha', 25, 15, 10);
@@ -266,7 +264,6 @@ describe('Training Battle Engine: normalizeTrainingInput', () => {
     });
 
     it('should not swap when already in order', () => {
-        const { normalizeTrainingInput } = require('../src/lib/battleEngine');
 
         const robot1 = createTestRobot('robot-a', 'Alpha', 30, 10, 20);
         const robot2 = createTestRobot('robot-z', 'Zeta', 25, 15, 10);

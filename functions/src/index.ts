@@ -5,9 +5,11 @@ import { onDocumentUpdated } from "firebase-functions/v2/firestore";
 import { randomInt } from "crypto";
 import { assertRobotNotExists, DuplicateRobotError, generateRobotFromBarcode, InvalidBarcodeError } from "./robotGenerator";
 import { simulateBattle } from "./battleSystem";
-import { GenerateRobotRequest, GenerateRobotResponse } from "./types";
+import { GenerateRobotRequest, GenerateRobotResponse, VariantData, FighterRef } from "./types";
 import { getRandomSkill, normalizeSkillIds } from "./skills";
 import { SeededRandom } from "./seededRandom";
+import { applyUserXp } from "./levelSystem";
+import { generateVariantRecipe, resolveVariantStats, resolveVariantAppearance } from "./variantSystem";
 // Node.js 20 has native fetch - no need for node-fetch
 
 
@@ -101,6 +103,38 @@ const buildDailyMissions = () => {
   }));
 };
 
+const updateMissionProgressInternal = async (
+  t: admin.firestore.Transaction,
+  userRef: admin.firestore.DocumentReference,
+  dateKey: string,
+  missionId: string,
+  increment: number = 1
+) => {
+  const missionsRef = userRef.collection("missions").doc(dateKey);
+  const missionSnap = await t.get(missionsRef);
+  let missions: any[];
+  if (!missionSnap.exists) {
+    missions = buildDailyMissions();
+  } else {
+    const data = missionSnap.data();
+    missions = (data && Array.isArray(data.missions)) ? data.missions : buildDailyMissions();
+  }
+
+  const updatedMissions = missions.map((m: any) => {
+    if (m.id === missionId && !m.claimed) {
+      const currentProgress = typeof m.progress === "number" ? m.progress : 0;
+      return { ...m, progress: Math.min(m.target || 1, currentProgress + increment) };
+    }
+    return m;
+  });
+
+  t.set(missionsRef, {
+    missions: updatedMissions,
+    dateKey,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  }, { merge: true });
+};
+
 const getUserCredits = (user: any): number => {
   const credits = user?.credits ?? 0;
   return typeof credits === "number" ? credits : 0;
@@ -176,6 +210,9 @@ export const generateRobot = functions.https.onCall(async (data: GenerateRobotRe
         dailyGenerationCount: currentDailyCount + 1,
         updatedAt: serverTimestamp
       }, { merge: true });
+
+      // Daily Mission: Scan Barcode
+      await updateMissionProgressInternal(t, userRef, todayKey, "scan_barcode");
     });
 
     return {
@@ -523,12 +560,22 @@ const findOpponent = async (db: admin.firestore.Firestore, playerId: string, pla
 
 const BATTLE_ITEM_IDS = ['repair_kit', 'attack_boost', 'defense_boost', 'critical_lens'];
 
+const calculateReward = (result: 'win' | 'loss' | 'draw') => {
+  switch (result) {
+    case 'win': return { credits: 2, xp: 10 };
+    case 'loss': return { credits: 0, xp: 3 };
+    case 'draw': return { credits: 1, xp: 5 };
+  }
+};
+const DAILY_CREDIT_CAP = 20;
+
 export const matchBattle = functions.https.onCall(async (data: any, context) => {
   if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'Auth required');
   }
 
-  const { playerRobotId, useItemId, cheer } = data;
+  const { playerRobotId, useItemId, cheer, battleItems, fighterRef } = data;
+  const pFighterRef = fighterRef || { kind: 'robot', id: playerRobotId };
   const userId = context.auth.uid;
   const db = admin.firestore();
 
@@ -537,18 +584,15 @@ export const matchBattle = functions.https.onCall(async (data: any, context) => 
     throw new functions.https.HttpsError('invalid-argument', 'Invalid battle item');
   }
 
+  // Pre-battle item validation
+  const validBattleItemTypes = ['BOOST', 'SHIELD', 'CANCEL_CRIT'];
+  if (battleItems?.p1 && !validBattleItemTypes.includes(battleItems.p1)) {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid P1 battle item type');
+  }
+
   try {
     // 1. プレイヤーロボット取得
-    const playerRobotSnap = await db
-      .collection('users').doc(userId)
-      .collection('robots').doc(playerRobotId)
-      .get();
-
-    if (!playerRobotSnap.exists) {
-      throw new functions.https.HttpsError('not-found', 'Robot not found');
-    }
-
-    const playerRobot = { id: playerRobotSnap.id, ...playerRobotSnap.data() } as any;
+    const playerRobot = await resolveFighterData(userId, pFighterRef);
 
     // 2. プレイヤー情報取得（ランキングポイント）
     const playerSnap = await db.collection('users').doc(userId).get();
@@ -565,6 +609,16 @@ export const matchBattle = functions.https.onCall(async (data: any, context) => 
       }
     }
 
+    // Pre-battle item credit check (1 credit per item)
+    const BATTLE_ITEM_CREDIT_COST = 1;
+    const battleItemCost = battleItems?.p1 ? BATTLE_ITEM_CREDIT_COST : 0;
+    if (battleItemCost > 0) {
+      const credits = getUserCredits(player);
+      if (credits < battleItemCost) {
+        throw new functions.https.HttpsError('resource-exhausted', 'クレジットが不足しています（アイテム使用）');
+      }
+    }
+
     // 3. 対戦相手選択
     const opponent = await findOpponent(db, userId, playerRating);
     const opponentRobot = { ...opponent.robot, id: opponent.robot.id || 'opponent_robot' };
@@ -574,7 +628,9 @@ export const matchBattle = functions.https.onCall(async (data: any, context) => 
     const playerItems = useItemId ? [useItemId] : [];
     // Pass cheer input: p1 = player, p2 = opponent
     const cheerInput = cheer ? { p1: !!cheer.p1, p2: !!cheer.p2 } : undefined;
-    const battleResult = simulateBattle(playerRobot as any, opponentRobot as any, battleId, playerItems, cheerInput);
+    // Pass battle items: p1 = player, p2 = opponent (opponent doesn't use items in PvE)
+    const battleItemInput = battleItems?.p1 ? { p1: battleItems.p1, p2: null } : undefined;
+    const battleResult = simulateBattle(playerRobot as any, opponentRobot as any, battleId, playerItems, cheerInput, battleItemInput);
 
     // 勝敗判定
     const winnerIsPlayer = battleResult.winnerId === playerRobot.id;
@@ -596,11 +652,46 @@ export const matchBattle = functions.https.onCall(async (data: any, context) => 
       ratingChange = Math.round(ratingChange * 0.5);
     }
 
-    // 6. 経験値計算
-    const experienceGained = battleResult.rewards.exp;
+    // 6. 報酬計算
+    const baseRewards = calculateReward(resultType);
+    const earnedXp = baseRewards.xp;
 
     // 7. Firestore更新（トランザクション）
-    await db.runTransaction(async (transaction) => {
+    const txnReward = await db.runTransaction(async (transaction) => {
+      // ユーザーデータ再取得（クレジット/DailyCapの整合性確保）
+      const userRef = db.collection('users').doc(userId);
+      const userSnap = await transaction.get(userRef);
+      if (!userSnap.exists) throw new functions.https.HttpsError('not-found', 'User not found in transaction');
+      const userData = userSnap.data() || {};
+
+      // Idempotency: 既に処理済みの場合はスキップ
+      const battleResultRef = userRef.collection('battleResults').doc(battleId);
+      const battleResultSnap = await transaction.get(battleResultRef);
+      if (battleResultSnap.exists) {
+        return null;
+      }
+
+      // Calculate Credits with Daily Cap
+      const todayKey = getJstDateKey();
+      const lastDateKey = userData.dailyEarnedDateKey;
+      let currentDailyCredits = 0;
+      if (lastDateKey === todayKey) {
+        currentDailyCredits = userData.dailyEarnedCredits || 0;
+      }
+
+      let earnedCredits = baseRewards.credits;
+      let dailyCapApplied = false;
+      if (currentDailyCredits + earnedCredits > DAILY_CREDIT_CAP) {
+        earnedCredits = Math.max(0, DAILY_CREDIT_CAP - currentDailyCredits);
+        dailyCapApplied = true;
+      }
+      const newDailyCredits = (lastDateKey === todayKey ? currentDailyCredits : 0) + earnedCredits;
+
+      // User Level Update
+      const currentUserLevel = userData.level || 1;
+      const currentUserXp = userData.xp || 0;
+      const lvlResult = applyUserXp(currentUserLevel, currentUserXp, earnedXp);
+
       // アイテム消費
       if (useItemId) {
         const itemRef = db.collection('users').doc(userId).collection('inventory').doc(useItemId);
@@ -615,37 +706,63 @@ export const matchBattle = functions.https.onCall(async (data: any, context) => 
           updatedAt: admin.firestore.FieldValue.serverTimestamp()
         });
       }
+
       // バトル結果保存
       transaction.set(db.collection('battles').doc(battleId), {
         id: battleId,
         playerId: userId,
         playerUsername: player.username || 'Unknown',
-        playerRobotId: playerRobotId,
+        playerRobotId: playerRobot.id,
         playerRobotSnapshot: playerRobot,
         opponentId: opponent.user.uid,
         opponentUsername: opponentUser.username,
         opponentRobotSnapshot: opponentRobot,
         winner: resultType === 'win' ? 'player' : resultType === 'loss' ? 'opponent' : 'draw',
-        turnCount: battleResult.logs.length, // logs array length is roughly turn count * 2 actions
-        playerFinalHp: 0, // simulateBattle doesn't return final HP in result, needed fix if critical. Using logs or 0 for now.
+        turnCount: battleResult.turnCount || battleResult.logs.length,
+        totalDamageP1: battleResult.totalDamageP1,
+        totalDamageP2: battleResult.totalDamageP2,
+        playerFinalHp: 0,
         opponentFinalHp: 0,
-        experienceGained,
+        experienceGained: earnedXp,
         rankingPointsChange: ratingChange,
         battleLog: battleResult.logs,
+        rewards: {
+          credits: earnedCredits, xp: earnedXp, dailyCapApplied,
+          levelUp: lvlResult.leveledUp, newLevel: lvlResult.newLevel, newWorkshopLines: lvlResult.workshopLines
+        },
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        duration: 0 // placeholder
+        duration: 0
+      });
+
+      // User Battle Result (Idempotency)
+      transaction.set(battleResultRef, {
+        battleId,
+        userId,
+        result: resultType,
+        creditsEarned: earnedCredits,
+        xpEarned: earnedXp,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
       });
 
       // プレイヤー統計更新
       const playerUpdates: any = {
+        level: lvlResult.newLevel,
+        xp: lvlResult.newXp,
+        workshopLines: lvlResult.workshopLines,
         totalBattles: admin.firestore.FieldValue.increment(1),
         rankingPoints: admin.firestore.FieldValue.increment(ratingChange),
+        credits: admin.firestore.FieldValue.increment(earnedCredits - battleItemCost),
+        dailyEarnedCredits: newDailyCredits,
+        dailyEarnedDateKey: todayKey,
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       };
 
       if (winnerIsPlayer) {
         playerUpdates.totalWins = admin.firestore.FieldValue.increment(1);
         playerUpdates.currentWinStreak = admin.firestore.FieldValue.increment(1);
+
+        // Daily Mission: Win Battle
+        await updateMissionProgressInternal(transaction, db.collection("users").doc(userId), todayKey, "win_battle");
       } else if (winnerIsOpponent) {
         playerUpdates.totalLosses = admin.firestore.FieldValue.increment(1);
         playerUpdates.currentWinStreak = 0;
@@ -656,26 +773,22 @@ export const matchBattle = functions.https.onCall(async (data: any, context) => 
       transaction.update(db.collection('users').doc(userId), playerUpdates);
 
       // ロボット統計更新
-      // simulateBattle handles level up logic, we need to adapt it here or keep it.
-      // The original startBattle had leveling logic inside transaction.
-      // We should replicate that.
-
-      const currentExp = getRobotXp(playerRobot) + experienceGained;
+      const currentExp = getRobotXp(playerRobot) + earnedXp;
       const currentLevel = playerRobot.level || 1;
       const expToNextLevel = currentLevel * 100;
 
       let robotUpdates: any = {
-        xp: currentExp, // Using xp as per previous implementation
-        totalBattles: admin.firestore.FieldValue.increment(1), // Added for spec
+        xp: currentExp,
+        totalBattles: admin.firestore.FieldValue.increment(1),
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       };
 
       if (winnerIsPlayer) {
-        robotUpdates.wins = admin.firestore.FieldValue.increment(1); // Using wins as per previous implementation
-        robotUpdates.totalWins = admin.firestore.FieldValue.increment(1); // Added for spec
+        robotUpdates.wins = admin.firestore.FieldValue.increment(1);
+        robotUpdates.totalWins = admin.firestore.FieldValue.increment(1);
       } else if (winnerIsOpponent) {
-        robotUpdates.losses = admin.firestore.FieldValue.increment(1); // Using losses
-        robotUpdates.totalLosses = admin.firestore.FieldValue.increment(1); // Added for spec
+        robotUpdates.losses = admin.firestore.FieldValue.increment(1);
+        robotUpdates.totalLosses = admin.firestore.FieldValue.increment(1);
       }
 
       // Level Up Logic
@@ -699,22 +812,34 @@ export const matchBattle = functions.https.onCall(async (data: any, context) => 
         }
       }
 
-      transaction.update(
-        db.collection('users').doc(userId).collection('robots').doc(playerRobotId),
-        robotUpdates
-      );
+      if (!playerRobot.isVariant) {
+        transaction.update(
+          db.collection('users').doc(userId).collection('robots').doc(playerRobot.id),
+          robotUpdates
+        );
+      }
+
+      return { earnedCredits, earnedXp, dailyCapApplied, lvlResult };
     });
 
     return {
       battleId,
+      resolvedPlayerRobot: playerRobot,
       result: {
         winner: resultType === 'win' ? 'player' : resultType === 'loss' ? 'opponent' : 'draw',
         log: battleResult.logs,
-        // Adapt to frontend expectations if necessary
       },
-      experienceGained,
+      experienceGained: txnReward?.earnedXp ?? 0,
       rankingPointsChange: ratingChange,
-      rewards: battleResult.rewards // Pass rewards for UI
+      rewards: {
+        exp: txnReward?.earnedXp ?? 0,
+        credits: txnReward?.earnedCredits ?? 0,
+        coins: txnReward?.earnedCredits ?? 0,
+        dailyCapApplied: txnReward?.dailyCapApplied ?? false,
+        levelUp: txnReward?.lvlResult?.leveledUp,
+        newLevel: txnReward?.lvlResult?.newLevel,
+        newWorkshopLines: txnReward?.lvlResult?.workshopLines
+      }
     };
 
   } catch (error) {
@@ -791,6 +916,11 @@ export const synthesizeRobots = functions.https.onCall(async (data: any, context
       level: newLevel,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
+
+    // Daily Mission: Synthesize
+    const todayKey = getJstDateKey();
+    const userRef = admin.firestore().collection("users").doc(userId);
+    await updateMissionProgressInternal(t, userRef, todayKey, "synthesize");
 
     materialRefs.forEach((ref) => t.delete(ref));
 
@@ -2001,3 +2131,160 @@ export const checkMatchStatus = functions.https.onCall(async (data: { queueId: s
 
 // Gemini API Barcode Scanner
 export { scanBarcodeFromImage } from "./geminiScanner";
+
+// ============================================
+// Variant System Functions
+// ============================================
+
+export const createVariant = functions.https.onCall(async (data: any, context) => {
+  const db = admin.firestore();
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
+  const uid = context.auth.uid;
+  const { robotIdA, robotIdB, name } = data;
+
+  if (!robotIdA || !robotIdB) throw new functions.https.HttpsError('invalid-argument', 'Missing parents');
+
+  // Transaction for safety (Credits & Limit)
+  return db.runTransaction(async (t) => {
+    // 1. Fetch User & Robots
+    const userRef = db.collection('users').doc(uid);
+    const rARef = db.collection('users').doc(uid).collection('robots').doc(robotIdA);
+    const rBRef = db.collection('users').doc(uid).collection('robots').doc(robotIdB);
+
+    const [userDoc, rA, rB] = await Promise.all([
+      t.get(userRef),
+      t.get(rARef),
+      t.get(rBRef)
+    ]);
+
+    if (!rA.exists || !rB.exists) throw new functions.https.HttpsError('not-found', 'Parent not found');
+    const userData = userDoc.data() || {};
+    const limit = userData.workshopLines || 0;
+
+    // 2. Check Capacity (Count variants)
+    // Note: Transactional count of collection is strict. 
+    // Optimization: Store 'variantCount' on userDoc if scale is high. For now, reading all keys is barely OK if limit is small (e.g. 10).
+    // Or just count() query (requires aggregation query which is not transactional in older SDKs? Modern Firebase supports it).
+    // Simple approach: trust existing count or just allow slight overage.
+    // User requirement: "Strict". I'll use `get()` size if small. Default limit starts at 3. Max likely 20.
+    const vSnap = await t.get(db.collection('users').doc(uid).collection('variants'));
+    if (vSnap.size >= limit) {
+      throw new functions.https.HttpsError('resource-exhausted', `Workshop full`);
+    }
+
+    // 3. Check Cost / Daily Free
+    const VARIANT_COST = 5;
+    const nowJST = new Date().toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
+    const lastFree = userData.lastFreeVariantDate; // "YYYY-M-D" string expected
+
+    let isFree = false;
+    let chargedCredits = 0;
+
+    if (lastFree !== nowJST) {
+      isFree = true;
+    } else {
+      if ((userData.credits || 0) < VARIANT_COST) {
+        throw new functions.https.HttpsError('failed-precondition', 'Insufficient credits');
+      }
+      chargedCredits = VARIANT_COST;
+    }
+
+    // 4. Generate Recipe
+    const recipe = generateVariantRecipe(uid, robotIdA, robotIdB);
+    const sortedIds = [robotIdA, robotIdB].sort();
+    const pA = sortedIds[0] === robotIdA ? rA : rB;
+    const pB = sortedIds[1] === robotIdA ? rA : rB;
+    const appearance = resolveVariantAppearance(recipe, pA.data() as any, pB.data() as any);
+
+    const variantRef = db.collection('users').doc(uid).collection('variants').doc();
+    const variantData: VariantData = {
+      id: variantRef.id,
+      name: name?.slice(0, 20) || `Variant ${variantRef.id.slice(0, 4)}`, // Use provided name or default
+      parentRobotIds: [sortedIds[0], sortedIds[1]],
+      appearanceRecipe: recipe,
+      parts: appearance.parts,
+      colors: appearance.colors,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    // 5. Writes
+    t.set(variantRef, variantData);
+
+    const userUpdates: any = {
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+    if (isFree) {
+      userUpdates.lastFreeVariantDate = nowJST;
+    } else {
+      userUpdates.credits = (userData.credits || 0) - chargedCredits;
+    }
+    t.update(userRef, userUpdates);
+
+    // Return extended info
+    return {
+      variantId: variantRef.id,
+      variant: variantData,
+      chargedCredits,
+      usedFreeToday: isFree,
+      remainingLines: limit - (vSnap.size + 1)
+    };
+  });
+});
+
+export async function resolveFighterData(
+  uid: string,
+  ref: FighterRef | string,
+  transaction?: admin.firestore.Transaction
+): Promise<any> {
+  const db = admin.firestore();
+  const id = typeof ref === 'string' ? ref : ref.id;
+  const kind = typeof ref === 'string' ? 'robot' : ref.kind;
+
+  if (kind === 'robot') {
+    const docRef = db.collection('users').doc(uid).collection('robots').doc(id);
+    const doc = transaction ? await transaction.get(docRef) : await docRef.get();
+    if (!doc.exists) throw new functions.https.HttpsError('not-found', 'Robot not found');
+    return { ...doc.data(), id: doc.id };
+  } else {
+    const docRef = db.collection('users').doc(uid).collection('variants').doc(id);
+    const vDoc = transaction ? await transaction.get(docRef) : await docRef.get();
+    if (!vDoc.exists) throw new functions.https.HttpsError('not-found', 'Variant not found');
+    const vData = vDoc.data() as VariantData;
+
+    const p1Ref = db.collection('users').doc(uid).collection('robots').doc(vData.parentRobotIds[0]);
+    const p2Ref = db.collection('users').doc(uid).collection('robots').doc(vData.parentRobotIds[1]);
+
+    const [p1, p2] = await Promise.all([
+      transaction ? transaction.get(p1Ref) : p1Ref.get(),
+      transaction ? transaction.get(p2Ref) : p2Ref.get()
+    ]);
+
+    if (!p1.exists || !p2.exists) throw new functions.https.HttpsError('failed-precondition', 'Parent robot missing');
+
+    const rA = { ...p1.data(), id: p1.id } as any;
+    const rB = { ...p2.data(), id: p2.id } as any;
+
+    const stats = resolveVariantStats(rA, rB);
+    const appearance = resolveVariantAppearance(vData.appearanceRecipe, rA, rB);
+
+    return {
+      id: vData.id,
+      userId: uid,
+      name: `Variant ${vData.id?.slice(0, 4)}`,
+      sourceBarcode: 'FUSION',
+      ...stats,
+      parts: appearance.parts,
+      colors: appearance.colors,
+      skills: rA.skills,
+      isVariant: true,
+      variantId: vData.id,
+      totalBattles: 0,
+      totalWins: 0,
+      isFavorite: false,
+      level: rA.level || 1,
+      xp: 0
+    };
+  }
+}
+

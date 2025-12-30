@@ -13,16 +13,18 @@ import { Link } from "wouter";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { RobotData, BattleResult, MatchBattleResponse, MatchmakingResponse } from "@/types/shared";
+import { RobotData, VariantData, BattleResult, MatchBattleResponse, MatchmakingResponse } from "@/types/shared";
 import ShareButton from "@/components/ShareButton";
 import { useSound } from "@/contexts/SoundContext";
 import { getItemLabel } from "@/lib/items";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion, AnimatePresence } from "framer-motion";
 import { Zap, Shield, Heart } from "lucide-react";
 import SEO from "@/components/SEO";
 import { useRobotFx } from "@/hooks/useRobotFx";
 import { simulateBattle as simulateTrainingBattle, getTrainingBattleId, BattleRobotData, normalizeTrainingInput, toBattleRobotData } from "@/lib/battleEngine";
+import { doc } from "firebase/firestore"; // Added doc
+import { BattleItemType } from "@/types/shared"; // Added BattleItemType
 
 
 
@@ -32,6 +34,7 @@ export default function Battle() {
   const { fx, trigger } = useRobotFx();
   const { user } = useAuth();
   const [robots, setRobots] = useState<RobotData[]>([]);
+  const [variants, setVariants] = useState<VariantData[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRobotId, setSelectedRobotId] = useState<string | null>(null);
   const [enemyRobotId, setEnemyRobotId] = useState<string | null>(null);
@@ -62,6 +65,22 @@ export default function Battle() {
   // Cheer (応援) state - Pre-battle reservation (server-side)
   const [cheerP1, setCheerP1] = useState(false);  // Reserve cheer for P1 (player)
   const [cheerP2, setCheerP2] = useState(false);  // Reserve cheer for P2 (opponent)
+
+  // Pre-Battle Item state
+  const [selectedBattleItem, setSelectedBattleItem] = useState<BattleItemType | null>(null);
+  const [credits, setCredits] = useState(0);
+  const BATTLE_ITEM_COST = 1;
+
+  // Use Firestore doc listener for credits
+  useEffect(() => {
+    if (!user) return;
+    const unsub = onSnapshot(doc(db, "users", user.uid), (snapshot) => {
+      if (snapshot.exists()) {
+        setCredits(snapshot.data().credits || 0);
+      }
+    });
+    return () => unsub();
+  }, [user]);
 
   // Visual effects state
   const [activeEffect, setActiveEffect] = useState<{ element: string; x: number; y: number } | null>(null);
@@ -122,6 +141,10 @@ export default function Battle() {
         const snapshot = await getDocs(q);
         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as RobotData));
         setRobots(data);
+        const vQ = query(collection(db, "users", user.uid, "variants"), orderBy("createdAt", "desc"));
+        const vSnap = await getDocs(vQ);
+        const vData = vSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as VariantData));
+        setVariants(vData);
       } catch (error) {
         console.error(error);
         toast.error("Failed to load your robots");
@@ -303,6 +326,11 @@ export default function Battle() {
 
     // トレーニングモードの場合は決定的ローカルシミュレーション
     if (isTrainingMode) {
+      if (variants.some(v => v.id === selectedRobotId)) {
+        toast.error("Variants not supported in Training Mode yet");
+        setIsBattling(false);
+        return;
+      }
       const myRobot = robots.find(r => r.id === selectedRobotId);
       const enemyRobot = robots.find(r => r.id === enemyRobotId);
       if (!myRobot || !enemyRobot) {
@@ -318,7 +346,9 @@ export default function Battle() {
       // Normalize robot order for consistent results (same 2 robots -> same battle)
       const { p1, p2, normalizedCheer } = normalizeTrainingInput(rawP1, rawP2, { p1: cheerP1, p2: cheerP2 });
       const battleId = getTrainingBattleId(p1.id!, p2.id!);
-      const result = simulateTrainingBattle(p1, p2, battleId, normalizedCheer);
+
+      const battleItemsInput = selectedBattleItem ? { p1: selectedBattleItem, p2: null } : undefined;
+      const result = simulateTrainingBattle(p1, p2, battleId, normalizedCheer, battleItemsInput);
       setBattleResult(result);
       playBattleLogs(result);
 
@@ -336,10 +366,16 @@ export default function Battle() {
     // 通常対戦モード
     try {
       const matchBattleFn = httpsCallable(functions, 'matchBattle');
+
+      const isVariant = variants.find(v => v.id === selectedRobotId);
+      const fighterRef = isVariant ? { kind: 'variant', id: selectedRobotId } : { kind: 'robot', id: selectedRobotId };
+
       const result = await matchBattleFn({
         playerRobotId: selectedRobotId,
+        fighterRef,
         useItemId: (!isTrainingMode && selectedItemId) ? selectedItemId : undefined,
-        cheer: { p1: cheerP1, p2: cheerP2 }  // Pass cheer reservation
+        cheer: { p1: cheerP1, p2: cheerP2 },  // Pass cheer reservation
+        battleItems: selectedBattleItem ? { p1: selectedBattleItem, p2: null } : undefined // Pre-Battle Items (Consumes credits)
       });
       // Safety: Use type assertion with the defined interface, validating at runtime implicitly by property access structure
       const data = result.data as MatchBattleResponse;
@@ -350,7 +386,8 @@ export default function Battle() {
           winnerId: data.result.winner === 'player' ? selectedRobotId : enemyRobotId!,
           loserId: data.result.winner === 'player' ? enemyRobotId! : selectedRobotId,
           logs: data.result.log || [],
-          rewards: data.rewards || { exp: data.experienceGained || 0, coins: 0 }
+          rewards: data.rewards || { exp: data.experienceGained || 0, coins: 0 },
+          resolvedPlayerRobot: data.resolvedPlayerRobot
         };
         setBattleResult(battleResult);
         // ログ再生開始
@@ -414,6 +451,30 @@ export default function Battle() {
         playSE('se_levelup');
       }
 
+      // ============================================
+      // PRE-BATTLE ITEM SYSTEM: Display activation
+      // ============================================
+      if (log.itemApplied && log.itemType) {
+        let msg = "";
+        let icon = "";
+        switch (log.itemType) {
+          case 'BOOST':
+            icon = "⚡";
+            msg = `ブースト発動！ (${log.itemEffect || 'Atk UP'})`;
+            break;
+          case 'SHIELD':
+            icon = "🛡️";
+            msg = `シールド発動！ (${log.itemEffect || 'Dmg Down'})`;
+            break;
+          case 'CANCEL_CRIT':
+            icon = "🤞";
+            msg = `お守りがクリティカルを防いだ！`;
+            break;
+        }
+        toast.success(`${icon} ${msg}`, { duration: 2000 });
+        playSE('se_equip');
+      }
+
       // VFX Logic
       if (log.damage > 0) {
         playSE('se_attack');
@@ -472,12 +533,16 @@ export default function Battle() {
     }, 1200);
   };
 
-  const myRobot = robots.find(r => r.id === selectedRobotId);
+  const myRobot = robots.find(r => r.id === selectedRobotId)
+    || (variants.find(v => v.id === selectedRobotId) ? { ...variants.find(v => v.id === selectedRobotId), name: `Variant ${selectedRobotId?.slice(0, 4)}`, baseHp: 0 } as any : null)
+    || battleResult?.resolvedPlayerRobot;
   const enemyRobot = enemyRobots.find(r => r.id === enemyRobotId) || robots.find(r => r.id === enemyRobotId);
 
   // 現在のHP計算
   const getCurrentHp = (robotId: string) => {
     if (currentLogIndex === -1) {
+      if (robotId === myRobot?.id) return myRobot.baseHp || 0;
+      if (robotId === enemyRobot?.id) return enemyRobot.baseHp || 0;
       const robot = robots.find(r => r.id === robotId);
       return robot ? robot.baseHp : 0;
     }
@@ -525,24 +590,53 @@ export default function Battle() {
                 <div className="text-xs text-muted-foreground mb-2">
                   {t('your_id')}: <span className="font-mono bg-secondary px-1 rounded select-all">{user?.uid}</span>
                 </div>
-                <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto">
-                  {robots.map(robot => {
-                    const { level } = getLevelInfo(robot);
-                    return (
-                      <div
-                        key={robot.id}
-                        onClick={() => setSelectedRobotId(robot.id)}
-                        className={`p-2 border rounded cursor-pointer hover:bg-secondary/10 ${selectedRobotId === robot.id ? 'border-primary bg-primary/10' : ''}`}
-                      >
-                        <div className="text-sm font-bold truncate">{robot.name}</div>
-                        <div className="flex justify-between items-center text-xs text-muted-foreground">
-                          <span>Lv.{level}</span>
-                          <span>HP: {robot.baseHp}</span>
+                <Tabs defaultValue="robots" className="w-full">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="robots">Original ({robots.length})</TabsTrigger>
+                    <TabsTrigger value="variants">Fusion ({variants.length})</TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="robots" className="mt-2">
+                    <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto">
+                      {robots.map(robot => {
+                        const { level } = getLevelInfo(robot);
+                        return (
+                          <div
+                            key={robot.id}
+                            onClick={() => setSelectedRobotId(robot.id)}
+                            className={`p-2 border rounded cursor-pointer hover:bg-secondary/10 ${selectedRobotId === robot.id ? 'border-primary bg-primary/10' : ''}`}
+                          >
+                            <div className="text-sm font-bold truncate">{robot.name}</div>
+                            <div className="flex justify-between items-center text-xs text-muted-foreground">
+                              <span>Lv.{level}</span>
+                              <span>HP: {robot.baseHp}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {robots.length === 0 && <div className="col-span-2 text-center text-xs text-muted-foreground p-4">No robots found.</div>}
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="variants" className="mt-2">
+                    <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto">
+                      {variants.map(v => (
+                        <div
+                          key={v.id}
+                          onClick={() => setSelectedRobotId(v.id!)}
+                          className={`p-2 border rounded cursor-pointer hover:bg-secondary/10 ${selectedRobotId === v.id ? 'border-primary bg-primary/10' : ''}`}
+                        >
+                          <div className="text-sm font-bold truncate">Variant {v.id?.slice(0, 4)}</div>
+                          <div className="flex justify-between items-center text-xs text-muted-foreground">
+                            <span>Fusion</span>
+                            <span>HP: ??</span>
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                      ))}
+                      {variants.length === 0 && <div className="col-span-2 text-center text-xs text-muted-foreground p-4">No variants created. Create one in Workshop!</div>}
+                    </div>
+                  </TabsContent>
+                </Tabs>
 
                 <div className="mt-6 pt-4 border-t">
                   <label className="text-sm font-bold mb-2 block">{t('battle_item') || 'Battle Item'}</label>
@@ -698,46 +792,133 @@ export default function Battle() {
             </Card>
 
             <div className="md:col-span-2 flex flex-col items-center gap-4">
-              {/* Pre-Battle Cheer Reservation */}
+              {/* Pre-Battle Items & Cheer */}
               {!isTrainingMode && (
-                <div className="flex gap-6 items-center glass-panel px-6 py-3 rounded-lg">
-                  <span className="text-sm text-muted-foreground">応援予約:</span>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={cheerP1}
-                      onChange={(e) => {
-                        const newVal = e.target.checked;
-                        setCheerP1(newVal);
-                        if (newVal) {
-                          toast.message('観客が青側に肩入れした！', { duration: 2000 });
-                          playSE('se_levelup');
-                        } else {
-                          toast.message('声援が引っ込んだ…', { duration: 1500 });
-                        }
-                      }}
-                      className="w-4 h-4 accent-cyan-500"
-                    />
-                    <span className="text-cyan-400 font-bold text-sm">青を焚きつける(P1)</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={cheerP2}
-                      onChange={(e) => {
-                        const newVal = e.target.checked;
-                        setCheerP2(newVal);
-                        if (newVal) {
-                          toast.message('観客が赤側を焚きつけた！', { duration: 2000 });
-                          playSE('se_levelup');
-                        } else {
-                          toast.message('声援が引っ込んだ…', { duration: 1500 });
-                        }
-                      }}
-                      className="w-4 h-4 accent-red-500"
-                    />
-                    <span className="text-red-400 font-bold text-sm">赤を焚きつける(P2)</span>
-                  </label>
+                <div className="w-full space-y-4">
+                  {/* Battle Item Selection */}
+                  <div className="glass-panel p-4 rounded-lg space-y-3">
+                    <div className="flex justify-between items-center text-sm border-b border-white/10 pb-2">
+                      <span className="font-bold flex items-center gap-2">
+                        <Sword className="w-4 h-4 text-primary" /> バトルアイテム (消費: {BATTLE_ITEM_COST} cr)
+                      </span>
+                      <span className="font-mono text-neon-cyan drop-shadow-[0_0_5px_rgba(0,243,255,0.5)]">
+                        所持クレジット: {credits}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                      <Button
+                        variant={selectedBattleItem === null ? "secondary" : "ghost"}
+                        onClick={() => {
+                          if (selectedBattleItem !== null) toast.message("アイテム選択を解除しました", { duration: 1000 });
+                          setSelectedBattleItem(null);
+                        }}
+                        className={`h-20 flex flex-col gap-1 ${selectedBattleItem === null ? 'bg-primary/20 border-primary' : 'border-dashed'}`}
+                      >
+                        <span className="text-sm font-bold">なし</span>
+                        <span className="text-[10px] text-muted-foreground">0 cr</span>
+                      </Button>
+
+                      <Button
+                        variant={selectedBattleItem === 'BOOST' ? "default" : "outline"}
+                        onClick={() => {
+                          if (credits < BATTLE_ITEM_COST && selectedBattleItem !== 'BOOST') {
+                            toast.error('クレジットが不足しています');
+                            return;
+                          }
+                          setSelectedBattleItem('BOOST');
+                          toast.success("⚡ 観客席からブーストドリンクが投げ込まれた！（予約）");
+                          playSE('se_equip');
+                        }}
+                        className={`h-20 flex flex-col gap-1 relative overflow-hidden ${selectedBattleItem === 'BOOST' ? 'bg-amber-500/20 border-amber-500 text-amber-500 hover:bg-amber-500/30' : 'hover:border-amber-500/50'}`}
+                        disabled={credits < BATTLE_ITEM_COST && selectedBattleItem !== 'BOOST'}
+                      >
+                        <Zap className="w-5 h-5" />
+                        <span className="text-xs font-bold">ブースト</span>
+                        <span className="text-[10px] opacity-80">初撃ダメージ x1.15</span>
+                      </Button>
+
+                      <Button
+                        variant={selectedBattleItem === 'SHIELD' ? "default" : "outline"}
+                        onClick={() => {
+                          if (credits < BATTLE_ITEM_COST && selectedBattleItem !== 'SHIELD') {
+                            toast.error('クレジットが不足しています');
+                            return;
+                          }
+                          setSelectedBattleItem('SHIELD');
+                          toast.success("🛡️ 観客席からシールド発生装置が投げ込まれた！（予約）");
+                          playSE('se_equip');
+                        }}
+                        className={`h-20 flex flex-col gap-1 relative overflow-hidden ${selectedBattleItem === 'SHIELD' ? 'bg-blue-500/20 border-blue-500 text-blue-500 hover:bg-blue-500/30' : 'hover:border-blue-500/50'}`}
+                        disabled={credits < BATTLE_ITEM_COST && selectedBattleItem !== 'SHIELD'}
+                      >
+                        <Shield className="w-5 h-5" />
+                        <span className="text-xs font-bold">シールド</span>
+                        <span className="text-[10px] opacity-80">初撃軽減 x0.85</span>
+                      </Button>
+
+                      <Button
+                        variant={selectedBattleItem === 'CANCEL_CRIT' ? "default" : "outline"}
+                        onClick={() => {
+                          if (credits < BATTLE_ITEM_COST && selectedBattleItem !== 'CANCEL_CRIT') {
+                            toast.error('クレジットが不足しています');
+                            return;
+                          }
+                          setSelectedBattleItem('CANCEL_CRIT');
+                          toast.success("🤞 観客席からお守りが投げ込まれた！（予約）");
+                          playSE('se_equip');
+                        }}
+                        className={`h-20 flex flex-col gap-1 relative overflow-hidden ${selectedBattleItem === 'CANCEL_CRIT' ? 'bg-purple-500/20 border-purple-500 text-purple-500 hover:bg-purple-500/30' : 'hover:border-purple-500/50'}`}
+                        disabled={credits < BATTLE_ITEM_COST && selectedBattleItem !== 'CANCEL_CRIT'}
+                      >
+                        <Heart className="w-5 h-5" />
+                        <span className="text-xs font-bold">クリ無効</span>
+                        <span className="text-[10px] opacity-80">初クリティカル無効</span>
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Cheer Reservation */}
+                  <div className="flex flex-wrap gap-4 items-center glass-panel px-6 py-4 rounded-lg justify-center md:justify-start">
+                    <span className="text-sm font-bold flex items-center gap-2">
+                      <Users className="w-4 h-4 text-primary" /> 応援予約 (無料):
+                    </span>
+                    <label className="flex items-center gap-2 cursor-pointer hover:bg-white/5 p-2 rounded transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={cheerP1}
+                        onChange={(e) => {
+                          const newVal = e.target.checked;
+                          setCheerP1(newVal);
+                          if (newVal) {
+                            toast.message('観客が青側に肩入れした！', { duration: 2000 });
+                            playSE('se_levelup');
+                          } else {
+                            toast.message('声援が引っ込んだ…', { duration: 1500 });
+                          }
+                        }}
+                        className="w-4 h-4 accent-cyan-500"
+                      />
+                      <span className="text-cyan-400 font-bold text-sm">青を焚きつける(P1)</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer hover:bg-white/5 p-2 rounded transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={cheerP2}
+                        onChange={(e) => {
+                          const newVal = e.target.checked;
+                          setCheerP2(newVal);
+                          if (newVal) {
+                            toast.message('観客が赤側を焚きつけた！', { duration: 2000 });
+                            playSE('se_levelup');
+                          } else {
+                            toast.message('声援が引っ込んだ…', { duration: 1500 });
+                          }
+                        }}
+                        className="w-4 h-4 accent-red-500"
+                      />
+                      <span className="text-red-400 font-bold text-sm">赤を焚きつける(P2)</span>
+                    </label>
+                  </div>
                 </div>
               )}
 

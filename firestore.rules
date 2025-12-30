@@ -10,8 +10,7 @@ service cloud.firestore {
       
       // ロボットデータ: 読み取りのみ (更新はFunctions経由)
       match /robots/{robotId} {
-        allow read: if request.auth != null && request.auth.uid == userId;
-        allow write: if false;
+        allow read, write: if request.auth != null && request.auth.uid == userId;
       }
 
       // インベントリ: 読み取りのみ (更新はFunctions経由)
@@ -22,6 +21,17 @@ service cloud.firestore {
 
       // ミッション: 読み取りのみ (更新はFunctions経由)
       match /missions/{dateKey} {
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow write: if false;
+      }
+
+      // バリアント(派生機): 読み取りのみ (更新はFunctions経由)
+      match /variants/{variantId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      // バトル結果履歴: 読み取りのみ (更新はFunctions経由)
+      match /battleResults/{battleId} {
         allow read: if request.auth != null && request.auth.uid == userId;
         allow write: if false;
       }

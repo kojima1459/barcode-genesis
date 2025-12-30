@@ -35,6 +35,7 @@ const Terms = lazy(() => import("@/pages/legal/Terms"));
 const SpecifiedCommercial = lazy(() => import("@/pages/legal/SpecifiedCommercial"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const Scan = lazy(() => import("@/pages/Scan"));
+const Workshop = lazy(() => import("@/pages/Workshop"));
 
 // Loading fallback component
 function PageLoader() {
@@ -108,6 +109,9 @@ function Router() {
               </Route>
               <Route path="/guide">
                 <ProtectedRoute component={Guide} />
+              </Route>
+              <Route path="/workshop">
+                <ProtectedRoute component={Workshop} />
               </Route>
               <Route path="/404" component={NotFound} />
               {/* Final fallback route */}
