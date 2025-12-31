@@ -55,7 +55,7 @@ interface DexProgressBarProps {
 
 function DexProgressBar({ unlocked, total, percent, remaining }: DexProgressBarProps) {
   return (
-    <Card className="bg-gradient-to-r from-neon-cyan/5 to-neon-pink/5 border-white/10">
+    <Card className="bg-linear-to-r from-neon-cyan/5 to-neon-pink/5 border-white/10">
       <CardContent className="p-4 space-y-2">
         <div className="flex items-center justify-between">
           <div className="font-bold text-lg flex items-center gap-2">
@@ -73,7 +73,7 @@ function DexProgressBar({ unlocked, total, percent, remaining }: DexProgressBarP
         </div>
         <div className="w-full h-2 bg-black/40 rounded-full overflow-hidden">
           <motion.div
-            className="h-full bg-gradient-to-r from-neon-cyan to-neon-pink"
+            className="h-full bg-linear-to-r from-neon-cyan to-neon-pink"
             initial={{ width: 0 }}
             animate={{ width: `${percent}%` }}
             transition={{ duration: 0.8, ease: "easeOut" }}

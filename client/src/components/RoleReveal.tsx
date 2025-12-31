@@ -55,7 +55,7 @@ export default function RoleReveal({ roleName, roleTitle, isRare, onComplete, on
                 <div className="flex flex-col items-center gap-4 animate-[popIn_400ms_ease-out]">
                     {/* RARE badge */}
                     {isRare && (
-                        <div className="px-6 py-2 bg-gradient-to-r from-yellow-500 to-amber-400 rounded-full 
+                        <div className="px-6 py-2 bg-linear-to-r from-yellow-500 to-amber-400 rounded-full 
                           text-black font-bold text-xl tracking-widest
                           shadow-[0_0_30px_rgba(255,215,0,0.8)] animate-pulse">
                             ★ RARE ★
@@ -66,7 +66,7 @@ export default function RoleReveal({ roleName, roleTitle, isRare, onComplete, on
                     <div
                         className={`text-6xl md:text-8xl font-orbitron font-black tracking-wider
                        ${isRare
-                                ? 'text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-400 to-yellow-500 drop-shadow-[0_0_30px_gold]'
+                                ? 'text-transparent bg-clip-text bg-linear-to-r from-yellow-300 via-amber-400 to-yellow-500 drop-shadow-[0_0_30px_gold]'
                                 : 'text-neon-cyan drop-shadow-[0_0_20px_rgba(62,208,240,0.8)]'
                             }`}
                     >

@@ -191,7 +191,7 @@ export default function BossBattle() {
                     {/* Result Banner */}
                     <div className={cn(
                         "text-center py-8 rounded-xl border",
-                        isWin ? "bg-gradient-to-br from-yellow-500/20 to-orange-500/10 border-yellow-500/30" : "bg-gradient-to-br from-red-500/20 to-gray-500/10 border-red-500/30"
+                        isWin ? "bg-linear-to-br from-yellow-500/20 to-orange-500/10 border-yellow-500/30" : "bg-linear-to-br from-red-500/20 to-gray-500/10 border-red-500/30"
                     )}>
                         <Badge variant={isWin ? "default" : "secondary"} className="mb-4 text-lg px-4 py-2">
                             <Skull className="w-5 h-5 mr-2" />
@@ -280,13 +280,13 @@ export default function BossBattle() {
                 <Card className={cn(
                     "border-2",
                     BOSS_TYPE_COLORS[bossData.type],
-                    "bg-gradient-to-br from-red-500/10 to-orange-500/5"
+                    "bg-linear-to-br from-red-500/10 to-orange-500/5"
                 )}>
                     <CardContent className="p-6">
                         <div className="flex gap-6">
                             {/* Boss Visual */}
-                            <div className="w-32 h-32 relative flex-shrink-0">
-                                <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-red-500/30 to-orange-500/30 border border-red-500/50 animate-pulse" />
+                            <div className="w-32 h-32 relative shrink-0">
+                                <div className="absolute inset-0 rounded-xl bg-linear-to-br from-red-500/30 to-orange-500/30 border border-red-500/50 animate-pulse" />
                                 <RobotSVG
                                     parts={bossData.parts}
                                     colors={bossData.colors}

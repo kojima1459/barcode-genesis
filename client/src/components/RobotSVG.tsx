@@ -55,7 +55,9 @@ function RobotSVG({
   silhouette = false,
   variantKey = 0,
   isRareVariant = false,
-  simplified = false
+  simplified = false,
+  visuals,
+  rarityEffect
 }: RobotSVGProps) {
   const isLite = simplified || size < 100;
 
@@ -106,7 +108,7 @@ function RobotSVG({
   // Use sensor glow for all glow effects to unify the MS sensor feel
   // Use sensor glow for all glow effects to unify the MS sensor feel
   const activeGlow = sensorColor;
-  const { aura = 'none', decal = 'none', eyeGlow = 'normal', weaponIcon = 'none' } = props.visuals || {};
+  const { aura = 'none', decal = 'none', eyeGlow = 'normal', weaponIcon = 'none' } = visuals || {};
 
 
   // --- Constants (User Requirements) ---
@@ -469,10 +471,10 @@ function RobotSVG({
   };
 
   const RareEffect = () => {
-    if (!props.rarityEffect || props.rarityEffect === 'none') return null;
+    if (!rarityEffect || rarityEffect === 'none') return null;
     // Legendary/Rare sparkle
     return (
-      <circle cx="100" cy="100" r="90" fill="none" stroke={props.rarityEffect === 'legendary' ? 'gold' : 'cyan'} strokeWidth="1" strokeDasharray="4 4" opacity="0.5" className="animate-spin-slow" />
+      <circle cx="100" cy="100" r="90" fill="none" stroke={rarityEffect === 'legendary' ? 'gold' : 'cyan'} strokeWidth="1" strokeDasharray="4 4" opacity="0.5" className="animate-spin-slow" />
     );
   };
 

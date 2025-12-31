@@ -215,7 +215,7 @@ export default function Premium() {
                 </section>
 
                 {/* Pricing & CTA Section (Summary for Desktop / Info for Mobile) */}
-                <section className={`rounded-xl p-1 ${isPremium ? 'bg-gradient-to-br from-yellow-500/20 to-orange-500/10 border border-yellow-500/30' : 'bg-gradient-to-br from-neon-cyan/20 to-blue-600/10 border border-neon-cyan/30'}`}>
+                <section className={`rounded-xl p-1 ${isPremium ? 'bg-linear-to-br from-yellow-500/20 to-orange-500/10 border border-yellow-500/30' : 'bg-linear-to-br from-neon-cyan/20 to-blue-600/10 border border-neon-cyan/30'}`}>
                     <div className="bg-black/80 backdrop-blur rounded p-6 text-center space-y-4">
                         <h3 className="font-orbitron text-lg text-muted-foreground">{t('maintenance_cost')}</h3>
 

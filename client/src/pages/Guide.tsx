@@ -77,7 +77,7 @@ export default function Guide() {
 
                 <div className="flex justify-center pt-8">
                     <Link href="/premium">
-                        <Button size="lg" className="w-full md:w-auto bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-500 hover:to-yellow-400 text-white border-0">
+                        <Button size="lg" className="w-full md:w-auto bg-linear-to-r from-yellow-600 to-yellow-500 hover:from-yellow-500 hover:to-yellow-400 text-white border-0">
                             <Crown className="mr-2 h-5 w-5" />
                             プレミアムプランを見る
                         </Button>

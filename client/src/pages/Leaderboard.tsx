@@ -116,7 +116,7 @@ export default function Leaderboard() {
                       {getRankIcon(index)}
                     </div>
 
-                    <div className="relative w-12 h-12 mr-4 flex-shrink-0">
+                    <div className="relative w-12 h-12 mr-4 shrink-0">
                       <RobotSVG parts={robot.parts} colors={robot.colors} size={48} />
                     </div>
 

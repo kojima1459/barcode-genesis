@@ -187,7 +187,7 @@ export default function Collection() {
         </div>
         <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 transition-all duration-500"
+            className="h-full bg-linear-to-r from-cyan-500 to-blue-500 transition-all duration-500"
             style={{ width: `${progressPercent}%` }}
           />
         </div>

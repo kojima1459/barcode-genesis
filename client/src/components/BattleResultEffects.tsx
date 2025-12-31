@@ -1,6 +1,7 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { Trophy, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
+import { playGenerated } from "@/lib/sound";
 
 interface VictoryEffectProps {
     onComplete?: () => void;
@@ -11,6 +12,9 @@ export function VictoryEffect({ onComplete }: VictoryEffectProps) {
     const [particles, setParticles] = useState<Array<{ id: number; x: number; y: number; delay: number }>>([]);
 
     useEffect(() => {
+        // Play victory sound
+        playGenerated('win');
+
         if (prefersReducedMotion) {
             onComplete?.();
             return;
@@ -60,7 +64,7 @@ export function VictoryEffect({ onComplete }: VictoryEffectProps) {
                     </motion.div>
 
                     <motion.div
-                        className="text-6xl font-bold bg-gradient-to-r from-yellow-400 via-yellow-300 to-yellow-400 bg-clip-text text-transparent"
+                        className="text-6xl font-bold bg-linear-to-r from-yellow-400 via-yellow-300 to-yellow-400 bg-clip-text text-transparent"
                         style={{
                             textShadow: "0 0 30px rgba(250, 204, 21, 0.5)"
                         }}
@@ -150,6 +154,9 @@ export function DefeatEffect({ onComplete }: DefeatEffectProps) {
     const prefersReducedMotion = useReducedMotion();
 
     useEffect(() => {
+        // Play defeat sound
+        playGenerated('lose');
+
         if (prefersReducedMotion) {
             onComplete?.();
             return;

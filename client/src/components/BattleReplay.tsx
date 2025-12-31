@@ -14,6 +14,7 @@ import { playGenerated, setMuted as setGlobalMuted, getMuted } from "@/lib/sound
 import { AnimatedHPBar } from "@/components/AnimatedHPBar";
 import { VictoryEffect, DefeatEffect } from "@/components/BattleResultEffects";
 import { useScreenShake } from "@/hooks/useScreenShake";
+import { EnhancedDamageNumber } from "@/components/EnhancedDamageNumber";
 
 // Confetti Component
 const Confetti = () => (
@@ -66,7 +67,7 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
     // Visual States
     const [shakeId, setShakeId] = useState<string | null>(null);
     const [flashId, setFlashId] = useState<string | null>(null);
-    const [popups, setPopups] = useState<{ id: string, text: string, type: 'damage' | 'crit' | 'miss', targetId: string }[]>([]);
+    const [popups, setPopups] = useState<{ id: string, value: number, isCritical: boolean, isDodge: boolean, cheerApplied?: boolean, x: number, y: number, targetId: string }[]>([]);
     const [lungeId, setLungeId] = useState<string | null>(null);
 
     // NEW: Critical Slow-mo state
@@ -167,7 +168,7 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
 
                         // Sound
                         if (event.isMiss) {
-                            // miss sound
+                            playGenerated('miss'); // Whoosh sound for miss
                         } else if (event.isCritical) {
                             playGenerated('hit_heavy'); // Code-generated crit sound
                         } else {
@@ -178,15 +179,23 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
                 case 'DAMAGE_POPUP':
                     if (event.defenderId) {
                         const popupId = Math.random().toString();
-                        let text = String(event.damage);
-                        let type: 'damage' | 'crit' | 'miss' = 'damage';
-                        if (event.isMiss) { text = "MISS"; type = 'miss'; }
-                        else if (event.isCritical) { type = 'crit'; }
+                        const value = event.damage || 0;
+                        const isCritical = Boolean(event.isCritical);
+                        const isDodge = Boolean(event.isMiss);
 
-                        setPopups(prev => [...prev, { id: popupId, text, type, targetId: event.defenderId! }]);
+                        setPopups(prev => [...prev, {
+                            id: popupId,
+                            value,
+                            isCritical,
+                            isDodge,
+                            cheerApplied: event.cheerApplied,
+                            x: 50, // center
+                            y: 50, // center
+                            targetId: event.defenderId!
+                        }]);
                         setTimeout(() => {
                             setPopups(prev => prev.filter(p => p.id !== popupId));
-                        }, 1000);
+                        }, 1200);
                     }
                     break;
                 case 'HP_UPDATE':
@@ -529,7 +538,7 @@ function RobotCard({ robot, hpPercent, currentHp, isShaking, isLunging, isPlayer
             {/* HP Bar */}
             <div className="w-full mt-4 bg-panel/80 h-4 rounded-full overflow-hidden border border-white/20 relative">
                 <motion.div
-                    className={`h-full ${isPlayer ? 'bg-gradient-to-r from-neon-cyan to-blue-600' : 'bg-gradient-to-r from-neon-pink to-red-600'}`}
+                    className={`h-full ${isPlayer ? 'bg-linear-to-r from-neon-cyan to-blue-600' : 'bg-linear-to-r from-neon-pink to-red-600'}`}
                     animate={{ width: `${hpPercent}%` }}
                     transition={{ type: "spring", stiffness: 100, damping: 20 }}
                 />
@@ -538,21 +547,19 @@ function RobotCard({ robot, hpPercent, currentHp, isShaking, isLunging, isPlayer
                 HP: <span className="text-white text-lg font-orbitron">{Math.floor(currentHp ?? 0)}</span> / {robot.baseHp}
             </div>
 
-            {/* Popups */}
+            {/* Enhanced Damage Numbers */}
             <AnimatePresence>
-                {popups.map((p: any) => (
-                    <motion.div
+                {popups.map((p) => (
+                    <EnhancedDamageNumber
                         key={p.id}
-                        initial={{ opacity: 0, y: 0, scale: 0.5 }}
-                        animate={{ opacity: 1, y: -80, scale: p.type === 'crit' ? 2 : 1.5 }}
-                        exit={{ opacity: 0, scale: 0 }}
-                        className={`absolute top-1/2 left-1/2 -translate-x-1/2 z-50 font-black italic text-shadow-black
-                            ${p.type === 'crit' ? 'text-yellow-400 text-6xl' : (p.type === 'miss' ? 'text-gray-400 text-5xl' : 'text-white text-5xl')}
-                        `}
-                    >
-                        {p.text}
-                        {p.type === 'crit' && <div className="text-sm text-center">CRITICAL!</div>}
-                    </motion.div>
+                        value={p.value}
+                        isCritical={p.isCritical}
+                        isDodge={p.isDodge}
+                        cheerApplied={p.cheerApplied}
+                        x={p.x}
+                        y={p.y}
+                        onComplete={() => setPopups(prev => prev.filter(popup => popup.id !== p.id))}
+                    />
                 ))}
             </AnimatePresence>
         </motion.div>

@@ -74,7 +74,7 @@ const RobotCard = React.forwardRef<HTMLDivElement, RobotCardProps>(({ robot, use
                                 <span className="text-[10px] font-orbitron tracking-[0.2em] text-white/50 border border-white/20 px-2 py-0.5 rounded-sm">
                                     UNIT DESIGNATION
                                 </span>
-                                <div className="h-px w-20 bg-gradient-to-r from-white/30 to-transparent" />
+                                <div className="h-px w-20 bg-linear-to-r from-white/30 to-transparent" />
                             </div>
 
                             {robot.epithet && (
@@ -153,10 +153,10 @@ const RobotCard = React.forwardRef<HTMLDivElement, RobotCardProps>(({ robot, use
                 <div className="w-full relative z-20">
                     {/* Stats Grid */}
                     <div className="px-8 pb-4">
-                        <div className="grid grid-cols-3 gap-px bg-gradient-to-r from-transparent via-white/20 to-transparent p-px">
+                        <div className="grid grid-cols-3 gap-px bg-linear-to-r from-transparent via-white/20 to-transparent p-px">
                             {/* HP */}
                             <div className="bg-black/80 backdrop-blur-md p-4 flex flex-col items-center group relative overflow-hidden">
-                                <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-green-500/50 to-transparent opacity-50" />
+                                <div className="absolute top-0 inset-x-0 h-px bg-linear-to-r from-transparent via-green-500/50 to-transparent opacity-50" />
                                 <StatIconHP className="w-8 h-8 text-green-400 mb-2 drop-shadow-[0_0_8px_rgba(74,222,128,0.5)]" />
                                 <span className="text-[10px] text-gray-500 font-orbitron tracking-widest mb-1">DURABILITY</span>
                                 <span className="text-2xl font-bold text-white font-orbitron">
@@ -166,7 +166,7 @@ const RobotCard = React.forwardRef<HTMLDivElement, RobotCardProps>(({ robot, use
 
                             {/* ATK */}
                             <div className="bg-black/80 backdrop-blur-md p-4 flex flex-col items-center group relative overflow-hidden">
-                                <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-red-500/50 to-transparent opacity-50" />
+                                <div className="absolute top-0 inset-x-0 h-px bg-linear-to-r from-transparent via-red-500/50 to-transparent opacity-50" />
                                 <StatIconATK className="w-8 h-8 text-red-400 mb-2 drop-shadow-[0_0_8px_rgba(248,113,113,0.5)]" />
                                 <span className="text-[10px] text-gray-500 font-orbitron tracking-widest mb-1">OFFENSE</span>
                                 <span className="text-2xl font-bold text-white font-orbitron">
@@ -176,7 +176,7 @@ const RobotCard = React.forwardRef<HTMLDivElement, RobotCardProps>(({ robot, use
 
                             {/* DEF */}
                             <div className="bg-black/80 backdrop-blur-md p-4 flex flex-col items-center group relative overflow-hidden">
-                                <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-blue-500/50 to-transparent opacity-50" />
+                                <div className="absolute top-0 inset-x-0 h-px bg-linear-to-r from-transparent via-blue-500/50 to-transparent opacity-50" />
                                 <StatIconDEF className="w-8 h-8 text-blue-400 mb-2 drop-shadow-[0_0_8px_rgba(96,165,250,0.5)]" />
                                 <span className="text-[10px] text-gray-500 font-orbitron tracking-widest mb-1">DEFENSE</span>
                                 <span className="text-2xl font-bold text-white font-orbitron">
@@ -201,7 +201,7 @@ const RobotCard = React.forwardRef<HTMLDivElement, RobotCardProps>(({ robot, use
 
                         <div className="text-right">
                             <div className="text-2xl font-black italic tracking-tighter text-white leading-none">
-                                BARCODE <span className="text-transparent bg-clip-text bg-gradient-to-r from-neon-cyan to-blue-500">GENESIS</span>
+                                BARCODE <span className="text-transparent bg-clip-text bg-linear-to-r from-neon-cyan to-blue-500">GENESIS</span>
                             </div>
                             <div className="text-[9px] text-white/30 tracking-[0.3em] mt-1 uppercase">Tactical Unit Card</div>
                         </div>

@@ -55,8 +55,8 @@ export default function TutorialModal() {
 
         {/* Background Effects */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900/50 via-black to-black pointer-events-none" />
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-500 to-transparent opacity-50" />
-        <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-purple-500 to-transparent opacity-50" />
+        <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-transparent via-cyan-500 to-transparent opacity-50" />
+        <div className="absolute bottom-0 left-0 w-full h-1 bg-linear-to-r from-transparent via-purple-500 to-transparent opacity-50" />
 
         <div className="relative z-10 flex flex-col items-center justify-center p-8 pt-12 min-h-[400px]">
           <AnimatePresence mode="wait">
@@ -74,7 +74,7 @@ export default function TutorialModal() {
               </div>
 
               <DialogHeader className="mb-4 space-y-4">
-                <DialogTitle className="text-center text-3xl font-bold font-orbitron tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-white via-cyan-200 to-white">
+                <DialogTitle className="text-center text-3xl font-bold font-orbitron tracking-wider bg-clip-text text-transparent bg-linear-to-r from-white via-cyan-200 to-white">
                   {step === 0 && t('tutorial_welcome_title')}
                   {step === 1 && t('tutorial_step1_title')}
                   {step === 2 && t('tutorial_step2_title')}
@@ -97,7 +97,7 @@ export default function TutorialModal() {
               <div
                 key={i}
                 className={`transition-all duration-300 rounded-full ${i === step
-                  ? 'w-8 h-2 bg-gradient-to-r from-cyan-400 to-purple-400 shadow-[0_0_10px_rgba(34,211,238,0.5)]'
+                  ? 'w-8 h-2 bg-linear-to-r from-cyan-400 to-purple-400 shadow-[0_0_10px_rgba(34,211,238,0.5)]'
                   : 'w-2 h-2 bg-white/20'
                   }`}
               />

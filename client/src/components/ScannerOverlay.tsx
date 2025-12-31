@@ -24,7 +24,7 @@ export default function ScannerOverlay({ isScanning, status }: ScannerOverlayPro
 
             {/* Scanline Effect - moving line from top to bottom */}
             <motion.div
-                className="absolute left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-400 to-transparent opacity-80"
+                className="absolute left-0 right-0 h-[2px] bg-linear-to-r from-transparent via-cyan-400 to-transparent opacity-80"
                 animate={{
                     top: ['0%', '100%'],
                 }}

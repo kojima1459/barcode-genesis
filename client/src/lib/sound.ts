@@ -152,7 +152,7 @@ const getAudioContext = () => {
   return audioContext;
 };
 
-type GeneratedSoundType = "ui_click" | "ui_skip" | "hit_light" | "hit_heavy" | "win" | "lose";
+type GeneratedSoundType = "ui_click" | "ui_skip" | "hit_light" | "hit_heavy" | "win" | "lose" | "miss";
 
 export const playGenerated = (type: GeneratedSoundType) => {
   if (muted) return;
@@ -286,6 +286,23 @@ export const playGenerated = (type: GeneratedSoundType) => {
       gain.connect(ctx.destination);
       osc.start(now);
       osc.stop(now + 1.0);
+      break;
+    }
+    case "miss": {
+      // Miss/Whoosh: Quick frequency sweep for swipe effect
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(800, now);
+      osc.frequency.exponentialRampToValueAtTime(200, now + 0.12);
+
+      gain.gain.setValueAtTime(0.15, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.12);
       break;
     }
   }

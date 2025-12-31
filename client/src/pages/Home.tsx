@@ -281,7 +281,7 @@ export default function Home() {
 
   if (loading) {
     return (
-      <div className="min-h-[100dvh] bg-bg text-text pb-24 md:pb-8 flex flex-col">
+      <div className="min-h-dvh bg-bg text-text pb-24 md:pb-8 flex flex-col">
         {/* Global Header */}
         <GlobalHeader missions={missions} />
 
@@ -312,7 +312,7 @@ export default function Home() {
   const mainRobot = robots.length > 0 ? robots[0] : null;
 
   return (
-    <div className="min-h-[100dvh] flex flex-col text-text relative pb-24 md:pb-8">
+    <div className="min-h-dvh flex flex-col text-text relative pb-24 md:pb-8">
       {/* Background Effect */}
       <div className="fixed inset-0 bg-[url('/grid.svg')] opacity-10 pointer-events-none z-0" />
 
@@ -357,7 +357,7 @@ export default function Home() {
               {/* NEW: How To Start Card */}
               <section>
                 <Link href="/how-to">
-                  <div className="w-full bg-gradient-to-r from-blue-600/20 to-cyan-600/20 border border-blue-500/30 rounded-lg p-3 flex items-center justify-between cursor-pointer hover:bg-blue-600/30 transition-all select-none active:scale-[0.98]">
+                  <div className="w-full bg-linear-to-r from-blue-600/20 to-cyan-600/20 border border-blue-500/30 rounded-lg p-3 flex items-center justify-between cursor-pointer hover:bg-blue-600/30 transition-all select-none active:scale-[0.98]">
                     <div className="flex items-center gap-3">
                       <div className="bg-blue-500/20 p-2 rounded-full">
                         <BookOpen className="w-5 h-5 text-blue-400" />

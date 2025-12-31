@@ -90,7 +90,7 @@ export default function Auth() {
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.2 }}
-              className="relative w-24 h-24 bg-gradient-to-br from-cyan-500/20 to-purple-500/20 rounded-full flex items-center justify-center border border-white/10 group"
+              className="relative w-24 h-24 bg-linear-to-br from-cyan-500/20 to-purple-500/20 rounded-full flex items-center justify-center border border-white/10 group"
             >
               <div className="absolute inset-0 bg-cyan-500/20 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
               <Cpu className="w-10 h-10 text-accent drop-shadow-[0_0_10px_rgba(62,208,240,0.4)]" />
@@ -104,7 +104,7 @@ export default function Auth() {
               transition={{ delay: 0.3 }}
               className="space-y-2"
             >
-              <h1 className="text-3xl font-semibold font-orbitron tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-white to-white/70">
+              <h1 className="text-3xl font-semibold font-orbitron tracking-tight bg-clip-text text-transparent bg-linear-to-r from-white via-white to-white/70">
                 System Login
               </h1>
               <p className="text-sm text-muted font-mono">
@@ -125,7 +125,7 @@ export default function Auth() {
                 onClick={handleLogin}
                 disabled={isLoading}
               >
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
+                <div className="absolute inset-0 bg-linear-to-r from-transparent via-white/5 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
                 <div className="flex items-center justify-center gap-3">
                   {isLoading ? (
                     <Loader2 className="h-5 w-5 animate-spin text-accent" />

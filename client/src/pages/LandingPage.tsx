@@ -94,7 +94,7 @@ const FeatureCard = ({ icon: Icon, title, desc, delay }: any) => {
             whileHover={{ y: -10 }}
             className="group relative p-8 bg-panel/70 border border-border/60 rounded-2xl hover:border-accent/50 transition-all duration-300"
         >
-            <div className="absolute inset-0 bg-gradient-to-br from-accent/10 to-accent2/10 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+            <div className="absolute inset-0 bg-linear-to-br from-accent/10 to-accent2/10 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
             <div className="relative z-10">
                 <div className="w-12 h-12 bg-panel/70 rounded-xl flex items-center justify-center mb-6 group-hover:bg-accent/15 group-hover:text-accent transition-colors">
                     <Icon className="w-6 h-6" />
@@ -151,8 +151,8 @@ const World = () => {
     return (
         <section className="py-24 bg-[#0a0f16] relative overflow-hidden">
             {/* Decorative lines */}
-            <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
-            <div className="absolute bottom-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
+            <div className="absolute top-0 left-0 w-full h-px bg-linear-to-r from-transparent via-white/20 to-transparent"></div>
+            <div className="absolute bottom-0 left-0 w-full h-px bg-linear-to-r from-transparent via-white/20 to-transparent"></div>
 
             <div className="container max-w-6xl mx-auto px-4 flex flex-col md:flex-row items-center gap-16">
                 <motion.div
@@ -167,7 +167,7 @@ const World = () => {
                     </div>
                     <h2 className="text-4xl md:text-6xl font-semibold leading-tight font-orbitron">
                         世界は<br />
-                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent2 to-accent">君の武器庫だ</span>
+                        <span className="text-transparent bg-clip-text bg-linear-to-r from-accent2 to-accent">君の武器庫だ</span>
                     </h2>
                     <p className="text-muted text-lg leading-relaxed">
                         204X年、デジタルデータと実体物質の境界は消滅した。
@@ -183,7 +183,7 @@ const World = () => {
                 </motion.div>
 
                 <div className="flex-1 relative">
-                    <div className="relative w-full aspect-square bg-gradient-to-br from-accent2/15 to-accent/15 rounded-full border border-white/5 animate-pulse-slow flex items-center justify-center p-12">
+                    <div className="relative w-full aspect-square bg-linear-to-br from-accent2/15 to-accent/15 rounded-full border border-white/5 animate-pulse-slow flex items-center justify-center p-12">
                         <div className="absolute inset-0 border border-white/10 rounded-full animate-[spin_10s_linear_infinite]"></div>
                         <div className="absolute inset-4 border border-white/5 rounded-full animate-[spin_15s_linear_infinite_reverse]"></div>
                         <Cpu className="w-32 h-32 text-white/20" />

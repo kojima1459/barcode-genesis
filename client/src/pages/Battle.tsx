@@ -425,7 +425,7 @@ export default function Battle() {
                       <Button
                         onClick={startMatchmaking}
                         disabled={!selectedRobotId}
-                        className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
+                        className="w-full bg-linear-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
                         size="lg"
                       >
                         <Wifi className="w-4 h-4 mr-2" />
@@ -607,7 +607,7 @@ export default function Battle() {
                   </div>
 
                   {/* Special Move Reservation */}
-                  <div className="flex flex-wrap gap-4 items-center glass-panel px-6 py-4 rounded-lg justify-center md:justify-start border border-orange-500/30 bg-gradient-to-r from-orange-500/10 to-transparent">
+                  <div className="flex flex-wrap gap-4 items-center glass-panel px-6 py-4 rounded-lg justify-center md:justify-start border border-orange-500/30 bg-linear-to-r from-orange-500/10 to-transparent">
                     <span className="text-sm font-bold flex items-center gap-2">
                       <StatIconATK className="w-4 h-4 text-orange-400" /> 必殺技 (1戦1回):
                     </span>

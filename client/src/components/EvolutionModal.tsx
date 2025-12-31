@@ -122,7 +122,7 @@ export default function EvolutionModal({ isOpen, onClose, target, allRobots, onS
 
                 {/* Target Robot */}
                 <div className="flex items-center gap-4 p-3 bg-secondary/20 rounded-lg mb-4">
-                    <div className="w-16 h-16 flex-shrink-0">
+                    <div className="w-16 h-16 shrink-0">
                         <RobotSVG
                             parts={target.parts}
                             colors={target.colors}

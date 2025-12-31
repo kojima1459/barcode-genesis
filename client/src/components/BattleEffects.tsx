@@ -84,7 +84,7 @@ export function SkillCutIn({ skillName, robot, onComplete }: SkillCutInProps) {
             onAnimationComplete={() => setTimeout(onComplete, 1000)} // Auto-close logic handled here or via parent timeout
             className="absolute inset-x-0 top-1/4 z-[60] flex items-center justify-center pointer-events-none overflow-hidden h-40 bg-black/60 backdrop-blur-sm border-y-2 border-neon-cyan/50"
         >
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-neon-cyan/20 to-transparent animate-pulse" />
+            <div className="absolute inset-0 bg-linear-to-r from-transparent via-neon-cyan/20 to-transparent animate-pulse" />
 
             <div className="container max-w-4xl mx-auto flex items-center gap-8 px-4 relative z-10">
                 {/* Robot Avatar Cut-in */}
@@ -92,7 +92,7 @@ export function SkillCutIn({ skillName, robot, onComplete }: SkillCutInProps) {
                     initial={{ x: -50, opacity: 0 }}
                     animate={{ x: 0, opacity: 1 }}
                     transition={{ delay: 0.2 }}
-                    className="flex-shrink-0 drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]"
+                    className="shrink-0 drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]"
                 >
                     <RobotSVG parts={robot.parts} colors={robot.colors} size={120} />
                 </motion.div>

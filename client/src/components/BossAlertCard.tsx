@@ -57,7 +57,7 @@ export function BossAlertCard({ boss, canChallenge, isLoading, onChallenge }: Bo
 
     if (isLoading) {
         return (
-            <TechCard className="border-red-500/30 bg-gradient-to-br from-red-500/5 to-orange-500/5">
+            <TechCard className="border-red-500/30 bg-linear-to-br from-red-500/5 to-orange-500/5">
                 <div className="flex items-center justify-center py-8">
                     <Loader2 className="w-6 h-6 animate-spin text-red-500" />
                 </div>
@@ -72,7 +72,7 @@ export function BossAlertCard({ boss, canChallenge, isLoading, onChallenge }: Bo
     const typeKey = `boss_type_${boss.type.toLowerCase()}` as keyof typeof t;
 
     return (
-        <TechCard className="border-red-500/30 bg-gradient-to-br from-red-500/10 to-orange-500/10 relative overflow-hidden">
+        <TechCard className="border-red-500/30 bg-linear-to-br from-red-500/10 to-orange-500/10 relative overflow-hidden">
             {/* Alert Badge */}
             <div className="absolute top-3 right-3 z-10">
                 <Badge variant="destructive" className="animate-pulse font-orbitron text-xs">
@@ -83,8 +83,8 @@ export function BossAlertCard({ boss, canChallenge, isLoading, onChallenge }: Bo
 
             <div className="flex gap-4 p-4">
                 {/* Boss Visual */}
-                <div className="w-24 h-24 relative flex-shrink-0">
-                    <div className="absolute inset-0 rounded-lg bg-gradient-to-br from-red-500/20 to-orange-500/20 border border-red-500/30" />
+                <div className="w-24 h-24 relative shrink-0">
+                    <div className="absolute inset-0 rounded-lg bg-linear-to-br from-red-500/20 to-orange-500/20 border border-red-500/30" />
                     <RobotSVG
                         parts={boss.parts}
                         colors={boss.colors}

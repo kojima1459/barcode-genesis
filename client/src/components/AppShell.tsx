@@ -102,7 +102,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const isActive = (path: string) => (path === "/" ? location === "/" : location.startsWith(path));
 
   return (
-    <div className="min-h-[100dvh] bg-bg text-text relative overflow-hidden overscroll-y-contain">
+    <div className="min-h-dvh bg-bg text-text relative overflow-hidden overscroll-y-contain">
       <div className="pointer-events-none absolute inset-0 bg-[url('/grid.svg')] opacity-[0.03]" />
       <div className="pointer-events-none absolute inset-0 bg-[url('/scanline.png')] opacity-[0.04] mix-blend-soft-light" />
       <div className="relative z-10">
@@ -134,7 +134,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
                 </Button>
               </Link>
               <Link href="/premium">
-                <Button variant="default" size="sm" className="shrink-0 bg-gradient-to-r from-yellow-500 to-orange-500 text-black hover:from-yellow-400 hover:to-orange-400 font-bold whitespace-nowrap text-xs px-2">
+                <Button variant="default" size="sm" className="shrink-0 bg-linear-to-r from-yellow-500 to-orange-500 text-black hover:from-yellow-400 hover:to-orange-400 font-bold whitespace-nowrap text-xs px-2">
                   <Crown className="h-4 w-4" aria-hidden="true" />
                   <span className="hidden sm:inline ml-1">{t('premium')}</span>
                 </Button>

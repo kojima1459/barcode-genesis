@@ -110,7 +110,7 @@ export function AnimatedHPBar({
 
                 {/* Main HP bar */}
                 <motion.div
-                    className={`absolute inset-y-0 left-0 bg-gradient-to-r ${getHPColor(hpPercent)} rounded-full`}
+                    className={`absolute inset-y-0 left-0 bg-linear-to-r ${getHPColor(hpPercent)} rounded-full`}
                     style={{
                         width: `${hpPercent}%`,
                     }}
@@ -121,7 +121,7 @@ export function AnimatedHPBar({
                 >
                     {/* Shine effect */}
                     <motion.div
-                        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
+                        className="absolute inset-0 bg-linear-to-r from-transparent via-white/30 to-transparent"
                         animate={!prefersReducedMotion ? {
                             x: ["-100%", "200%"],
                             transition: {

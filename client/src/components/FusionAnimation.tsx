@@ -120,7 +120,7 @@ export default function FusionAnimation({ parentA, parentB, result, onClose }: F
                             <motion.div
                                 animate={{ rotate: 360 }}
                                 transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
-                                className="absolute inset-0 bg-gradient-to-r from-cyan-500/30 to-purple-500/30 blur-3xl rounded-full"
+                                className="absolute inset-0 bg-linear-to-r from-cyan-500/30 to-purple-500/30 blur-3xl rounded-full"
                             />
                             <RobotSVG parts={result.parts} colors={result.colors} size={250} animate={true} />
 
@@ -139,7 +139,7 @@ export default function FusionAnimation({ parentA, parentB, result, onClose }: F
                                 initial={{ y: 20, opacity: 0 }}
                                 animate={{ y: 0, opacity: 1 }}
                                 transition={{ delay: 0.3 }}
-                                className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400"
+                                className="text-3xl font-bold text-transparent bg-clip-text bg-linear-to-r from-cyan-400 to-purple-400"
                             >
                                 VARIANT FUSED!
                             </motion.h2>
