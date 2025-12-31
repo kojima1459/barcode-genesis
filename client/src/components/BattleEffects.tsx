@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { Zap, Droplets, Flame, Snowflake, Wind } from "lucide-react";
 import RobotSVG from "./RobotSVG";
-import { RobotData } from "@/lib/types"; // Adjust import path if needed, or use shared types
+import { RobotData } from "@/types/shared";
 
 // Shared Types if not imported, for self-containment in this snippet context
 // In real usage, import from @/types/shared

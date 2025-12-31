@@ -68,7 +68,7 @@ describe("Battle item reservation UI", () => {
     };
 
     const matchBattleMock = vi.fn(async () => ({ data: battleResponse }));
-    vi.mocked(httpsCallable).mockImplementationOnce(() => matchBattleMock);
+    vi.mocked(httpsCallable).mockImplementationOnce(() => vi.fn(async () => ({ data: battleResponse })) as any);
 
     renderWithRouter("/battle");
 
@@ -94,7 +94,7 @@ describe("Battle item reservation UI", () => {
     });
 
     expect(matchBattleMock).toHaveBeenCalled();
-    const payload = matchBattleMock.mock.calls[0]?.[0] as Record<string, unknown>;
+    const payload = (matchBattleMock.mock.calls[0] as any)?.[0] as Record<string, unknown>;
     expect(payload?.battleItems).toEqual({ p1: "JAMMER", p2: null });
 
     await act(async () => {

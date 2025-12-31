@@ -95,6 +95,7 @@
     "@vitejs/plugin-react": "^5.0.4",
     "add": "^2.0.6",
     "autoprefixer": "^10.4.20",
+    "dotenv": "^17.2.3",
     "esbuild": "^0.25.0",
     "jsdom": "^27.4.0",
     "pnpm": "^10.15.1",

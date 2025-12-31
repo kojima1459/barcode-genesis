@@ -228,6 +228,7 @@ export default function ShareCardModal({ robot, trigger }: ShareCardModalProps) 
                         ref={cardRef}
                         robot={robot}
                         userName={user?.displayName || "COMMANDER"}
+                        staticMode={true}
                     />
                 </div>
             )}

@@ -4,17 +4,20 @@ import { httpsCallable } from "firebase/functions";
 import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 import { ArrowLeft, Loader2, Zap, Sword, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SystemSkeleton } from "@/components/ui/SystemSkeleton";
+import { CountUp } from "@/components/ui/CountUp";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { db, functions } from "@/lib/firebase";
-import { SHOP_ITEMS, ShopItemCategory, getCategoryLabel } from "@/lib/items";
+import { SHOP_ITEMS, ShopItemCategory, getCategoryLabel, getItemLabel, getItemDescription } from "@/lib/items";
 import { PRODUCTS } from "../../../shared/products";
 import { toast } from "sonner";
+import { Interactive } from "@/components/ui/interactive";
 
 type InventoryMap = Record<string, number>;
 
-const getErrorMessage = (error: unknown, isCraftItem: boolean) => {
+const getErrorMessage = (error: unknown, isCraftItem: boolean, t: (key: string) => string) => {
   if (error && typeof error === "object") {
     const code = typeof (error as { code?: unknown }).code === "string"
       ? String((error as { code?: unknown }).code)
@@ -25,17 +28,17 @@ const getErrorMessage = (error: unknown, isCraftItem: boolean) => {
     const normalizedCode = code.replace("functions/", "");
 
     if (isCraftItem) {
-      if (normalizedCode.includes("invalid-argument")) return "レシピ指定が不正です";
-      if (normalizedCode.includes("failed-precondition")) return "素材 or クレジットが足りません";
+      if (normalizedCode.includes("invalid-argument")) return t('shop_invalid_recipe');
+      if (normalizedCode.includes("failed-precondition")) return t('shop_insufficient_materials');
     } else if (normalizedCode.includes("failed-precondition")) {
-      return "クレジットが不足しています";
+      return t('shop_insufficient_credits');
     }
 
-    if (message.includes("insufficient-tokens")) return "ScanTokenが不足しています";
-    if (message.includes("insufficient-credits")) return "クレジットが不足しています";
+    if (message.includes("insufficient-tokens")) return t('shop_insufficient_tokens');
+    if (message.includes("insufficient-credits")) return t('shop_insufficient_credits');
     if (message) return message;
   }
-  return "購入に失敗しました";
+  return t('shop_purchase_error');
 };
 
 const CategoryIcon = ({ category }: { category: ShopItemCategory }) => {
@@ -48,6 +51,7 @@ const CategoryIcon = ({ category }: { category: ShopItemCategory }) => {
 
 export default function Shop() {
   const { user } = useAuth();
+  const { language, t } = useLanguage();
   const [credits, setCredits] = useState(0);
   const [scanTokens, setScanTokens] = useState(0);
   const [xp, setXp] = useState(0);
@@ -92,7 +96,7 @@ export default function Shop() {
         setInventory(nextInventory);
       } catch (error) {
         console.error("Failed to load shop data:", error);
-        toast.error("ショップの読み込みに失敗しました");
+        toast.error(t('shop_load_error'));
       } finally {
         setLoading(false);
       }
@@ -115,7 +119,7 @@ export default function Shop() {
       }
     } catch (error) {
       console.error("Checkout failed:", error);
-      toast.error("Failed to start checkout");
+      toast.error(t('shop_checkout_error'));
     } finally {
       setBuyingProduct(null);
     }
@@ -146,12 +150,12 @@ export default function Shop() {
         ...prev,
         [data.inventoryDelta.itemId]: data.inventoryDelta.totalQty
       }));
-      toast.success(isCraftItem ? "クラフト完了！" : "購入完了！");
+      toast.success(isCraftItem ? t('shop_craft_success') : t('shop_purchase_success'));
     } catch (error) {
       console.error("Purchase failed:", error);
       const item = SHOP_ITEMS.find((entry) => entry.id === itemId);
       const isCraftItem = typeof item?.tokenCost === "number";
-      const message = getErrorMessage(error, isCraftItem);
+      const message = getErrorMessage(error as any, isCraftItem, t as any);
       setErrorMessage(message);
     } finally {
       setPurchasingItemId(null);
@@ -165,22 +169,22 @@ export default function Shop() {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {items.map((item) => (
-          <Card key={item.id} className="hover:border-primary/50 transition-colors">
+          <Interactive key={item.id} className="hover:border-primary/50 transition-colors h-auto overflow-hidden rounded-xl">
             <CardHeader className="pb-2">
               <CardTitle className="text-lg flex items-center gap-2">
                 <CategoryIcon category={item.category} />
-                {item.nameJa}
+                {getItemLabel(item.id, language)}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <p className="text-sm text-muted-foreground">{item.descriptionJa}</p>
+              <p className="text-sm text-muted-foreground">{getItemDescription(item.id, language)}</p>
               <div className="flex justify-between items-center text-sm">
                 <span className="font-bold text-primary">
                   {typeof item.tokenCost === "number"
-                    ? `素材: Token ${item.tokenCost} + ${item.price} クレジット`
-                    : `${item.price} クレジット`}
+                    ? `${t('shop_material')}: Token ${item.tokenCost} + ${item.price} ${t('shop_credits')}`
+                    : `${item.price} ${t('shop_credits')}`}
                 </span>
-                <span className="text-muted-foreground">所持: {inventory[item.id] ?? 0}</span>
+                <span className="text-muted-foreground">{t('shop_owned')}: {inventory[item.id] ?? 0}</span>
               </div>
               <div className="flex items-center gap-2">
                 <select
@@ -209,11 +213,11 @@ export default function Shop() {
                   size="sm"
                 >
                   {purchasingItemId === item.id && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
-                  {typeof item.tokenCost === "number" ? "クラフト" : "購入"}
+                  {typeof item.tokenCost === "number" ? t('shop_craft') : t('shop_buy')}
                 </Button>
               </div>
             </CardContent>
-          </Card>
+          </Interactive>
         ))}
       </div>
     );
@@ -221,8 +225,12 @@ export default function Shop() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      <div className="min-h-screen flex items-center justify-center bg-background p-8">
+        <SystemSkeleton
+          className="w-full max-w-2xl h-80 rounded-3xl"
+          text="ACCESSING MARKETPLACE..."
+          subtext="RETRIEVING INVENTORY DATA"
+        />
       </div>
     );
   }
@@ -233,25 +241,25 @@ export default function Shop() {
         <Link href="/">
           <Button variant="ghost" className="mr-4">
             <ArrowLeft className="h-5 w-5 mr-2" />
-            戻る
+            {t('back')}
           </Button>
         </Link>
-        <h1 className="text-2xl font-bold text-primary">ショップ</h1>
+        <h1 className="text-2xl font-bold text-primary">{t('shop')}</h1>
         <div className="ml-auto text-xs font-bold bg-primary/10 text-primary px-3 py-1 rounded-full flex flex-wrap items-center gap-3">
           <span>Lv {level}</span>
           <span>XP {xp}</span>
-          <span>💰 {credits} クレジット</span>
-          <span>🧩 {scanTokens} ScanToken</span>
+          <span className="flex items-center gap-1">💰 <CountUp value={credits} /> {t('shop_credits')}</span>
+          <span className="flex items-center gap-1">🧩 <CountUp value={scanTokens} /> {t('shop_scan_token')}</span>
         </div>
       </header>
 
       <main className="flex-1 max-w-4xl mx-auto w-full space-y-8">
         {/* Coin Shop Section */}
         <section>
-          <h2 className="text-xl font-bold mb-4 text-primary">コイン購入</h2>
+          <h2 className="text-xl font-bold mb-4 text-primary">{t('shop_coins_title')}</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {PRODUCTS.map((product) => (
-              <Card key={product.id} className="border-primary/20">
+              <Interactive key={product.id} className="border-primary/20 h-auto overflow-hidden rounded-xl">
                 <CardHeader>
                   <CardTitle className="text-lg">{product.name}</CardTitle>
                 </CardHeader>
@@ -260,11 +268,11 @@ export default function Shop() {
                     💰
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-yellow-500">{product.amount} Coins</div>
+                    <div className="text-2xl font-bold text-yellow-500">{product.amount} {t('shop_coins_unit')}</div>
                     <div className="text-sm text-muted-foreground">{product.description}</div>
                   </div>
-                  <Button 
-                    className="w-full" 
+                  <Button
+                    className="w-full"
                     onClick={() => handleBuyCoins(product.id)}
                     disabled={buyingProduct === product.id}
                   >
@@ -272,30 +280,24 @@ export default function Shop() {
                     ¥{product.price}
                   </Button>
                 </CardContent>
-              </Card>
+              </Interactive>
             ))}
           </div>
         </section>
 
         {errorMessage && <p className="text-sm text-destructive bg-destructive/10 p-2 rounded">{errorMessage}</p>}
 
-        <section>
-          <h2 className="text-xl font-bold mb-4 text-primary">アイテムショップ</h2>
-          <Tabs defaultValue="boost" className="w-full">
-            <TabsList className="w-full grid grid-cols-3">
-              {categories.map(cat => (
-                <TabsTrigger key={cat} value={cat} className="flex items-center gap-2">
-                  <CategoryIcon category={cat} />
-                  {getCategoryLabel(cat)}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-            {categories.map(cat => (
-              <TabsContent key={cat} value={cat} className="mt-4">
-                {renderItems(cat)}
-              </TabsContent>
-            ))}
-          </Tabs>
+        <section className="space-y-8">
+          <h2 className="text-xl font-bold text-primary">{t('shop_items_title')}</h2>
+          {categories.map(cat => (
+            <div key={cat} className="space-y-4">
+              <h3 className="text-lg font-semibold flex items-center gap-2 text-foreground border-b border-border pb-2">
+                <CategoryIcon category={cat} />
+                {getCategoryLabel(cat, language)}
+              </h3>
+              {renderItems(cat)}
+            </div>
+          ))}
         </section>
       </main>
     </div>

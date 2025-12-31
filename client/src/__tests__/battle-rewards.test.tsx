@@ -53,7 +53,7 @@ describe("Battle rewards UI", () => {
       },
     };
 
-    vi.mocked(httpsCallable).mockImplementationOnce(() => vi.fn(async () => ({ data: battleResponse })));
+    vi.mocked(httpsCallable).mockImplementationOnce(() => vi.fn(async () => ({ data: battleResponse })) as any);
 
     renderWithRouter("/battle");
 
@@ -135,7 +135,7 @@ describe("Battle rewards UI", () => {
       },
     };
 
-    vi.mocked(httpsCallable).mockImplementationOnce(() => vi.fn(async () => ({ data: battleResponse })));
+    vi.mocked(httpsCallable).mockImplementationOnce(() => vi.fn(async () => ({ data: battleResponse })) as any);
 
     renderWithRouter("/battle");
 

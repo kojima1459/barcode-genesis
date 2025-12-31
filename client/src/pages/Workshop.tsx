@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { RobotData, VariantData } from "@/types/shared";
 import SEO from "@/components/SEO";
+import { Interactive } from "@/components/ui/interactive";
 import {
     Select,
     SelectContent,
@@ -22,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import FusionAnimation from "@/components/FusionAnimation";
+import { SystemSkeleton } from "@/components/ui/SystemSkeleton";
 
 export default function Workshop() {
     const { t } = useLanguage();
@@ -265,8 +267,16 @@ export default function Workshop() {
     const canAfford = isFreeToday === true || userCredits == null || userCredits >= VARIANT_COST;
     const isFull = userLimit > 0 ? variants.length >= userLimit : false;
 
-    if (loading && !robots.length) {
-        return <div className="min-h-screen flex items-center justify-center bg-dark-bg"><Loader2 className="animate-spin text-neon-cyan" /></div>;
+    if (loading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-dark-bg p-6">
+                <SystemSkeleton
+                    className="w-full max-w-2xl aspect-video rounded-3xl"
+                    text="CALIBRATING WORKSHOP..."
+                    subtext="INITIALIZING FUSION PROTOCOLS"
+                />
+            </div>
+        );
     }
 
     return (
@@ -278,9 +288,9 @@ export default function Workshop() {
             {/* Header */}
             <header className="flex items-center mb-8 max-w-4xl mx-auto w-full z-10 relative">
                 <Link href="/profile">
-                    <Button variant="ghost" className="mr-4"><ArrowLeft className="mr-2 h-5 w-5" /> {t('back') || 'Back'}</Button>
+                    <Button variant="ghost" className="mr-4"><ArrowLeft className="mr-2 h-5 w-5" /> 戻る</Button>
                 </Link>
-                <h1 className="text-2xl font-bold text-primary">Fusion Workshop</h1>
+                <h1 className="text-2xl font-bold text-primary">融合ワークショップ</h1>
             </header>
 
             <main className="max-w-4xl mx-auto w-full space-y-8 z-10 relative">
@@ -299,8 +309,8 @@ export default function Workshop() {
 
                     <CardHeader>
                         <CardTitle className="flex flex-col gap-1">
-                            <span>Create Variant</span>
-                            <span className="text-sm font-normal text-muted-foreground">Select two units to fuse their appearance.</span>
+                            <span>製造バリアント作成</span>
+                            <span className="text-sm font-normal text-muted-foreground">2体のユニットを選択して、新たな見た目のバリアントを製造します。</span>
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-6">
@@ -309,10 +319,10 @@ export default function Workshop() {
                         <div className="bg-secondary/10 border border-white/5 rounded-lg p-3 flex justify-between items-center text-sm">
                             <span className="flex items-center gap-2">
                                 <RefreshCw className="w-4 h-4 text-primary" />
-                                製造コスト (Cost):
+                                製造コスト:
                             </span>
                             <span className={`font-bold ${isFreeToday ? "text-green-400" : "text-amber-400"}`}>
-                                {isFreeToday === true ? "0 (Daily Free!)" : isFreeToday === null ? "…" : `${VARIANT_COST} Credits`}
+                                {isFreeToday === true ? "0 (1日1回無料!)" : isFreeToday === null ? "…" : `${VARIANT_COST} クレジット`}
                             </span>
                         </div>
 
@@ -333,9 +343,9 @@ export default function Workshop() {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
                             {/* Input A */}
                             <div className="space-y-2">
-                                <label className="text-sm font-medium">Source Unit A</label>
+                                <label className="text-sm font-medium">素材ユニット A</label>
                                 <Select value={robotAId} onValueChange={setRobotAId}>
-                                    <SelectTrigger><SelectValue placeholder="Select Robot" /></SelectTrigger>
+                                    <SelectTrigger><SelectValue placeholder="ロボットを選択" /></SelectTrigger>
                                     <SelectContent className="max-h-60">
                                         {robots.map(r => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
                                     </SelectContent>
@@ -351,14 +361,14 @@ export default function Workshop() {
                             <div className="flex flex-col justify-center items-center gap-4">
                                 <Plus className="h-8 w-8 text-muted-foreground" />
                                 <div className="w-full space-y-2">
-                                    <label className="text-xs font-medium mb-1 block text-center">Preview Preset</label>
+                                    <label className="text-xs font-medium mb-1 block text-center">合成プリセット</label>
                                     <Select value={previewPreset} onValueChange={(v) => setPreviewPreset(v as any)}>
-                                        <SelectTrigger><SelectValue placeholder="Select preset" /></SelectTrigger>
+                                        <SelectTrigger><SelectValue placeholder="プリセット選択" /></SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="HALF">Half (A/B mix)</SelectItem>
-                                            <SelectItem value="ALT">Alternate</SelectItem>
-                                            <SelectItem value="A_DOMINANT">A Dominant</SelectItem>
-                                            <SelectItem value="B_DOMINANT">B Dominant</SelectItem>
+                                            <SelectItem value="HALF">混合 (A/B mix)</SelectItem>
+                                            <SelectItem value="ALT">交互 (Alternate)</SelectItem>
+                                            <SelectItem value="A_DOMINANT">A ベース</SelectItem>
+                                            <SelectItem value="B_DOMINANT">B ベース</SelectItem>
                                         </SelectContent>
                                     </Select>
                                     {previewRobot && (
@@ -368,9 +378,9 @@ export default function Workshop() {
                                     )}
                                 </div>
                                 <div className="w-full">
-                                    <label className="text-xs font-medium mb-1 block text-center">Custom Name (Optional)</label>
+                                    <label className="text-xs font-medium mb-1 block text-center">バリアント名 (任意)</label>
                                     <Input
-                                        placeholder="Naming..."
+                                        placeholder="名称未設定..."
                                         value={variantName}
                                         onChange={(e) => setVariantName(e.target.value)}
                                         className="bg-black/20 text-center"
@@ -381,9 +391,9 @@ export default function Workshop() {
 
                             {/* Input B */}
                             <div className="space-y-2">
-                                <label className="text-sm font-medium">Source Unit B</label>
+                                <label className="text-sm font-medium">素材ユニット B</label>
                                 <Select value={robotBId} onValueChange={setRobotBId}>
-                                    <SelectTrigger><SelectValue placeholder="Select Robot" /></SelectTrigger>
+                                    <SelectTrigger><SelectValue placeholder="ロボットを選択" /></SelectTrigger>
                                     <SelectContent className="max-h-60">
                                         {robots.map(r => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
                                     </SelectContent>
@@ -403,25 +413,25 @@ export default function Workshop() {
                             onClick={handleCreate}
                         >
                             {creating ? <Loader2 className="animate-spin mr-2" /> : <RefreshCw className="mr-2" />}
-                            Fuse Appearance ({isFreeToday === true ? "Free" : isFreeToday === null ? "…" : `${VARIANT_COST} Cr`})
+                            融合開始 ({isFreeToday === true ? "無料" : isFreeToday === null ? "…" : `${VARIANT_COST} Cr`})
                         </Button>
                         <p className="text-xs text-center text-muted-foreground">
-                            Variants are cosmetic only. Stats are averaged from current parents.
+                            バリアントは見た目のみ変更されます。ステータスは両親の平均値となります。
                         </p>
                     </CardContent>
                 </Card>
 
                 {/* List Section */}
                 <div className="space-y-4">
-                    <h2 className="text-xl font-bold">Your Variants ({variants.length})</h2>
+                    <h2 className="text-xl font-bold">所有バリアント ({variants.length})</h2>
                     {variants.length === 0 ? (
                         <div className="text-center p-8 text-muted-foreground border border-dashed rounded bg-black/20">
-                            No variants created yet.
+                            バリアントはまだありません。
                         </div>
                     ) : (
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                             {variants.map(v => (
-                                <Card key={v.id} className="overflow-hidden bg-black/40 border-white/10 transition-colors relative group">
+                                <Interactive key={v.id} className="overflow-hidden bg-black/40 border-white/10 relative group h-auto rounded-xl">
                                     {/* Read-only list in client. */} {/* REF: A2 */}
                                     <CardContent className="p-4 flex flex-col items-center space-y-2">
                                         {v.parts && (
@@ -432,7 +442,7 @@ export default function Workshop() {
                                             <span className="bg-secondary/20 px-1 rounded">Fusion</span>
                                         </div>
                                     </CardContent>
-                                </Card>
+                                </Interactive>
                             ))}
                         </div>
                     )}

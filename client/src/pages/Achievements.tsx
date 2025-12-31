@@ -5,6 +5,7 @@ import { collection, getDocs } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Trophy } from 'lucide-react';
+import { Interactive } from '@/components/ui/interactive';
 
 interface Achievement {
     achievementId: number;
@@ -63,7 +64,7 @@ export default function Achievements() {
                         const isUnlocked = userAchievement?.isCompleted;
 
                         return (
-                            <Card key={id} className={`${isUnlocked ? 'border-yellow-500 bg-yellow-500/10' : 'opacity-60'}`}>
+                            <Interactive key={id} className={`h-auto overflow-hidden rounded-xl border ${isUnlocked ? 'border-yellow-500 bg-yellow-500/10' : 'opacity-60 grayscale'}`} disabled={!isUnlocked}>
                                 <CardHeader className="pb-2">
                                     <div className="flex justify-between items-center">
                                         <CardTitle className="text-lg flex items-center gap-2">
@@ -76,7 +77,7 @@ export default function Achievements() {
                                 <CardContent>
                                     <p className="text-sm text-gray-400">{info.description}</p>
                                 </CardContent>
-                            </Card>
+                            </Interactive>
                         );
                     })}
                 </div>

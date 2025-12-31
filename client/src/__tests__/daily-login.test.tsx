@@ -25,7 +25,7 @@ describe("daily login display + toast", () => {
         creditsGained: 50,
       },
     }));
-    vi.mocked(httpsCallable).mockImplementationOnce(() => claimMock);
+    vi.mocked(httpsCallable).mockImplementationOnce(() => claimMock as any);
 
     const memory = memoryLocation({ path: "/" });
     render(

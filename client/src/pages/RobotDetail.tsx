@@ -19,6 +19,9 @@ import SEO from "@/components/SEO";
 import ShareCardModal from "@/components/ShareCardModal";
 import EvolutionModal from "@/components/EvolutionModal";
 import { useRobotFx } from "@/hooks/useRobotFx";
+import { Interactive } from "@/components/ui/interactive";
+import { ScrambleText } from "@/components/ui/ScrambleText";
+import { SystemSkeleton } from "@/components/ui/SystemSkeleton";
 
 
 type InventoryMap = Record<string, number>;
@@ -363,14 +366,18 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
           <div className="flex items-center">
             <Skeleton className="h-10 w-20" />
           </div>
-          <Skeleton className="aspect-square w-full rounded-xl" />
-          <div className="space-y-2">
-            <Skeleton className="h-8 w-full" />
+          <SystemSkeleton
+            className="aspect-square w-full rounded-2xl"
+            text="BOOTING UNIT DATA..."
+            subtext="DECRYPTING GENETIC SIGNATURE"
+          />
+          <div className="space-y-4">
+            <SystemSkeleton className="h-12 w-full" showText={false} />
             <div className="grid grid-cols-2 gap-4">
-              <Skeleton className="h-24 w-full" />
-              <Skeleton className="h-24 w-full" />
-              <Skeleton className="h-24 w-full" />
-              <Skeleton className="h-24 w-full" />
+              <SystemSkeleton className="h-24 w-full" text="ANALYZING STATS..." subtext="CALIBRATING SYSTEMS" />
+              <SystemSkeleton className="h-24 w-full" text="ANALYZING STATS..." subtext="CALIBRATING SYSTEMS" />
+              <SystemSkeleton className="h-24 w-full" text="ANALYZING STATS..." subtext="CALIBRATING SYSTEMS" />
+              <SystemSkeleton className="h-24 w-full" text="ANALYZING STATS..." subtext="CALIBRATING SYSTEMS" />
             </div>
           </div>
         </div>
@@ -421,7 +428,10 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
             <RobotSVG parts={baseRobot.parts} colors={baseRobot.colors} size={240} fx={fx} />
           </div>
 
-          <h1 className="text-3xl font-black italic tracking-wider text-white mb-1">{baseRobot.name}</h1>
+
+          <h1 className="text-3xl font-black italic tracking-wider text-white mb-1">
+            <ScrambleText text={baseRobot.name} duration={1000} />
+          </h1>
           <div className="text-neon-cyan font-orbitron text-sm mb-4">
             {baseRobot.rarityName} // {baseRobot.elementName || "Neutral"}
           </div>
@@ -448,7 +458,7 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
               <Barcode className="w-4 h-4 text-muted-foreground" />
               <div>
                 <div className="text-xs text-muted-foreground">Source Barcode</div>
-                <div className="font-mono text-neon-cyan">{baseRobot.barcode || "N/A"}</div>
+                <div className="font-mono text-neon-cyan">{baseRobot.sourceBarcode || "N/A"}</div>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -466,7 +476,7 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
           </div>
           {/* Flavor text */}
           <div className="mt-4 p-3 bg-black/30 rounded-lg border border-white/5 text-xs text-muted-foreground italic">
-            「このユニットはバーコード {baseRobot.barcode?.slice(0, 6) || "??????"}... から抽出されたデータを基に、第{(baseRobot.parts?.head || 1) % 7 + 1}世代合成プロトコルにより生成されました。」
+            「このユニットはバーコード {baseRobot.sourceBarcode?.slice(0, 6) || "??????"}... から抽出されたデータを基に、第{(baseRobot.parts?.head || 1) % 7 + 1}世代合成プロトコルにより生成されました。」
           </div>
         </div>
 
@@ -478,9 +488,9 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
             </h3>
             <div className="space-y-2">
               {battleHistory.map((battle, index) => (
-                <div
+                <Interactive
                   key={battle.id || index}
-                  className={`flex items-center justify-between p-2 rounded-lg ${battle.won ? 'bg-green-500/10 border border-green-500/20' : 'bg-red-500/10 border border-red-500/20'}`}
+                  className={`flex items-center justify-between p-2 rounded-lg h-auto border ${battle.won ? 'bg-green-500/10 border-green-500/20' : 'bg-red-500/10 border-red-500/20'}`}
                 >
                   <div className="flex items-center gap-2">
                     {battle.won ? (
@@ -493,7 +503,7 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
                   <div className="text-xs text-muted-foreground">
                     {battle.date.toLocaleDateString("ja-JP")}
                   </div>
-                </div>
+                </Interactive>
               ))}
             </div>
             <div className="mt-3 text-xs text-muted-foreground text-center">
@@ -532,22 +542,30 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
         {/* Status Grid */}
         <div className="grid grid-cols-2 gap-4">
           {/* Simple Status Cards with Neon Styled Borders */}
-          <div className="glass-panel p-4 rounded-xl border-l-4 border-l-red-500">
+          <Interactive className="glass-panel p-4 rounded-xl border-l-4 border-l-red-500 h-auto">
             <div className="text-xs text-muted-foreground uppercase tracking-wider">Attack</div>
-            <div className="text-2xl font-bold font-orbitron">{baseRobot.baseAttack}</div>
-          </div>
-          <div className="glass-panel p-4 rounded-xl border-l-4 border-l-blue-500">
+            <div className="text-2xl font-bold font-orbitron">
+              <ScrambleText text={String(baseRobot.baseAttack)} delay={300} />
+            </div>
+          </Interactive>
+          <Interactive className="glass-panel p-4 rounded-xl border-l-4 border-l-blue-500 h-auto">
             <div className="text-xs text-muted-foreground uppercase tracking-wider">Defense</div>
-            <div className="text-2xl font-bold font-orbitron">{baseRobot.baseDefense}</div>
-          </div>
-          <div className="glass-panel p-4 rounded-xl border-l-4 border-l-green-500">
+            <div className="text-2xl font-bold font-orbitron">
+              <ScrambleText text={String(baseRobot.baseDefense)} delay={400} />
+            </div>
+          </Interactive>
+          <Interactive className="glass-panel p-4 rounded-xl border-l-4 border-l-green-500 h-auto">
             <div className="text-xs text-muted-foreground uppercase tracking-wider">Speed</div>
-            <div className="text-2xl font-bold font-orbitron">{baseRobot.baseSpeed}</div>
-          </div>
-          <div className="glass-panel p-4 rounded-xl border-l-4 border-l-yellow-500">
+            <div className="text-2xl font-bold font-orbitron">
+              <ScrambleText text={String(baseRobot.baseSpeed)} delay={500} />
+            </div>
+          </Interactive>
+          <Interactive className="glass-panel p-4 rounded-xl border-l-4 border-l-yellow-500 h-auto">
             <div className="text-xs text-muted-foreground uppercase tracking-wider">HP</div>
-            <div className="text-2xl font-bold font-orbitron">{baseRobot.baseHp}</div>
-          </div>
+            <div className="text-2xl font-bold font-orbitron">
+              <ScrambleText text={String(baseRobot.baseHp)} delay={200} />
+            </div>
+          </Interactive>
         </div>
 
         {/* Skills Section (Placeholder for improved skill listing) */}
@@ -571,13 +589,13 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
         )}
 
         <section className="space-y-3">
-          <h2 className="text-lg font-semibold">Equipment</h2>
-          <p className="text-sm text-muted-foreground">Equip up to 2 items from your inventory.</p>
+          <h2 className="text-lg font-semibold">装備</h2>
+          <p className="text-sm text-muted-foreground">インベントリから2つまでアイテムを装備できます。</p>
           <div className="grid gap-3">
             {(["slot1", "slot2"] as const).map((slot) => (
               <div key={slot} className="border rounded-lg p-3 space-y-2">
                 <div className="text-sm font-medium">
-                  {slot.toUpperCase()}: {equipped?.[slot] ? getItemLabel(equipped[slot] as string) : "Empty"}
+                  {slot === 'slot1' ? 'スロット1' : 'スロット2'}: {equipped?.[slot] ? getItemLabel(equipped[slot] as string) : "空"}
                 </div>
                 <select
                   value={equipSelection[slot]}
@@ -586,7 +604,7 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
                   }
                   className="border rounded px-2 py-1 bg-background text-sm w-full"
                 >
-                  <option value="">Select item</option>
+                  <option value="">アイテムを選択</option>
                   {inventoryOptions.map(([itemId, qty]) => (
                     <option key={itemId} value={itemId}>
                       {getItemLabel(itemId)} (x{qty})
@@ -599,7 +617,7 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
                     disabled={!equipSelection[slot] || equippingSlot === slot}
                   >
                     {equippingSlot === slot && <Loader2 className="h-4 w-4 animate-spin" />}
-                    Equip
+                    装備する
                   </Button>
                   <Button
                     variant="secondary"
@@ -607,7 +625,7 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
                     disabled={!equipped?.[slot] || equippingSlot === slot}
                   >
                     {equippingSlot === slot && <Loader2 className="h-4 w-4 animate-spin" />}
-                    Unequip
+                    外す
                   </Button>
                 </div>
               </div>
@@ -643,11 +661,11 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-lg font-semibold">Synthesize</h2>
-          <p className="text-sm text-muted-foreground">Select 1-5 material robots to fuse into the base robot.</p>
+          <h2 className="text-lg font-semibold">合成</h2>
+          <p className="text-sm text-muted-foreground">1～5体の素材ロボットを選択してベースロボットに融合。</p>
           <div className="space-y-2">
             {materialRobots.length === 0 && (
-              <p className="text-sm text-muted-foreground">No material robots available.</p>
+              <p className="text-sm text-muted-foreground">素材ロボットがありません。</p>
             )}
             {materialRobots.map((robot) => {
               const isSelected = selectedMaterials.includes(robot.id);
@@ -670,14 +688,14 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
             disabled={isSynthesizing || selectedMaterials.length === 0}
           >
             {isSynthesizing && <Loader2 className="h-4 w-4 animate-spin" />}
-            Synthesize
+            合成する
           </Button>
           {synthesizeError && <p className="text-sm text-destructive">{synthesizeError}</p>}
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-lg font-semibold">Inherit Skill</h2>
-          <p className="text-sm text-muted-foreground">Select one material robot and one skill to inherit.</p>
+          <h2 className="text-lg font-semibold">スキル継承</h2>
+          <p className="text-sm text-muted-foreground">素材ロボットと継承するスキルを選択してください。</p>
           <div className="flex flex-col gap-2 max-w-md">
             <select
               value={inheritMaterialId}
@@ -687,7 +705,7 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
               }}
               className="border rounded px-3 py-2 bg-background text-sm"
             >
-              <option value="">Select material robot</option>
+              <option value="">素材ロボットを選択</option>
               {materialRobots.map((robot) => (
                 <option key={robot.id} value={robot.id}>
                   {robot.name}
@@ -700,7 +718,7 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
               className="border rounded px-3 py-2 bg-background text-sm"
               disabled={!inheritMaterialId || inheritSkillOptions.length === 0}
             >
-              <option value="">Select skill</option>
+              <option value="">スキルを選択</option>
               {inheritSkillOptions.map((skillId) => (
                 <option key={skillId} value={skillId}>
                   {skillId}
@@ -708,7 +726,7 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
               ))}
             </select>
             {inheritMaterialId && inheritSkillOptions.length === 0 && (
-              <p className="text-xs text-muted-foreground">Selected material has no skills.</p>
+              <p className="text-xs text-muted-foreground">選択した素材にはスキルがありません。</p>
             )}
           </div>
           <Button
@@ -716,7 +734,7 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
             disabled={isInheriting || !inheritMaterialId || !inheritSkillId}
           >
             {isInheriting && <Loader2 className="h-4 w-4 animate-spin" />}
-            Inherit
+            継承する
           </Button>
           {inheritError && <p className="text-sm text-destructive">{inheritError}</p>}
         </section>

@@ -8,7 +8,7 @@ import { db, functions } from "@/lib/firebase";
 import { callGenerateRobot } from "@/lib/functions";
 import { httpsCallable } from "firebase/functions";
 import { collection, doc, getDocs, onSnapshot } from "firebase/firestore";
-import { Factory, Loader2, Trophy, Zap, ScanBarcode, Swords } from "lucide-react";
+import { Factory, Loader2, Trophy, Zap, ScanBarcode, Swords, ShoppingCart, Activity, Users } from "lucide-react";
 import RobotSVG from "@/components/RobotSVG";
 import { toast } from "sonner";
 import { Link } from "wouter";
@@ -22,7 +22,11 @@ import { useSound } from "@/contexts/SoundContext";
 import { RobotData } from "@/types/shared";
 import AdBanner from "@/components/AdBanner";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
-
+import { Interactive } from "@/components/ui/interactive";
+import { SystemSkeleton } from "@/components/ui/SystemSkeleton";
+import HangarCard from "@/components/HangarCard";
+import { TechCard } from "@/components/ui/TechCard";
+import { cn } from "@/lib/utils";
 
 
 interface Mission {
@@ -56,6 +60,7 @@ export default function Home() {
   const [following, setFollowing] = useState<string[]>([]);
   const [followError, setFollowError] = useState<string | null>(null);
   const [isFollowing, setIsFollowing] = useState(false);
+  const [hasClaimed, setHasClaimed] = useState(false);
 
   const [robots, setRobots] = useState<RobotData[]>([]);
   const [robotsLoading, setRobotsLoading] = useState(true);
@@ -183,11 +188,13 @@ export default function Home() {
           setLoginStreak(data.streak);
         }
         toast.success("ログインボーナス獲得！");
+        setHasClaimed(true);
         if (Array.isArray(data.newBadges) && data.newBadges.length > 0) {
           toast(`新バッジ獲得: ${data.newBadges.length}個`, { icon: "🏅" });
         }
       } else {
-        toast("Login bonus already claimed", { icon: "✅" });
+        setHasClaimed(true);
+        toast("本日は受け取り済みです", { icon: "✅" });
       }
     } catch (error: any) {
       const message = error?.message || "Login bonus failed";
@@ -246,230 +253,236 @@ export default function Home() {
 
   if (loading) {
     return (
-      <div className="min-h-[100dvh] p-4 flex flex-col text-text">
-        <main className="flex-1 w-full max-w-4xl mx-auto space-y-4">
-          <div className="flex justify-between items-center py-2">
-            <Skeleton className="h-14 w-40" />
-            <Skeleton className="h-10 w-24" />
-          </div>
+      <div className="min-h-[100dvh] p-4 flex flex-col text-text bg-bg">
+        <main className="flex-1 w-full max-w-4xl mx-auto space-y-6">
+          <header className="flex justify-between items-center py-4">
+            <SystemSkeleton className="h-16 w-48 rounded-lg" text="BOOTING OS..." showText={false} />
+            <SystemSkeleton className="h-10 w-24 rounded-lg" showText={false} />
+          </header>
+
+          <SystemSkeleton
+            className="h-64 w-full rounded-2xl"
+            text="INITIALIZING SYSTEM..."
+            subtext="CONNECTING TO BARCODE NETWORK"
+          />
+
           <div className="grid grid-cols-3 gap-3">
-            <Skeleton className="h-20 w-full" />
-            <Skeleton className="h-20 w-full" />
-            <Skeleton className="h-20 w-full" />
-          </div>
-          <div className="space-y-3">
-            <Skeleton className="h-6 w-32" />
-            <Skeleton className="h-20 w-full" />
-            <Skeleton className="h-32 w-full" />
+            <SystemSkeleton className="h-24 w-full rounded-xl" showText={false} />
+            <SystemSkeleton className="h-24 w-full rounded-xl" showText={false} />
+            <SystemSkeleton className="h-24 w-full rounded-xl" showText={false} />
           </div>
         </main>
       </div>
     );
   }
 
+  // Get the most "active" robot (using last one in list for now, ideally sort by lastUsed)
+  // Logic: last added often feels like current main
+  const mainRobot = robots.length > 0 ? robots[0] : null;
+
   return (
-    <div className="min-h-[100dvh] p-4 flex flex-col text-text">
-      <main className="flex-1 w-full max-w-4xl mx-auto space-y-4">
-        {/* Header Section */}
-        <section className="flex justify-between items-center py-2">
-          <div>
-            <h1 className="text-3xl font-semibold tracking-tight text-primary">
-              BARCODE<br />GENESIS
-            </h1>
-            <p className="text-xs text-muted-foreground tracking-[0.12em] font-orbitron">SYSTEM ONLINE</p>
+    <div className="min-h-[100dvh] flex flex-col text-text relative pb-24 md:pb-8">
+      {/* Background Effect */}
+      <div className="fixed inset-0 bg-[url('/grid.svg')] opacity-10 pointer-events-none z-0" />
+
+      {/* Mobile: Constrained width, Desktop: Expanded width */}
+      <main className="flex-1 w-full max-w-md md:max-w-5xl mx-auto space-y-5 px-4 pt-4 relative z-10">
+
+        {/* 1. System Ticker */}
+        <div className="w-full bg-black/40 border-y border-white/5 py-1 overflow-hidden">
+          <div className="whitespace-nowrap animate-marquee text-[10px] font-mono text-muted-foreground/80 flex gap-8">
+            <span>SYSTEM ONLINE...</span>
+            <span>CONNECTION STABLE</span>
+            <span>GRID ACCESS: AUTHORIZED</span>
+            <span>WELCOME BACK, OPERATOR {user?.uid.slice(0, 6)}...</span>
+            <span className="text-neon-cyan">NEW ORDERS AVAILABLE</span>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <div className="text-xs text-muted-foreground font-mono">CREDITS</div>
-              <div className="text-xl font-bold font-orbitron text-primary">{credits.toLocaleString()}</div>
+        </div>
+
+        {/* Header (Minimal) */}
+        <header className="flex justify-between items-end">
+          <div>
+            <h1 className="text-xl font-bold font-orbitron text-white tracking-widest">BASE // HOME</h1>
+            <div className="text-xs text-muted-foreground font-mono">OP: {user?.uid.slice(0, 8)}</div>
+          </div>
+          <div className="flex flex-col items-end">
+            <div className="flex items-center gap-2 text-neon-cyan font-bold font-mono text-lg">
+              <span className="text-xs text-muted-foreground">CR</span>
+              {credits.toLocaleString()}
             </div>
-            {/* User Avatar or something could go here */}
-            <div className="flex gap-2">
+            <div className="flex gap-2 mt-1">
               <ThemeSwitcher />
               <SoundSettings />
               <LanguageSwitcher />
             </div>
           </div>
-        </section>
+        </header>
 
-        {/* Quick Actions */}
-        <section className="space-y-2">
-          <div className="flex items-center justify-between">
-            <h2 className="text-[11px] font-semibold text-muted-foreground tracking-[0.12em]">Quick Actions</h2>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-          <Link href="/scan">
-            <Button
-              id="tutorial-generate-btn"
-              onClick={() => completeStep('HOME_GENERATE')}
-              className="h-20 w-full flex flex-col gap-2 glass-panel hover:bg-surface2/60 transition-all group"
-            >
-              <ScanBarcode className="w-7 h-7 text-primary transition-all" />
-              <span className="font-bold text-sm tracking-wider">SCAN</span>
-            </Button>
-          </Link>
-          <Link href="/battle">
-            <Button className="h-20 w-full flex flex-col gap-2 glass-panel hover:bg-surface2/60 transition-all group">
-              <Swords className="w-7 h-7 text-primary transition-all" />
-              <span className="font-bold text-sm tracking-wider">BATTLE</span>
-            </Button>
-          </Link>
-          <Link href="/workshop">
-            <Button className="h-20 w-full flex flex-col gap-2 glass-panel hover:bg-surface2/60 transition-all group">
-              <Factory className="w-7 h-7 text-primary transition-all" />
-              <span className="font-bold text-sm tracking-wider">WORKSHOP</span>
-            </Button>
-          </Link>
-          </div>
-        </section>
+        {/* Desktop: Grid Layout | Mobile: Flex Column */}
+        <div className="md:grid md:grid-cols-12 md:gap-6 space-y-5 md:space-y-0">
 
-        {/* Daily Bonus */}
-        <section className="glass-panel p-4 rounded-lg border-border/70 space-y-3">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded bg-surface2 border border-border flex items-center justify-center text-primary">
-                <Trophy className="w-5 h-5" />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold font-orbitron tracking-[0.08em]">DAILY BONUS</h2>
-                <div className="text-xs text-muted-foreground font-mono">STREAK: {loginStreak || 0} DAYS</div>
-                <div className="text-[11px] text-muted-foreground">1日1回受け取れます</div>
-              </div>
-            </div>
-            <Button
-              onClick={handleClaimLoginBonus}
-              disabled={isClaimingLogin}
-              className="bg-primary text-black hover:bg-primary/80 font-bold px-5 h-10"
-            >
-              {isClaimingLogin ? <Loader2 className="w-4 h-4 animate-spin" /> : "CLAIM"}
-            </Button>
-          </div>
-        </section>
+          {/* Main Column (Hangar + Operations) */}
+          <div className="md:col-span-8 space-y-5">
+            {/* 2. Hangar Card (Main Visual) */}
+            <section>
+              <HangarCard robot={mainRobot} className="md:aspect-[21/10]" />
+            </section>
 
-        {/* Active Missions */}
-        <section className="glass-panel p-4 rounded-lg border-border/70 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-semibold text-muted-foreground tracking-[0.12em]">Active Missions</h3>
-            <Button variant="link" className="text-primary h-auto p-0 text-xs" disabled>
-              VIEW ALL
-            </Button>
-          </div>
-          {missionsLoading ? (
-            <div className="py-4 flex items-center justify-center">
-              <Loader2 className="w-5 h-5 animate-spin text-primary" />
-            </div>
-          ) : missionsError ? (
-            <div className="py-4 text-xs text-danger font-mono">{missionsError}</div>
-          ) : missions.length === 0 ? (
-            <div className="py-3 text-xs text-muted-foreground font-mono">No missions available today.</div>
-          ) : (
-            <div className="grid grid-cols-1 gap-2">
-              {missions.slice(0, 3).map(mission => (
-                <div key={mission.id} className="flex items-center justify-between p-3 bg-surface2/70 border border-border/60 rounded group/mission transition-all">
-                  <div className="flex-1">
-                    <div className="text-sm font-bold text-text mb-1">{mission.title || "Daily Mission"}</div>
-                    <div className="w-full h-1.5 bg-bg/60 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary transition-all duration-1000"
-                        style={{ width: `${Math.min(100, ((mission.progress || 0) / (mission.target || 1)) * 100)}%` }}
-                      />
+            {/* 3. Primary Objectives (Grid) */}
+            <section className="space-y-2">
+              <h2 className="text-xs font-bold text-muted-foreground tracking-widest flex items-center gap-2">
+                <Activity className="w-3 h-3" />
+                OPERATIONS
+              </h2>
+              <div className="grid grid-cols-3 gap-3 md:gap-4">
+                <Link href="/scan">
+                  <Button
+                    id="tutorial-generate-btn"
+                    onClick={() => completeStep('HOME_GENERATE')}
+                    className="h-28 md:h-32 w-full flex flex-col items-center justify-center gap-2 glass-panel border border-neon-cyan/30 hover:bg-neon-cyan/10 hover:border-neon-cyan transition-all group shadow-[0_0_15px_rgba(0,0,0,0.3)] bg-surface1/80"
+                  >
+                    <div className="p-3 rounded-full bg-surface2 group-hover:bg-neon-cyan/20 transition-colors">
+                      <ScanBarcode className="w-6 h-6 text-neon-cyan" />
                     </div>
-                    <div className="mt-1 text-[10px] text-muted-foreground font-mono flex justify-between">
-                      <span>PROGRESS: {mission.progress || 0}/{mission.target || 1}</span>
-                      <span className="text-primary">REWARD: {mission.rewardCredits} CR</span>
+                    <span className="font-bold text-xs text-white tracking-wider group-hover:text-neon-cyan">SCAN</span>
+                  </Button>
+                </Link>
+
+                <Link href="/battle">
+                  <Button className="h-28 md:h-32 w-full flex flex-col items-center justify-center gap-2 glass-panel border border-neon-pink/30 hover:bg-neon-pink/10 hover:border-neon-pink transition-all group shadow-[0_0_15px_rgba(0,0,0,0.3)] bg-surface1/80">
+                    <div className="p-3 rounded-full bg-surface2 group-hover:bg-neon-pink/20 transition-colors">
+                      <Swords className="w-6 h-6 text-neon-pink" />
                     </div>
+                    <span className="font-bold text-xs text-white tracking-wider group-hover:text-neon-pink">BATTLE</span>
+                  </Button>
+                </Link>
+
+                <Link href="/workshop">
+                  <Button className="h-28 md:h-32 w-full flex flex-col items-center justify-center gap-2 glass-panel border border-orange-500/30 hover:bg-orange-500/10 hover:border-orange-500 transition-all group shadow-[0_0_15px_rgba(0,0,0,0.3)] bg-surface1/80">
+                    <div className="p-3 rounded-full bg-surface2 group-hover:bg-orange-500/20 transition-colors">
+                      <Factory className="w-6 h-6 text-orange-500" />
+                    </div>
+                    <span className="font-bold text-xs text-white tracking-wider group-hover:text-orange-500">CRAFT</span>
+                  </Button>
+                </Link>
+              </div>
+            </section>
+          </div>
+
+          {/* Side Column (Mission / Status) */}
+          <div className="md:col-span-4 space-y-4">
+
+            {/* Daily Missions (Consolidated) */}
+            <TechCard className="p-4 h-full flex flex-col" intensity="medium" variant="outline">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-xs font-bold text-muted-foreground tracking-widest flex items-center gap-2">
+                  <Trophy className="w-3 h-3 text-yellow-500" />
+                  DAILY ORDERS
+                </h3>
+                <span className="text-[10px] text-muted-foreground/60">RESET: 00:00 JST</span>
+              </div>
+
+              {/* Daily Login Button inline if not claimed */}
+              {!hasClaimed && (
+                <div className="mb-4 flex items-center justify-between bg-surface2/50 p-2 rounded border border-yellow-500/30">
+                  <div className="text-xs font-bold text-yellow-500 flex items-center gap-2">
+                    <span className="animate-pulse">●</span> LOGIN BONUS
                   </div>
-
                   <Button
                     size="sm"
-                    disabled={mission.claimed || (mission.progress || 0) < (mission.target || 1) || claimingMissionId === mission.id}
-                    onClick={() => handleClaimMission(mission.id)}
-                    className={`ml-3 text-[10px] font-black tracking-tighter ${
-                      mission.claimed
-                        ? 'bg-surface2 text-muted'
-                        : (mission.progress || 0) >= (mission.target || 1)
-                          ? 'bg-primary text-black hover:bg-primary/80'
-                          : 'bg-bg/60 text-muted border border-border/60 hover:bg-surface2/80'
-                    }`}
+                    onClick={handleClaimLoginBonus}
+                    disabled={isClaimingLogin}
+                    className="h-7 text-xs bg-yellow-500/20 text-yellow-500 hover:bg-yellow-500/40 border border-yellow-500/50"
                   >
-                    {claimingMissionId === mission.id ? <Loader2 className="w-3 h-3 animate-spin" /> : mission.claimed ? "CLAIMED" : "CLAIM"}
+                    {isClaimingLogin ? "Claiming..." : "CLAIM"}
                   </Button>
                 </div>
-              ))}
-            </div>
-          )}
-        </section>
+              )}
 
-
-        {/* Robot List Preview */}
-        <section className="space-y-2">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-bold font-orbitron flex items-center gap-2">
-              <Zap className="w-5 h-5 text-primary" />
-              YOUR UNIT
-            </h2>
-            <Link href="/collection">
-              <Button variant="link" className="text-primary h-auto p-0 text-xs">VIEW ALL &gt;</Button>
-            </Link>
-          </div>
-
-          <div className="w-full">
-            {loading ? (
-              <div className="py-8 text-center text-muted-foreground animate-pulse">Scanning database...</div>
-            ) : robots.length === 0 ? (
-              <div className="py-8 text-center glass-panel rounded-lg border-dashed border-border/60">
-                <p className="text-muted-foreground mb-4">No Units Found</p>
-                <Link href="/scan"><Button variant="secondary">Generate First Robot</Button></Link>
-              </div>
-            ) : (
-              <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x snap-mandatory">
-                {robots.slice(0, 8).map((robot, index) => (
-                  <Link key={robot.id} href={'/robots/' + robot.id} className="snap-start">
-                    <div
-                      className="glass-panel p-3 rounded-lg flex items-center gap-3 hover:border-border transition-all cursor-pointer group min-w-[220px] card-in"
-                      style={{ "--delay": `${index * 60}ms` } as CSSProperties}
-                    >
-                      <RobotSVG parts={robot.parts} colors={robot.colors} size={56} />
-                      <div className="flex-1 min-w-0">
-                        <div className="font-bold truncate text-text group-hover:text-primary transition-colors">{robot.name}</div>
-                        <div className="text-xs text-muted-foreground font-mono">
-                          Lv.{robot.level || 1} • <span className="text-muted-foreground">{robot.rarityName}</span>
+              {/* Mission List */}
+              <div className="space-y-2 flex-1">
+                {missionsLoading ? (
+                  <div className="text-xs text-muted-foreground text-center py-2 animate-pulse">SYNCING...</div>
+                ) : missions.length === 0 ? (
+                  <div className="text-xs text-muted-foreground text-center py-2">NO ACTIVE ORDERS</div>
+                ) : (
+                  missions.slice(0, 3).map(mission => (
+                    <div key={mission.id} className="flex items-center justify-between p-2 bg-surface1/50 rounded border border-white/5">
+                      <div className="flex-1">
+                        <div className="text-xs font-bold text-gray-300">{mission.title}</div>
+                        <div className="w-full h-1 bg-white/10 rounded-full mt-1.5 overflow-hidden">
+                          <div className="h-full bg-neon-cyan transition-all" style={{ width: `${Math.min(100, ((mission.progress || 0) / (mission.target || 1)) * 100)}%` }} />
                         </div>
                       </div>
-                      <div className="text-[10px] font-mono text-muted-foreground">
-                        HP {robot.baseHp}
-                      </div>
+                      <Button
+                        size="sm"
+                        disabled={mission.claimed || (mission.progress || 0) < (mission.target || 1) || claimingMissionId === mission.id}
+                        onClick={() => handleClaimMission(mission.id)}
+                        className={cn("ml-3 h-6 px-3 text-[10px] font-bold uppercase",
+                          mission.claimed ? "bg-transparent text-muted-foreground border border-white/10" :
+                            (mission.progress || 0) >= (mission.target || 1) ? "bg-neon-cyan text-black hover:bg-white" : "bg-transparent text-muted-foreground border border-white/10"
+                        )}
+                      >
+                        {mission.claimed ? "DONE" : "CLAIM"}
+                      </Button>
                     </div>
-                  </Link>
-                ))}
+                  ))
+                )}
               </div>
-            )}
+            </TechCard>
+
+            {/* Quick Link Rows (Vertical Stack in Side Column) */}
+            <div className="flex flex-col gap-3">
+              <Link href="/shop">
+                <TechCard className="p-3 flex items-center gap-3 cursor-pointer group hover:bg-white/5 transition-colors" variant="outline" intensity="low">
+                  <div className="p-2 rounded bg-surface2 text-primary group-hover:text-white transition-colors">
+                    <ShoppingCart className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-white">SHOP</div>
+                    <div className="text-[10px] text-muted-foreground">SUPPLIES</div>
+                  </div>
+                </TechCard>
+              </Link>
+              <Link href="/collection">
+                <TechCard className="p-3 flex items-center gap-3 cursor-pointer group hover:bg-white/5 transition-colors" variant="outline" intensity="low">
+                  <div className="p-2 rounded bg-surface2 text-primary group-hover:text-white transition-colors">
+                    <Users className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-white">UNITS</div>
+                    <div className="text-[10px] text-muted-foreground">DATABASE</div>
+                  </div>
+                </TechCard>
+              </Link>
+            </div>
+
           </div>
-        </section>
+        </div>
 
         <AdBanner />
 
-        {permission === 'default' && (
-          <div className="flex justify-center mt-4">
-            <Button
-              variant="outline"
-              onClick={requestPermission}
-              className="border-neon-cyan text-neon-cyan hover:bg-neon-cyan/20"
-            >
-              <Zap className="mr-2 h-4 w-4" />
-              通知を有効にする
+        {/* Footer Area */}
+        <div className="text-center pb-8 pt-4">
+          {permission === 'default' && (
+            <Button variant="ghost" size="sm" onClick={requestPermission} className="text-xs text-muted-foreground hover:text-white">
+              <Zap className="w-3 h-3 mr-1" /> Enable Notifications
             </Button>
-          </div>
-        )}
+          )}
+          <p className="text-[10px] text-white/20 mt-4 font-mono">
+            BARCODE GENESIS SYSTEM v{import.meta.env.VITE_APP_VERSION || '1.0.0'}
+          </p>
+        </div>
 
         <TutorialModal />
 
+        {/* --- Modals/Dialogs preserved --- */}
         <Dialog open={showLimitModal} onOpenChange={setShowLimitModal}>
           <DialogContent className="bg-card border-neon-cyan text-foreground">
             <DialogHeader>
               <DialogTitle className="text-neon-cyan flex items-center gap-2">
                 <Zap className="h-5 w-5" />
-                GENERATION LIMIT REACHED
+                製造上限に達しました
               </DialogTitle>
               <DialogDescription className="text-muted-foreground pt-4">
                 {limitMessage}
@@ -489,14 +502,20 @@ export default function Home() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-        <div className="mt-8 pb-8 text-center">
-          <p className="text-gray-500 text-xs font-mono">
-            v{import.meta.env.VITE_APP_VERSION || '1.0.0-dev'}
-          </p>
-        </div>
+
       </main>
+
+      <style>{`
+        @keyframes marquee {
+          0% { transform: translateX(100%); }
+          100% { transform: translateX(-100%); }
+        }
+        .animate-marquee {
+          animation: marquee 20s linear infinite;
+        }
+      `}</style>
     </div>
   );
-
-
 }
+
+

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, memo } from "react";
 import { getMotif, getRarityTier, getRobotSeed, type Motif, type RarityTier, type RobotPartsSeed } from "@/lib/rarity";
 
 type RobotParts = RobotPartsSeed;
@@ -10,7 +10,7 @@ interface RobotColors {
   glow: string;
 }
 
-export type RobotVariant = "idle" | "scan" | "evolve" | "battle";
+export type RobotVariant = "idle" | "scan" | "evolve" | "battle" | "maintenance";
 
 interface RobotFx {
   variant: RobotVariant;
@@ -27,6 +27,10 @@ interface RobotSVGProps {
   showGlow?: boolean;
   variant?: RobotVariant;
   fx?: RobotFx;
+  /** Render as black silhouette with noise effect (for locked dex entries) */
+  variantKey?: number; // Visual seed (0-99)
+  isRareVariant?: boolean; // Rarity >= 3 trigger for Type B visuals
+  silhouette?: boolean;
 }
 
 const pickFromPalette = (palette: string[], seed: number, salt = 0) => {
@@ -34,7 +38,7 @@ const pickFromPalette = (palette: string[], seed: number, salt = 0) => {
   return palette[(Math.abs(safeSeed) + salt) % palette.length];
 };
 
-export default function RobotSVG({
+function RobotSVG({
   parts,
   colors,
   size = 200,
@@ -43,7 +47,10 @@ export default function RobotSVG({
   decals = [],
   showGlow = false,
   variant = "idle",
-  fx
+  fx,
+  silhouette = false,
+  variantKey = 0,
+  isRareVariant = false
 }: RobotSVGProps) {
 
   // Use fx.variant/nonce if available
@@ -56,9 +63,20 @@ export default function RobotSVG({
   const motif = useMemo<Motif>(() => getMotif(seed), [seed]);
 
   // Stable ID for gradients/filters
-  const instanceId = useMemo(() => `mech-${seed}`, [seed]);
+  const instanceId = useMemo(() => `mech-${seed}-${variantKey}`, [seed, variantKey]);
 
+  // Color Mapping: Use props.colors if valid, else fall back (though generateRobot always provides them now)
   const colorTokens = useMemo(() => {
+    if (colors && colors.primary) {
+      return {
+        mainColor: colors.primary,
+        subColor: colors.secondary,
+        accentColor: colors.accent,
+        sensorColor: colors.glow,
+        highlightColor: isRareVariant ? colors.glow : colors.accent, // Type B shines more
+      };
+    }
+    // Fallback legacy logic
     const mainColor = "#E6E8EC";
     const subColor = "#2B2F36";
     const sensorPalette = ["#4DFFB3", "#46C7FF"];
@@ -70,7 +88,7 @@ export default function RobotSVG({
     const sensorColor = pickFromPalette(sensorPalette, seed, 11);
     const highlightColor = "#F5D24B";
     return { mainColor, subColor, accentColor, sensorColor, highlightColor };
-  }, [seed, tier]);
+  }, [seed, tier, colors, isRareVariant]);
 
   const { mainColor, subColor, accentColor, sensorColor, highlightColor } = colorTokens;
 
@@ -129,8 +147,31 @@ export default function RobotSVG({
           <feMergeNode in="SourceGraphic" />
         </feMerge>
       </filter>
+
+      {/* Silhouette filter: converts all colors to dark silhouette with noise */}
+      <filter id={`${instanceId}-silhouette`} x="0" y="0" width="100%" height="100%">
+        {/* Convert to grayscale then darken to near-black */}
+        <feColorMatrix
+          type="matrix"
+          values="0 0 0 0 0.12
+                  0 0 0 0 0.12
+                  0 0 0 0 0.15
+                  0 0 0 1 0"
+          result="darkened"
+        />
+        {/* Add subtle noise for mystery effect */}
+        <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" result="noise" />
+        <feBlend in="darkened" in2="noise" mode="overlay" result="noisy" />
+        {/* Reduce noise intensity */}
+        <feComponentTransfer in="noisy">
+          <feFuncR type="linear" slope="0.85" intercept="0.05" />
+          <feFuncG type="linear" slope="0.85" intercept="0.05" />
+          <feFuncB type="linear" slope="0.85" intercept="0.08" />
+        </feComponentTransfer>
+      </filter>
     </defs>
   );
+
 
   // Layering Component: Fill -> Shade -> Rim -> Outline -> Texture -> Details
   const MechPart = ({
@@ -272,7 +313,7 @@ export default function RobotSVG({
       </g>,
       // B3: Orb Core + Slit
       <g key="b3">
-        <MechPart d="M70 90 L130 90 L120 120 L80 120 Z" fillColor={mainColor} stroke="none" />
+        <MechPart d="M70 90 L130 90 L120 120 L80 120 Z" fillColor={mainColor} />
         <circle cx="100" cy="90" r="16" fill={subColor} />
         <circle cx="100" cy="90" r="8" fill={activeGlow} className={`glow-sensor variant-${activeVariant}`} filter={`url(#${instanceId}-glow)`} />
         <MechPart d="M70 65 L130 65 L130 75 L70 75 Z" fillColor={mainColor} />
@@ -281,12 +322,84 @@ export default function RobotSVG({
     return variants[(parts.body - 1) % variants.length] || variants[0];
   };
 
+  // --- Visual Variant Components ---
+
+  const ShoulderArmor = () => {
+    // variantKey determines style: 0-2=None, 3-4=Round, 5-6=Spike, 7-8=Plate
+    const style = variantKey % 9;
+
+    if (style < 3) return null;
+
+    const shape = (() => {
+      if (style <= 4) { // Round
+        return <MechPart d="M-10 0 L30 0 L30 35 L10 50 L-10 35 Z" fillColor={mainColor}><circle cx="10" cy="20" r="5" fill={subColor} opacity="0.5" stroke="none" /></MechPart>;
+      }
+      if (style <= 6) { // Spike
+        return <MechPart d="M-5 0 L25 0 L35 25 L10 60 L-15 25 Z" fillColor={subColor}><path d="M-15 25 L10 25" stroke={accentColor} /></MechPart>;
+      }
+      return <MechPart d="M-15 -10 L35 -10 L35 20 L20 40 L0 40 L-15 20 Z" fillColor={mainColor}><rect x="0" y="0" width="20" height="10" fill={subColor} stroke="none" /></MechPart>;
+    })();
+
+    return (
+      <>
+        <g transform="translate(15, 60)">{shape}</g>
+        <g transform="translate(185, 60) scale(-1, 1)">{shape}</g>
+      </>
+    );
+  };
+
+  const ExtraBackpack = () => {
+    // variantKey determines style: 0-2=None, 3-4=Wings, 5-6=Cannons, 7=Radome
+    const style = Math.floor(variantKey / 10) % 8;
+
+    if (style < 3) return null;
+
+    if (style <= 4) { // Wings
+      return (
+        <>
+          <g transform="translate(0, 20)">
+            <MechPart d="M20 20 L0 0 L-20 40 L20 60 Z" fillColor={subColor} />
+            <path d="M0 10 L10 30" stroke={activeGlow} filter={`url(#${instanceId}-glow)`} />
+          </g>
+          <g transform="translate(200, 20) scale(-1, 1)">
+            <MechPart d="M20 20 L0 0 L-20 40 L20 60 Z" fillColor={subColor} />
+            <path d="M0 10 L10 30" stroke={activeGlow} filter={`url(#${instanceId}-glow)`} />
+          </g>
+        </>
+      );
+    }
+
+    if (style <= 6) { // Cannons
+      return (
+        <>
+          <g transform="translate(45, 10) rotate(-10)">
+            <MechPart d="M0 0 L15 0 L15 50 L0 50 Z" fillColor={subColor} />
+            <rect x="3" y="2" width="9" height="15" fill={accentColor} stroke="none" />
+          </g>
+          <g transform="translate(155, 10) rotate(10) scale(-1, 1)">
+            <MechPart d="M0 0 L15 0 L15 50 L0 50 Z" fillColor={subColor} />
+            <rect x="3" y="2" width="9" height="15" fill={accentColor} stroke="none" />
+          </g>
+        </>
+      );
+    }
+
+    // Radome
+    return (
+      <g transform="translate(140, 20)">
+        <MechPart d="M0 0 L30 0 L35 25 L-5 25 Z" fillColor={subColor} />
+        <circle cx="15" cy="12" r="6" fill={activeGlow} filter={`url(#${instanceId}-glow)`} />
+      </g>
+    );
+  };
+
   const Arms = () => {
     const shape = (() => {
       const idx = (parts.armLeft - 1) % 4;
       if (idx === 0) return ( // Blocky
         <MechPart d="M0 0 L25 0 L22 35 L25 65 L0 65 L-5 35 Z" fillColor={subColor}>
           <rect x="0" y="10" width="20" height="5" fill={accentColor} stroke="none" opacity="0.8" />
+          <path d="M-10 25 L35 25" />
         </MechPart>
       );
       if (idx === 1) return ( // Piston
@@ -561,10 +674,31 @@ export default function RobotSVG({
              50% { transform: scaleY(1.3); opacity: 1; }
              100% { transform: scaleY(1.0); opacity: 0.8; }
           }
+          @keyframes maintenance-scan-${instanceId} {
+             0% { top: 0%; opacity: 0; }
+             20% { opacity: 1; }
+             80% { opacity: 1; }
+             100% { top: 100%; opacity: 0; }
+          }
+          @keyframes maintenance-jitter-${instanceId} {
+             0% { transform: translate(0, 0); }
+             25% { transform: translate(0.5px, 0.5px); }
+             50% { transform: translate(-0.5px, -0.5px); }
+             75% { transform: translate(0.5px, -0.5px); }
+             100% { transform: translate(0, 0); }
+          }
+          @keyframes maintenance-blink-${instanceId} {
+             0%, 100% { opacity: 0.2; }
+             50% { opacity: 0.8; }
+          }
 
           /* Classes */
           .mech-anim-${instanceId} {
-            animation: ${animate ? `hover-${instanceId} 4s ease-in-out infinite` : 'none'};
+            animation: ${activeVariant === 'maintenance'
+          ? `maintenance-jitter-${instanceId} 0.2s steps(2) infinite`
+          : animate
+            ? `hover-${instanceId} 4s ease-in-out infinite`
+            : 'none'};
           }
           .thruster-anim {
              animation: ${animate ? `thruster-breath-${instanceId} 2.2s ease-in-out infinite` : 'none'};
@@ -585,40 +719,111 @@ export default function RobotSVG({
           
           .variant-evolve .glow-sensor { opacity: 0; animation: high-alert-pulse-${instanceId} 0.3s infinite; }
           .variant-evolve .glow-thruster { opacity: 0.2; }
+
+          .variant-maintenance .glow-sensor { animation: maintenance-blink-${instanceId} 2s ease-in-out infinite; }
+          .variant-maintenance .glow-thruster { opacity: 0.1; }
+          .variant-maintenance .glow-slit { opacity: 0.1; }
       `}</style>
 
-      {/* Background Glow (Optional) */}
-      {showGlow && (
+      {/* Background Glow (Optional) - hidden in silhouette mode */}
+      {showGlow && !silhouette && (
         <radialGradient id={`${instanceId}-bg-glow`} cx="50%" cy="50%" r="50%">
           <stop offset="0%" stopColor={activeGlow} stopOpacity="0.15" />
           <stop offset="100%" stopColor="transparent" stopOpacity="0" />
         </radialGradient>
       )}
-      {showGlow && <circle cx="100" cy="100" r="90" fill={`url(#${instanceId}-bg-glow)`} />}
+      {showGlow && !silhouette && <circle cx="100" cy="100" r="90" fill={`url(#${instanceId}-bg-glow)`} />}
 
-      {/* Render Order: Back -> Thrusters -> Legs -> Arms -> Body -> Head -> Weapon */}
-      <g className={`mech-anim-${instanceId}`}>
-        <Backpack />
-        <Thrusters />
-        <Legs />
-        <Arms />
-        <Body />
-        <Head />
-        <Weapon />
+      {/* Main robot rendering - wrapped in silhouette filter when locked */}
+      <g filter={silhouette ? `url(#${instanceId}-silhouette)` : undefined}>
+        {/* Render Order: Back -> Thrusters -> Legs -> Arms -> Body -> Head -> Weapon */}
+        <g className={silhouette ? undefined : `mech-anim-${instanceId}`}>
+          <ExtraBackpack />
+          <Backpack />
+          <Thrusters />
+          <Legs />
+          <Arms />
+          <ShoulderArmor />
+          <Body />
+          <Head />
+          <Weapon />
+        </g>
+
+        <g id="msShadow" opacity="0.12">
+          <path d="M110 72 L150 72 L165 130 L150 176 L110 176 Z" fill="#000" />
+        </g>
+
+        {!silhouette && msOverlay}
+        {!silhouette && motifOverlay}
+
+        {/* Decals Overlay - hidden in silhouette mode */}
+        {!silhouette && decals.includes('hazard') && (
+          <path d="M100 80 L110 80 L105 90 Z" fill={accentColor} opacity="0.6" style={{ mixBlendMode: 'multiply' }} />
+        )}
+
+        {/* Maintenance Scanline Overlay */}
+        {activeVariant === 'maintenance' && !silhouette && (
+          <g>
+            <rect x="0" y="-10" width="200" height="2" fill={activeGlow} opacity="0.5" style={{ animation: `maintenance-scan-${instanceId} 2s linear infinite` }} />
+            <rect x="50" y="80" width="2" height="2" fill="white" opacity="0.8" style={{ animation: `maintenance-blink-${instanceId} 0.5s steps(2) infinite 0.2s` }} />
+            <rect x="150" y="120" width="2" height="2" fill="white" opacity="0.8" style={{ animation: `maintenance-blink-${instanceId} 0.7s steps(2) infinite 0.5s` }} />
+          </g>
+        )}
       </g>
-
-      <g id="msShadow" opacity="0.12">
-        <path d="M110 72 L150 72 L165 130 L150 176 L110 176 Z" fill="#000" />
-      </g>
-
-      {msOverlay}
-      {motifOverlay}
-
-      {/* Decals Overlay */}
-      {decals.includes('hazard') && (
-        <path d="M100 80 L110 80 L105 90 Z" fill={accentColor} opacity="0.6" style={{ mixBlendMode: 'multiply' }} />
-      )}
 
     </svg>
   );
 }
+
+// Memoize to prevent expensive re-renders of complex SVG
+// Custom comparison to handle object props efficiently
+export default memo(RobotSVG, (prevProps, nextProps) => {
+  // Re-render if essential props change
+  if (
+    prevProps.parts !== nextProps.parts ||
+    prevProps.size !== nextProps.size ||
+    prevProps.variant !== nextProps.variant ||
+    prevProps.silhouette !== nextProps.silhouette ||
+    prevProps.showGlow !== nextProps.showGlow ||
+    prevProps.animate !== nextProps.animate ||
+    prevProps.variantKey !== nextProps.variantKey ||
+    prevProps.isRareVariant !== nextProps.isRareVariant
+  ) {
+    return false; // Props changed, re-render
+  }
+
+  // Check colors object (shallow comparison)
+  if (prevProps.colors !== nextProps.colors) {
+    const prevColors = prevProps.colors;
+    const nextColors = nextProps.colors;
+    if (
+      prevColors.primary !== nextColors.primary ||
+      prevColors.secondary !== nextColors.secondary ||
+      prevColors.accent !== nextColors.accent ||
+      prevColors.glow !== nextColors.glow
+    ) {
+      return false; // Colors changed, re-render
+    }
+  }
+
+  // Check fx object
+  if (prevProps.fx !== nextProps.fx) {
+    if (!prevProps.fx || !nextProps.fx) return false;
+    if (
+      prevProps.fx.variant !== nextProps.fx.variant ||
+      prevProps.fx.nonce !== nextProps.fx.nonce
+    ) {
+      return false; // FX changed, re-render
+    }
+  }
+
+  // Check decals array
+  if (prevProps.decals !== nextProps.decals) {
+    if (!prevProps.decals && !nextProps.decals) return true;
+    if (!prevProps.decals || !nextProps.decals) return false;
+    if (prevProps.decals.length !== nextProps.decals.length) return false;
+    if (prevProps.decals.some((d, i) => d !== nextProps.decals![i])) return false;
+  }
+
+  return true; // No changes, skip re-render
+});

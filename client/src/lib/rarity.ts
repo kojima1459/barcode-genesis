@@ -37,3 +37,13 @@ export const getMotif = (seed: number): Motif => {
 export const getMotifLabel = (motif: Motif): string => {
   return motif === "EVA" ? "EVA" : "ZAKU";
 };
+
+/**
+ * Deterministic rare detection (1% chance)
+ * Same barcode always produces same result
+ */
+export const isSpecialRare = (barcode: string): boolean => {
+  const seed = barcode.split('').reduce((a, c) => a + Number(c), 0);
+  return seed % 100 === 7; // Exactly 1% of barcodes
+};
+

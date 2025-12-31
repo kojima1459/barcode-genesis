@@ -9,6 +9,7 @@ import { functions } from "@/lib/firebase";
 import { toast } from "sonner";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import AdBanner from "@/components/AdBanner";
 
 const CREDIT_PACKS = [
     { id: "credits_100", credits: 100, price: 120, popular: false },
@@ -243,6 +244,7 @@ export default function Premium() {
                     <p>※ プレミアム会員は月額自動更新です。解約はいつでも可能です。</p>
                     <p>※ クレジットは購入後すぐにアカウントに反映されます。</p>
                 </section>
+                <AdBanner />
             </main>
         </div>
     );

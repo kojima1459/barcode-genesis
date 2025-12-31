@@ -4,10 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { db } from "@/lib/firebase";
 import { collectionGroup, getDocs, query, orderBy, limit } from "firebase/firestore";
 import { ArrowLeft, Trophy, Medal, Crown } from "lucide-react";
+import { SystemSkeleton } from "@/components/ui/SystemSkeleton";
 import { Link } from "wouter";
 import RobotSVG from "@/components/RobotSVG";
-import { Loader2 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { Interactive } from "@/components/ui/interactive";
 
 interface RobotData {
   id: string;
@@ -93,8 +94,12 @@ export default function Leaderboard() {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <div className="flex justify-center p-8">
-                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              <div className="flex justify-center p-4">
+                <SystemSkeleton
+                  className="w-full h-64 rounded-xl"
+                  text="COMPILING HALL OF FAME..."
+                  subtext="QUERYING GLOBAL UNIT STATISTICS"
+                />
               </div>
             ) : topRobots.length === 0 ? (
               <div className="text-center p-8 text-muted-foreground">
@@ -103,9 +108,9 @@ export default function Leaderboard() {
             ) : (
               <div className="space-y-2">
                 {topRobots.map((robot, index) => (
-                  <div
+                  <Interactive
                     key={robot.id}
-                    className={`flex items-center p-4 rounded-lg border ${index < 3 ? 'bg-secondary/10 border-primary/20' : 'bg-card'}`}
+                    className={`flex items-center p-4 rounded-lg border h-auto ${index < 3 ? 'bg-secondary/10 border-primary/20' : 'bg-card'}`}
                   >
                     <div className="flex items-center justify-center w-12 mr-4">
                       {getRankIcon(index)}
@@ -131,7 +136,7 @@ export default function Leaderboard() {
                       <div className="font-bold text-lg text-primary">{robot.wins || 0}</div>
                       <div className="text-xs text-muted-foreground">{t('wins')}</div>
                     </div>
-                  </div>
+                  </Interactive>
                 ))}
               </div>
             )}

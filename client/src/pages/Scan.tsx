@@ -17,6 +17,11 @@ import ShareCardModal from "@/components/ShareCardModal";
 import { useRobotFx } from "@/hooks/useRobotFx";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/lib/firebase";
+import AdBanner from "@/components/AdBanner";
+import RoleReveal from "@/components/RoleReveal";
+import { isSpecialRare } from "@/lib/rarity";
+import { Interactive } from "@/components/ui/interactive";
+import { ScrambleText } from "@/components/ui/ScrambleText";
 
 const getCallableErrorCode = (error: unknown) => {
     if (error && typeof error === "object" && "code" in error) {
@@ -30,11 +35,13 @@ export default function Scan() {
     const { t } = useLanguage();
     const { playSE } = useSound();
     const [, setLocation] = useLocation();
-    const [mode, setMode] = useState<'scan' | 'generating' | 'result'>('scan');
+    const [mode, setMode] = useState<'scan' | 'generating' | 'revealing' | 'result'>('scan');
     const [robot, setRobot] = useState<RobotData | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
     const [showLimitModal, setShowLimitModal] = useState(false);
     const [limitMessage, setLimitMessage] = useState("");
+    const [isRare, setIsRare] = useState(false);
+    const [scannedBarcode, setScannedBarcode] = useState("");
 
     const { triggerHaptic } = useHaptic();
 
@@ -87,12 +94,10 @@ export default function Scan() {
 
             if (data?.robot) {
                 setRobot(data.robot);
-                setMode('result');
-                trigger("scan");
-                // Success haptic handled in context or here? 
-                // GenerationAnimation handles 'heavy' reveal, so we might duplicate if we do success here.
-                // Let's rely on GenerationAnimation's final sound/haptic.
-                toast.success(t('scan_success') || "ロボット生成成功！");
+                setScannedBarcode(barcode);
+                setIsRare(isSpecialRare(barcode));
+                setMode('revealing');
+                // Sound and haptic handled in reveal phase
             } else {
                 toast.error(t('scan_failed') || "生成に失敗しました");
                 setMode('scan');
@@ -170,6 +175,35 @@ export default function Scan() {
                     </div>
                 )}
 
+                {mode === 'revealing' && robot && (
+                    <>
+                        <RoleReveal
+                            roleName={robot.roleName || ''}
+                            roleTitle={robot.roleTitle || ''}
+                            isRare={isRare}
+                            onRevealMoment={() => {
+                                if (isRare) {
+                                    playSE('se_rare');
+                                } else {
+                                    playSE('se_reveal');
+                                }
+                                triggerHaptic('heavy');
+                            }}
+                            onComplete={() => {
+                                trigger("scan");
+                                toast.success(t('scan_success') || "ロボット生成成功！");
+                                setMode('result');
+                            }}
+                        />
+                        {/* Show robot preview behind reveal */}
+                        <div className="w-full max-w-md px-4 opacity-20">
+                            <div className="glass-panel p-8 rounded-2xl">
+                                <RobotSVG parts={robot.parts} colors={robot.colors} size={200} animate={false} />
+                            </div>
+                        </div>
+                    </>
+                )}
+
                 {mode === 'result' && robot && (
                     <div className="flex flex-col items-center gap-8 py-8 w-full pop-in" id="tutorial-scan-result">
                         <div className="glass-panel p-8 rounded-2xl border-neon-cyan shadow-[0_0_20px_rgba(62,208,240,0.3)] pop-glow">
@@ -177,33 +211,43 @@ export default function Scan() {
                         </div>
 
                         <div className="text-center space-y-4 pop-in">
-                            <h2 className="text-3xl font-semibold font-orbitron text-white">{robot.name}</h2>
+                            <h2 className="text-3xl font-semibold font-orbitron text-white">
+                                <ScrambleText text={robot.name} duration={1200} />
+                            </h2>
                             <div className="flex gap-3 justify-center">
                                 <span className="px-3 py-1 rounded-full bg-neon-cyan/20 text-neon-cyan text-sm font-bold border border-neon-cyan/50">
-                                    {robot.rarityName}
+                                    <ScrambleText text={robot.rarityName} delay={400} />
                                 </span>
                                 <span className="px-3 py-1 rounded-full bg-neon-purple/20 text-neon-purple text-sm font-bold border border-neon-purple/50">
-                                    {robot.elementName}
+                                    <ScrambleText text={robot.elementName || "Unknown"} delay={600} />
                                 </span>
                             </div>
 
                             <div className="grid grid-cols-4 gap-4 mt-6 text-center">
-                                <div>
-                                    <div className="text-2xl font-bold text-white">{robot.baseHp}</div>
+                                <Interactive className="h-auto">
+                                    <div className="text-2xl font-bold text-white">
+                                        <ScrambleText text={String(robot.baseHp)} delay={400} />
+                                    </div>
                                     <div className="text-xs text-muted-foreground">HP</div>
-                                </div>
-                                <div>
-                                    <div className="text-2xl font-bold text-red-400">{robot.baseAttack}</div>
+                                </Interactive>
+                                <Interactive className="h-auto">
+                                    <div className="text-2xl font-bold text-red-400">
+                                        <ScrambleText text={String(robot.baseAttack)} delay={500} />
+                                    </div>
                                     <div className="text-xs text-muted-foreground">ATK</div>
-                                </div>
-                                <div>
-                                    <div className="text-2xl font-bold text-blue-400">{robot.baseDefense}</div>
+                                </Interactive>
+                                <Interactive className="h-auto">
+                                    <div className="text-2xl font-bold text-blue-400">
+                                        <ScrambleText text={String(robot.baseDefense)} delay={600} />
+                                    </div>
                                     <div className="text-xs text-muted-foreground">DEF</div>
-                                </div>
-                                <div>
-                                    <div className="text-2xl font-bold text-yellow-400">{robot.baseSpeed}</div>
+                                </Interactive>
+                                <Interactive className="h-auto">
+                                    <div className="text-2xl font-bold text-yellow-400">
+                                        <ScrambleText text={String(robot.baseSpeed)} delay={700} />
+                                    </div>
                                     <div className="text-xs text-muted-foreground">SPD</div>
-                                </div>
+                                </Interactive>
                             </div>
                         </div>
 
@@ -229,6 +273,7 @@ export default function Scan() {
                                 </Link>
                             </div>
                         </div>
+                        <AdBanner />
                     </div>
                 )}
 

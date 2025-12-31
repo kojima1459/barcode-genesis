@@ -74,7 +74,14 @@ export interface RobotData {
   family?: number;           // 1-5 (DRINK, SNACK, DAILY, BEAUTY, OTHER)
   familyName?: string;
   slot?: number;             // 0-19
-  evolutionLevel?: number;   // 0+
+  evolutionLevel: number;   // 0+
+  epithet?: string; // 二つ名 (e.g., "《紅蓮の》")
+  variantKey?: number; // Visual variant seed (0-99)
+
+  // ロール（アーキタイプ）
+  role?: RobotRole;          // ATTACKER | TANK | SPEED | BALANCE | TRICKY
+  roleName?: string;         // 日本語ロール名 (e.g., "アタッカー")
+  roleTitle?: string;        // ロール称号 (e.g., "突撃")
 
   // 統計
   totalBattles: number;
@@ -96,6 +103,17 @@ export interface GenerateRobotResponse {
 // ============================================
 // BattleEngine v2 Types
 // ============================================
+
+// Robot Archetypes (Roles)
+export type RobotRole = 'ATTACKER' | 'TANK' | 'SPEED' | 'BALANCE' | 'TRICKY';
+
+// Special Move Types (role-based, 1 per battle)
+export type SpecialMoveType = 'PIERCING_ASSAULT' | 'IRON_FORTRESS' | 'RAPID_COMBO' | 'ADAPTIVE_STRIKE' | 'CHAOS_DISRUPT';
+
+export interface SpecialMoveInput {
+  p1Used: boolean;  // P1 activates special this battle
+  p2Used: boolean;  // P2 activates special this battle
+}
 
 export type Stance = "ATTACK" | "GUARD" | "TRICK";
 export type StanceOutcome = "WIN" | "LOSE" | "DRAW";
@@ -160,6 +178,13 @@ export interface BattleLog {
   stunApplied?: boolean;
   stunTargetId?: string;
   stunned?: boolean;
+
+  // Special Move System (必殺技)
+  specialTriggered?: boolean;
+  specialName?: string;
+  specialRoleName?: string;
+  specialImpact?: string;  // e.g., "DEF貫通×1.8", "回復15%"
+  specialHits?: number;    // For multi-hit specials like RAPID_COMBO
 }
 
 // ============================================

@@ -7,9 +7,9 @@
 
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
-  --font-display: "Oxanium", "Rajdhani", "Orbitron", system-ui, sans-serif;
+  --font-display: "Orbitron", "Oxanium", "Rajdhani", system-ui, sans-serif;
   --font-body: "IBM Plex Sans JP", "Inter", "Noto Sans JP", system-ui, sans-serif;
-  --font-orbitron: "Oxanium", "Rajdhani", "Orbitron", system-ui, sans-serif;
+  --font-orbitron: "Orbitron", "Oxanium", "Rajdhani", system-ui, sans-serif;
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
@@ -93,6 +93,25 @@
   .text-shadow-sm {
     text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
   }
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .interactive-glow {
+    @apply transition-all duration-300;
+  }
+  .interactive-glow:hover {
+    box-shadow: 0 0 15px color-mix(in oklab, var(--primary) 40%, transparent), 
+                inset 0 0 5px color-mix(in oklab, var(--primary) 20%, transparent);
+    border-color: color-mix(in oklab, var(--primary) 60%, transparent);
+  }
+  .bg-noise {
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+    pointer-events: none;
+  }
 }
 
 :root {
@@ -151,12 +170,39 @@
   }
   body {
     @apply bg-bg text-text;
-    font-family: var(--font-body);
-    font-size: var(--fs-md);
-    line-height: var(--lh-relaxed);
-    letter-spacing: var(--tracking-normal);
     text-rendering: optimizeLegibility;
+    background-color: #050a10;
+    background-image: 
+      radial-gradient(circle at 50% 0%, #1a2c4e 0%, transparent 40%),
+      radial-gradient(circle at 80% 20%, #0a1525 0%, transparent 30%),
+      radial-gradient(circle at 20% 80%, #050a10 0%, transparent 40%),
+      linear-gradient(to bottom, #020408, #0a111a);
+    background-attachment: fixed;
   }
+
+  /* Custom Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: color-mix(in oklab, var(--border) 50%, transparent);
+    border-radius: 3px;
+    transition: background 0.3s;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--accent);
+  }
+
+  /* Custom Selection */
+  ::selection {
+    background: var(--accent);
+    color: #000;
+  }
+
   h1,
   h2,
   h3,

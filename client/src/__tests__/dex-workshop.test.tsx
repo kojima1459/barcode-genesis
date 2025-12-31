@@ -18,6 +18,10 @@ describe("Dex -> Workshop wiring", () => {
       firestore.emitCollection(`users/${uid}/variants`, []);
     });
 
+    // Switch to Robots tab (Collection is now default)
+    const robotsTab = screen.getByRole("tab", { name: /Robots/i });
+    await userEvent.click(robotsTab);
+
     await screen.findByText("Alpha");
     const button = screen.getByRole("button", { name: /Use in workshop/i });
     await userEvent.click(button);

@@ -158,7 +158,7 @@ vi.mock("@/lib/firebase", () => ({
 }));
 
 vi.mock("firebase/functions", () => ({
-  httpsCallable: vi.fn(() => vi.fn(async () => ({ data: {} }))),
+  httpsCallable: vi.fn(() => Object.assign(vi.fn(async () => ({ data: {} })), { stream: vi.fn() })),
 }));
 
 vi.mock("firebase/firestore", () => {
@@ -194,8 +194,8 @@ vi.mock("firebase/firestore", () => {
     onSnapshot,
     orderBy: vi.fn(),
     query,
-    setDoc: vi.fn(async () => {}),
-    updateDoc: vi.fn(async () => {}),
+    setDoc: vi.fn(async () => { }),
+    updateDoc: vi.fn(async () => { }),
   };
 });
 

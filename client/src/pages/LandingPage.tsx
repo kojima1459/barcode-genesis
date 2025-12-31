@@ -13,6 +13,13 @@ const Hero = () => {
     const y2 = useTransform(scrollY, [0, 500], [0, -150]);
     const opacity = useTransform(scrollY, [0, 300], [1, 0]);
 
+    const scrollToFeatures = () => {
+        const featuresSection = document.getElementById('features');
+        if (featuresSection) {
+            featuresSection.scrollIntoView({ behavior: 'smooth' });
+        }
+    };
+
     return (
         <section className="relative h-screen w-full flex items-center justify-center overflow-hidden bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-[#111b29] via-[#0b1118] to-[#070a10]">
             {/* Background Grid */}
@@ -36,27 +43,30 @@ const Hero = () => {
                     transition={{ duration: 0.8, ease: "easeOut" }}
                 >
                     <div className="inline-block mb-4 px-3 py-1 border border-border/60 rounded-full bg-panel/60 backdrop-blur-sm text-xs tracking-[0.14em] text-accent font-orbitron">
-                        Next Gen Barcode Battler
+                        次世代バーコードバトラー
                     </div>
                     <h1 className="text-5xl md:text-7xl font-semibold tracking-tight mb-6 bg-clip-text text-transparent bg-gradient-to-b from-white via-white to-white/70 drop-shadow-[0_0_12px_rgba(255,255,255,0.25)] font-orbitron">
                         BARCODE<br />GENESIS
                     </h1>
                     <p className="text-lg md:text-xl text-muted mb-8 max-w-2xl mx-auto leading-relaxed">
-                        Scan reality. Forge your mechanical army. <br />
-                        Every barcode holds a secret power waiting to be unleashed.
+                        現実をスキャンせよ。機械の軍団を築け。<br />
+                        すべてのバーコードには、未知なる力が眠っている。
                     </p>
 
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                         <Link href="/auth">
                             <Button size="lg" className="h-14 px-8 text-lg rounded-full bg-accent text-bg hover:bg-accent/90 transition-all hover:scale-[1.02] shadow-[0_0_20px_rgba(62,208,240,0.3)]">
-                                Start Game <ArrowRight className="ml-2 w-5 h-5" />
+                                ゲームスタート <ArrowRight className="ml-2 w-5 h-5" />
                             </Button>
                         </Link>
-                        <Link href="#features">
-                            <Button variant="outline" size="lg" className="h-14 px-8 text-lg rounded-full border-border/70 text-text hover:bg-panel/60 hover:border-border transition-all">
-                                Learn More
-                            </Button>
-                        </Link>
+                        <Button
+                            variant="outline"
+                            size="lg"
+                            onClick={scrollToFeatures}
+                            className="h-14 px-8 text-lg rounded-full border-border/70 text-text hover:bg-panel/60 hover:border-border transition-all"
+                        >
+                            詳しく見る
+                        </Button>
                     </div>
                 </motion.div>
             </div>
@@ -103,29 +113,29 @@ const Features = () => {
         <section id="features" className="py-24 bg-bg relative">
             <div className="container max-w-6xl mx-auto px-4">
                 <div className="text-center mb-16">
-                    <h2 className="text-3xl md:text-5xl font-semibold mb-6 font-orbitron">System Features</h2>
+                    <h2 className="text-3xl md:text-5xl font-semibold mb-6 font-orbitron">ゲームシステム</h2>
                     <p className="text-muted max-w-2xl mx-auto">
-                        Experience the fusion of physical reality and digital warfare.
+                        現実とデジタルの融合を体験せよ。
                     </p>
                 </div>
 
                 <div className="grid md:grid-cols-3 gap-8">
                     <FeatureCard
                         icon={ScanIcon}
-                        title="Scan & Generate"
-                        desc="Point your camera at any barcode in the real world to generate a unique robot. Every product creates a different mechanical warrior."
+                        title="スキャン＆生成"
+                        desc="身の回りのバーコードをカメラでスキャンして、ユニークなロボットを生成。商品ごとに異なるメカ戦士が誕生します。"
                         delay={0}
                     />
                     <FeatureCard
                         icon={BattleIcon}
-                        title="Tactical Battle"
-                        desc="Auto-battle system with strategic depth. Equip items, customize skills, and challenge rivals in the arena."
+                        title="戦略的バトル"
+                        desc="戦略的なオートバトルシステム。アイテムを装備し、スキルをカスタマイズして、ライバルたちに挑め。"
                         delay={0.2}
                     />
                     <FeatureCard
                         icon={WorkshopIcon}
-                        title="Evolution & Synthesis"
-                        desc="Merge robots to create stronger variants. Inherit skills and stats to build the ultimate combat machine."
+                        title="進化と合成"
+                        desc="ロボット同士を融合させて強化。スキルやステータスを引き継ぎ、究極の機体を組み上げよう。"
                         delay={0.4}
                     />
                 </div>
@@ -153,21 +163,21 @@ const World = () => {
                     className="flex-1 space-y-8"
                 >
                     <div className="inline-block px-3 py-1 text-xs font-mono border border-accent2/50 text-accent2 rounded font-orbitron">
-                        STORY MODE
+                        ストーリー
                     </div>
                     <h2 className="text-4xl md:text-6xl font-semibold leading-tight font-orbitron">
-                        THE WORLD IS<br />
-                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent2 to-accent">YOUR ARMORY</span>
+                        世界は<br />
+                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent2 to-accent">君の武器庫だ</span>
                     </h2>
                     <p className="text-muted text-lg leading-relaxed">
-                        In 204X, the boundary between digital data and physical matter dissolved.
-                        Barcodes became gateways to the "Genesis Layer", where mechanical lifeforms reside.
+                        204X年、デジタルデータと実体物質の境界は消滅した。
+                        バーコードは機械生命体が生息する「ジェネシスレイヤー」への入り口となった。
                         <br /><br />
-                        As a "Scanner", your mission is to explore the world, decode the hidden data, and command your legion in the struggle for digital supremacy.
+                        あなたは「スキャナー」として世界を探索し、隠されたデータを解読。デジタル覇権をかけた戦いに身を投じる。
                     </p>
                     <Link href="/auth">
                         <Button className="rounded-full px-8 bg-accent2 hover:bg-accent2/90 text-bg border-none">
-                            Enter Genesis Layer
+                            ジェネシスレイヤーへ
                         </Button>
                     </Link>
                 </motion.div>

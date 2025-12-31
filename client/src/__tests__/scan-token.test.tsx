@@ -71,7 +71,7 @@ describe("ScanToken issuance UX", () => {
     const awardMock = vi.fn(async () => {
       throw awardError;
     });
-    vi.mocked(httpsCallable).mockImplementationOnce(() => awardMock);
+    vi.mocked(httpsCallable).mockImplementationOnce(() => awardMock as any);
 
     const memory = memoryLocation({ path: "/scan" });
     render(

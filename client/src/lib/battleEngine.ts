@@ -67,6 +67,7 @@ export interface BattleRobotData {
     parts: RobotParts;
     colors: RobotColors;
     skills?: Array<string | Skill>;
+    role?: RobotRole;  // For special move system
 }
 
 export interface BattleLog {
@@ -108,6 +109,13 @@ export interface BattleLog {
     stunApplied?: boolean;
     stunTargetId?: string;
     stunned?: boolean;
+
+    // Special Move System (必殺技)
+    specialTriggered?: boolean;
+    specialName?: string;
+    specialRoleName?: string;
+    specialImpact?: string;
+    specialHits?: number;
 }
 
 export type BattleItemType = 'BOOST' | 'SHIELD' | 'JAMMER' | 'DRONE' | 'DISRUPT' | 'CANCEL_CRIT';
@@ -115,6 +123,15 @@ export type BattleItemType = 'BOOST' | 'SHIELD' | 'JAMMER' | 'DRONE' | 'DISRUPT'
 export interface BattleItemInput {
     p1?: BattleItemType | null;
     p2?: BattleItemType | null;
+}
+
+// Special Move Types (role-based, 1 per battle)
+export type RobotRole = 'ATTACKER' | 'TANK' | 'SPEED' | 'BALANCE' | 'TRICKY';
+export type SpecialMoveType = 'PIERCING_ASSAULT' | 'IRON_FORTRESS' | 'RAPID_COMBO' | 'ADAPTIVE_STRIKE' | 'CHAOS_DISRUPT';
+
+export interface SpecialMoveInput {
+    p1Used: boolean;
+    p2Used: boolean;
 }
 
 export interface BattleResult {
@@ -556,6 +573,91 @@ const getElementMultiplier = (attacker: BattleRobotData, defender: BattleRobotDa
     return 1;
 };
 
+// ============================================
+// Special Move System (必殺技)
+// ============================================
+
+interface SpecialMoveDefinition {
+    type: SpecialMoveType;
+    name: string;
+    roleJa: string;
+    damageMultiplier: number;
+    defPenetration: number;
+    healRatio: number;
+    damageReduction: number;
+    hitCount: number;
+    stunChance: number;
+    guaranteedCrit: boolean;
+}
+
+const SPECIAL_MOVES: Record<RobotRole, SpecialMoveDefinition> = {
+    ATTACKER: {
+        type: 'PIERCING_ASSAULT',
+        name: '貫通強襲',
+        roleJa: 'アタッカー',
+        damageMultiplier: 1.8,
+        defPenetration: 0.3,
+        healRatio: 0,
+        damageReduction: 0,
+        hitCount: 1,
+        stunChance: 0,
+        guaranteedCrit: false,
+    },
+    TANK: {
+        type: 'IRON_FORTRESS',
+        name: '鉄壁の盾',
+        roleJa: 'タンク',
+        damageMultiplier: 0.8,
+        defPenetration: 0,
+        healRatio: 0.15,
+        damageReduction: 0.5,
+        hitCount: 1,
+        stunChance: 0,
+        guaranteedCrit: false,
+    },
+    SPEED: {
+        type: 'RAPID_COMBO',
+        name: '連撃乱舞',
+        roleJa: 'スピード',
+        damageMultiplier: 1.5,
+        defPenetration: 0,
+        healRatio: 0,
+        damageReduction: 0,
+        hitCount: 3,
+        stunChance: 0,
+        guaranteedCrit: false,
+    },
+    BALANCE: {
+        type: 'ADAPTIVE_STRIKE',
+        name: '適応一撃',
+        roleJa: 'バランス',
+        damageMultiplier: 1.4,
+        defPenetration: 0,
+        healRatio: 0,
+        damageReduction: 0,
+        hitCount: 1,
+        stunChance: 0,
+        guaranteedCrit: true,
+    },
+    TRICKY: {
+        type: 'CHAOS_DISRUPT',
+        name: '混沌撹乱',
+        roleJa: 'トリッキー',
+        damageMultiplier: 1.6,
+        defPenetration: 0,
+        healRatio: 0,
+        damageReduction: 0,
+        hitCount: 1,
+        stunChance: 0.5,
+        guaranteedCrit: false,
+    },
+};
+
+const getSpecialMove = (role?: RobotRole): SpecialMoveDefinition | null => {
+    if (!role) return null;
+    return SPECIAL_MOVES[role] ?? null;
+};
+
 /**
  * Simulate a deterministic battle between two robots
  * @param robot1 P1 robot
@@ -563,16 +665,20 @@ const getElementMultiplier = (attacker: BattleRobotData, defender: BattleRobotDa
  * @param battleId Seed for determinism (e.g., training_p1id_p2id)
  * @param cheer Cheer reservation input
  * @param battleItems Pre-battle items input
+ * @param specialInput Special move input (once per battle)
  */
 export const simulateBattle = (
     robot1: BattleRobotData,
     robot2: BattleRobotData,
     battleId: string,
     cheer?: CheerInput,
-    battleItems?: BattleItemInput
+    battleItems?: BattleItemInput,
+    specialInput?: SpecialMoveInput
 ): BattleResult => {
     let hp1 = robot1.baseHp;
     let hp2 = robot2.baseHp;
+    const maxHp1 = robot1.baseHp;
+    const maxHp2 = robot2.baseHp;
     const logs: BattleLog[] = [];
     let turn = 1;
     const robot1Skills = resolveSkills(robot1.skills);
@@ -608,6 +714,12 @@ export const simulateBattle = (
     // Stun state (skip next action)
     let p1Stunned = false;
     let p2Stunned = false;
+
+    // Special Move System: Initialize state (once per battle)
+    let p1SpecialUsed = false;
+    let p2SpecialUsed = false;
+    const p1SpecialRequested = !!specialInput?.p1Used;
+    const p2SpecialRequested = !!specialInput?.p2Used;
 
     // Track total damage for tiebreaker
     let totalDamageP1 = 0;

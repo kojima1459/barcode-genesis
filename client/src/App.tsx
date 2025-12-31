@@ -10,12 +10,13 @@ import { HapticProvider } from "@/contexts/HapticContext";
 import { TutorialProvider } from "@/contexts/TutorialContext";
 import TutorialOverlay from "@/components/TutorialOverlay";
 import { SoundProvider, useSound } from "@/contexts/SoundContext";
-import { useEffect, lazy, Suspense, type ComponentType } from "react";
+import { useEffect, lazy, Suspense, type ComponentType, useRef } from "react";
 import { AnimatePresence } from "framer-motion";
 import PageTransition from "@/components/PageTransition";
 import OfflineBanner from "@/components/OfflineBanner";
 import { Loader2 } from "lucide-react";
 import AppShell from "@/components/AppShell";
+import { SystemSkeleton } from "@/components/ui/SystemSkeleton";
 
 // Lazy load pages for better performance
 const Home = lazy(() => import("@/pages/Home"));
@@ -42,8 +43,12 @@ const Workshop = lazy(() => import("@/pages/Workshop"));
 // Loading fallback component
 function PageLoader() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-dark-bg">
-      <Loader2 className="w-8 h-8 text-neon-cyan animate-spin" />
+    <div className="min-h-screen flex items-center justify-center bg-dark-bg p-8">
+      <SystemSkeleton
+        className="w-full max-w-2xl aspect-video rounded-3xl"
+        text="LOADING SECTOR..."
+        subtext="STREAMING UNIT DATA FROM GRID"
+      />
     </div>
   );
 }
@@ -72,69 +77,67 @@ function Router() {
   );
 
   return (
-    <>
-      <AnimatePresence mode="wait">
-        <PageTransition key={location}>
-          <Suspense fallback={<PageLoader />}>
-            <Switch location={location}>
-              <Route path="/lp" component={LandingPage} />
-              <Route path="/privacy" component={Privacy} />
-              <Route path="/terms" component={Terms} />
-              <Route path="/law" component={SpecifiedCommercial} />
-              <Route path="/auth" component={Auth} />
+    <AnimatePresence mode="wait">
+      <PageTransition key={location}>
+        <Suspense fallback={<PageLoader />}>
+          <Switch location={location}>
+            <Route path="/lp" component={LandingPage} />
+            <Route path="/privacy" component={Privacy} />
+            <Route path="/terms" component={Terms} />
+            <Route path="/law" component={SpecifiedCommercial} />
+            <Route path="/auth" component={Auth} />
 
-              <Route path="/">
-                <ProtectedRoute component={withShell(Home)} />
-              </Route>
-              <Route path="/dex">
-                <ProtectedRoute component={withShell(Dex)} />
-              </Route>
-              <Route path="/battle">
-                <ProtectedRoute component={withShell(Battle)} />
-              </Route>
-              <Route path="/collection">
-                <ProtectedRoute component={withShell(Collection)} />
-              </Route>
-              <Route path="/shop">
-                <ProtectedRoute component={withShell(Shop)} />
-              </Route>
-              <Route path="/scan">
-                <ProtectedRoute component={withShell(Scan)} />
-              </Route>
-              <Route path="/robots/:robotId">
-                {(params) => (
-                  <ProtectedRoute component={withShell(() => <RobotDetail robotId={params.robotId} />)} />
-                )}
-              </Route>
-              <Route path="/leaderboard">
-                <ProtectedRoute component={withShell(Leaderboard)} />
-              </Route>
-              <Route path="/achievements">
-                <ProtectedRoute component={withShell(Achievements)} />
-              </Route>
-              <Route path="/premium">
-                <ProtectedRoute component={withShell(Premium)} />
-              </Route>
-              <Route path="/profile">
-                <ProtectedRoute component={withShell(Profile)} />
-              </Route>
-              <Route path="/guide">
-                <ProtectedRoute component={withShell(Guide)} />
-              </Route>
-              <Route path="/how-to">
-                <ProtectedRoute component={withShell(HowTo)} />
-              </Route>
-              <Route path="/workshop">
-                <ProtectedRoute component={withShell(Workshop)} />
-              </Route>
-              <Route path="/404" component={NotFound} />
-              {/* Final fallback route */}
-              <Route component={NotFound} />
-            </Switch>
-          </Suspense>
-        </PageTransition>
-      </AnimatePresence>
-    </>
+            <Route path="/">
+              <ProtectedRoute component={withShell(Home)} />
+            </Route>
+            <Route path="/dex">
+              <ProtectedRoute component={withShell(Dex)} />
+            </Route>
+            <Route path="/battle">
+              <ProtectedRoute component={withShell(Battle)} />
+            </Route>
+            <Route path="/collection">
+              <ProtectedRoute component={withShell(Collection)} />
+            </Route>
+            <Route path="/shop">
+              <ProtectedRoute component={withShell(Shop)} />
+            </Route>
+            <Route path="/scan">
+              <ProtectedRoute component={withShell(Scan)} />
+            </Route>
+            <Route path="/robots/:robotId">
+              {(params) => (
+                <ProtectedRoute component={withShell(() => <RobotDetail robotId={params.robotId} />)} />
+              )}
+            </Route>
+            <Route path="/leaderboard">
+              <ProtectedRoute component={withShell(Leaderboard)} />
+            </Route>
+            <Route path="/achievements">
+              <ProtectedRoute component={withShell(Achievements)} />
+            </Route>
+            <Route path="/premium">
+              <ProtectedRoute component={withShell(Premium)} />
+            </Route>
+            <Route path="/profile">
+              <ProtectedRoute component={withShell(Profile)} />
+            </Route>
+            <Route path="/guide">
+              <ProtectedRoute component={withShell(Guide)} />
+            </Route>
+            <Route path="/how-to">
+              <ProtectedRoute component={withShell(HowTo)} />
+            </Route>
+            <Route path="/workshop">
+              <ProtectedRoute component={withShell(Workshop)} />
+            </Route>
+            <Route path="/404" component={NotFound} />
+            {/* Final fallback route */}
+            <Route component={NotFound} />
+          </Switch>
+        </Suspense>
+      </PageTransition>
+    </AnimatePresence>
   );
 }
 

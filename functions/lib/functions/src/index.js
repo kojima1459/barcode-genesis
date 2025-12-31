@@ -94,7 +94,9 @@ const DAILY_MISSIONS = [
 const buildDailyMissions = () => {
     return DAILY_MISSIONS.map((mission) => (Object.assign(Object.assign({}, mission), { progress: 0, claimed: false })));
 };
-const updateMissionProgressInternal = async (t, userRef, dateKey, missionId, increment = 1) => {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+// @ts-expect-error - Kept for potential future use
+const _updateMissionProgressInternal = async (t, userRef, dateKey, missionId, increment = 1) => {
     const missionsRef = userRef.collection("missions").doc(dateKey);
     const missionSnap = await t.get(missionsRef);
     let missions;
@@ -105,6 +107,24 @@ const updateMissionProgressInternal = async (t, userRef, dateKey, missionId, inc
         const data = missionSnap.data();
         missions = (data && Array.isArray(data.missions)) ? data.missions : buildDailyMissions();
     }
+    const updatedMissions = missions.map((m) => {
+        if (m.id === missionId && !m.claimed) {
+            const currentProgress = typeof m.progress === "number" ? m.progress : 0;
+            return Object.assign(Object.assign({}, m), { progress: Math.min(m.target || 1, currentProgress + increment) });
+        }
+        return m;
+    });
+    t.set(missionsRef, {
+        missions: updatedMissions,
+        dateKey,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+};
+// Write-only version for when missions data is already fetched
+const writeMissionProgress = (t, missionsRef, dateKey, missionId, existingMissions, increment = 1) => {
+    const missions = (existingMissions && Array.isArray(existingMissions))
+        ? existingMissions
+        : buildDailyMissions();
     const updatedMissions = missions.map((m) => {
         if (m.id === missionId && !m.claimed) {
             const currentProgress = typeof m.progress === "number" ? m.progress : 0;
@@ -146,11 +166,16 @@ exports.generateRobot = functions.https.onCall(async (data, context) => {
         // ロボットデータ生成
         const robotData = (0, robotGenerator_1.generateRobotFromBarcode)(barcode, userId);
         await db.runTransaction(async (t) => {
-            const [userSnap, scanDailySnap] = await Promise.all([
+            var _a;
+            const missionsRef = userRef.collection('missions').doc(todayKey);
+            const [userSnap, scanDailySnap, robotSnap, missionsSnap] = await Promise.all([
                 t.get(userRef),
-                t.get(scanDailyRef)
+                t.get(scanDailyRef),
+                t.get(robotRef),
+                t.get(missionsRef)
             ]);
             const userData = userSnap.exists ? userSnap.data() : {};
+            const existingMissions = missionsSnap.exists ? (_a = missionsSnap.data()) === null || _a === void 0 ? void 0 : _a.missions : undefined;
             const isPremium = !!(userData === null || userData === void 0 ? void 0 : userData.isPremium);
             const lastGenDate = userData === null || userData === void 0 ? void 0 : userData.lastGenerationDateKey;
             const currentDailyCount = (lastGenDate === todayKey) ? ((userData === null || userData === void 0 ? void 0 : userData.dailyGenerationCount) || 0) : 0;
@@ -160,8 +185,7 @@ exports.generateRobot = functions.https.onCall(async (data, context) => {
                     ? `Premium limit reached (${PREMIUM_DAILY_LIMIT}/day). Come back tomorrow!`
                     : `Free limit reached (${FREE_DAILY_LIMIT}/day). Upgrade to Premium for ${PREMIUM_DAILY_LIMIT}/day!`);
             }
-            const existing = await t.get(robotRef);
-            (0, robotGenerator_1.assertRobotNotExists)(existing.exists);
+            (0, robotGenerator_1.assertRobotNotExists)(robotSnap.exists);
             const serverTimestamp = admin.firestore.FieldValue.serverTimestamp();
             const scanDailyState = (0, scanTokens_1.normalizeScanDaily)(scanDailySnap.exists ? scanDailySnap.data() : {});
             const scanAward = (0, scanTokens_1.applyScanDailyAward)(scanDailyState, barcode);
@@ -190,7 +214,7 @@ exports.generateRobot = functions.https.onCall(async (data, context) => {
                 })), { createdAt: serverTimestamp }));
             }
             // Daily Mission: Scan Barcode
-            await updateMissionProgressInternal(t, userRef, todayKey, "scan_barcode");
+            writeMissionProgress(t, missionsRef, todayKey, "scan_barcode", existingMissions);
         });
         return {
             robotId: robotRef.id,
@@ -556,14 +580,21 @@ const normalizePreBattleItem = (item) => {
 };
 const stripItemFields = (log) => {
     const { itemApplied, itemSide, itemType, itemEffect, itemEvent, itemMessage } = log, rest = __rest(log, ["itemApplied", "itemSide", "itemType", "itemEffect", "itemEvent", "itemMessage"]);
-    return rest;
+    // Remove undefined values to prevent Firestore errors
+    const sanitized = {};
+    for (const [key, value] of Object.entries(rest)) {
+        if (value !== undefined) {
+            sanitized[key] = value;
+        }
+    }
+    return sanitized;
 };
 exports.matchBattle = functions.https.onCall(async (data, context) => {
     var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16;
     if (!context.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'Auth required');
     }
-    const { playerRobotId, useItemId, cheer, battleItems, fighterRef } = data;
+    const { playerRobotId, useItemId, cheer, battleItems, fighterRef, specialInput } = data;
     const pFighterRef = fighterRef || { kind: 'robot', id: playerRobotId };
     const userId = context.auth.uid;
     const db = admin.firestore();
@@ -633,7 +664,9 @@ exports.matchBattle = functions.https.onCall(async (data, context) => {
         const cheerInput = cheer ? { p1: !!cheer.p1, p2: !!cheer.p2 } : undefined;
         // Pass battle items: p1 = player, p2 = opponent (opponent doesn't use items in PvE)
         const battleItemInput = normalizedBattleItem ? { p1: normalizedBattleItem, p2: null } : undefined;
-        const battleResult = (0, battleSystem_1.simulateBattle)(playerRobot, opponentRobot, battleId, playerItems, cheerInput, battleItemInput);
+        // Pass special move input: p1 = player, p2 = opponent (opponent doesn't use specials in PvE)
+        const specialMoveInput = specialInput ? { p1Used: !!specialInput.p1Used, p2Used: false } : undefined;
+        const battleResult = (0, battleSystem_1.simulateBattle)(playerRobot, opponentRobot, battleId, playerItems, cheerInput, battleItemInput, specialMoveInput);
         const publicLogs = battleResult.logs.map(stripItemFields);
         // 勝敗判定
         const winnerIsPlayer = battleResult.winnerId === playerRobot.id;
@@ -819,7 +852,7 @@ exports.matchBattle = functions.https.onCall(async (data, context) => {
                 creditsEarned: earnedCredits,
                 xpEarned: earnedXp,
                 scanTokensGained,
-                battleLog: battleResult.logs,
+                battleLog: publicLogs,
                 battleItems: battleItemInput !== null && battleItemInput !== void 0 ? battleItemInput : null,
                 entryFeeCharged,
                 reward: rewardResult.reward,
@@ -844,8 +877,8 @@ exports.matchBattle = functions.https.onCall(async (data, context) => {
             if (winnerIsPlayer) {
                 playerUpdates.totalWins = admin.firestore.FieldValue.increment(1);
                 playerUpdates.currentWinStreak = admin.firestore.FieldValue.increment(1);
-                // Daily Mission: Win Battle
-                await updateMissionProgressInternal(transaction, userRef, todayKey, "win_battle");
+                // NOTE: Mission update moved outside transaction to avoid read-after-write violation
+                // See post-transaction mission update below
             }
             else if (winnerIsOpponent) {
                 playerUpdates.totalLosses = admin.firestore.FieldValue.increment(1);
@@ -872,14 +905,12 @@ exports.matchBattle = functions.https.onCall(async (data, context) => {
                 robotUpdates.losses = admin.firestore.FieldValue.increment(1);
                 robotUpdates.totalLosses = admin.firestore.FieldValue.increment(1);
             }
-            // Level Up Logic
+            // Level Up Logic (battle engine now applies level scaling dynamically)
             if (currentExp >= expToNextLevel) {
                 const newLevel = currentLevel + 1;
                 robotUpdates.level = newLevel;
-                robotUpdates.baseHp = Math.floor(playerRobot.baseHp * 1.1);
-                robotUpdates.baseAttack = Math.floor(playerRobot.baseAttack * 1.1);
-                robotUpdates.baseDefense = Math.floor(playerRobot.baseDefense * 1.1);
-                robotUpdates.baseSpeed = Math.floor(playerRobot.baseSpeed * 1.1);
+                // NOTE: Base stats are no longer modified here.
+                // Battle system uses getLevelMultiplier() for level-scaled effective stats.
                 // Skill Acquisition
                 if ([3, 5, 10].includes(newLevel)) {
                     const newSkill = (0, skills_1.getRandomSkill)();
@@ -900,9 +931,39 @@ exports.matchBattle = functions.https.onCall(async (data, context) => {
                 earnedXp,
                 scanTokensGained,
                 leveledUp,
-                newWorkshopLines
+                newWorkshopLines,
+                winnerIsPlayer
             };
         });
+        // Post-transaction mission update (non-transactional to avoid read-after-write violation)
+        if (txnReward === null || txnReward === void 0 ? void 0 : txnReward.winnerIsPlayer) {
+            try {
+                const postTxnTodayKey = (0, dateKey_1.getJstDateKey)();
+                const missionsRef = db.collection('users').doc(userId).collection('missions').doc(postTxnTodayKey);
+                const missionSnap = await missionsRef.get();
+                let missions = buildDailyMissions();
+                if (missionSnap.exists) {
+                    const data = missionSnap.data();
+                    missions = (data && Array.isArray(data.missions)) ? data.missions : missions;
+                }
+                const updatedMissions = missions.map((m) => {
+                    if (m.id === 'win_battle' && !m.claimed) {
+                        const currentProgress = typeof m.progress === 'number' ? m.progress : 0;
+                        return Object.assign(Object.assign({}, m), { progress: Math.min(m.target || 1, currentProgress + 1) });
+                    }
+                    return m;
+                });
+                await missionsRef.set({
+                    missions: updatedMissions,
+                    dateKey: postTxnTodayKey,
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+            }
+            catch (missionError) {
+                console.error('Mission update failed (non-critical):', missionError);
+                // Non-critical failure - don't throw
+            }
+        }
         return {
             battleId,
             resolvedPlayerRobot: playerRobot,
@@ -994,13 +1055,37 @@ exports.synthesizeRobots = functions.https.onCall(async (data, context) => {
             level: newLevel,
             updatedAt: admin.firestore.FieldValue.serverTimestamp()
         });
-        // Daily Mission: Synthesize
-        const todayKey = (0, dateKey_1.getJstDateKey)();
-        const userRef = admin.firestore().collection("users").doc(userId);
-        await updateMissionProgressInternal(t, userRef, todayKey, "synthesize");
+        // NOTE: Mission update moved outside transaction to avoid read-after-write violation
         materialRefs.forEach((ref) => t.delete(ref));
         return { baseRobotId: baseRef.id, newLevel, newXp };
     });
+    // Post-transaction mission update (non-transactional)
+    try {
+        const postTxnTodayKey = (0, dateKey_1.getJstDateKey)();
+        const missionsRef = admin.firestore().collection('users').doc(userId).collection('missions').doc(postTxnTodayKey);
+        const missionSnap = await missionsRef.get();
+        let missions = buildDailyMissions();
+        if (missionSnap.exists) {
+            const data = missionSnap.data();
+            missions = (data && Array.isArray(data.missions)) ? data.missions : missions;
+        }
+        const updatedMissions = missions.map((m) => {
+            if (m.id === 'synthesize' && !m.claimed) {
+                const currentProgress = typeof m.progress === 'number' ? m.progress : 0;
+                return Object.assign(Object.assign({}, m), { progress: Math.min(m.target || 1, currentProgress + 1) });
+            }
+            return m;
+        });
+        await missionsRef.set({
+            missions: updatedMissions,
+            dateKey: postTxnTodayKey,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+    }
+    catch (missionError) {
+        console.error('Mission update failed (non-critical):', missionError);
+        // Non-critical failure - don't throw
+    }
     return result;
 });
 // 継承API

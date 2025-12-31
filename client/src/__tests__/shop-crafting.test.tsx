@@ -22,20 +22,14 @@ describe("Shop crafting", () => {
       },
     }));
 
-    vi.mocked(httpsCallable).mockImplementationOnce(() => craftMock);
+    vi.mocked(httpsCallable).mockImplementationOnce(() => craftMock as any);
 
     const userEventInstance = userEvent.setup();
     renderWithRouter("/shop");
 
-    const battleTab = await screen.findByRole("tab", { name: "バトルアイテム" });
-    await userEventInstance.click(battleTab);
-
-    const craftable = SHOP_ITEMS.filter(
-      (item) => item.category === "battle" && typeof item.tokenCost === "number"
-    );
-    const expectedItem = craftable[0];
-
-    const craftButtons = await screen.findAllByRole("button", { name: "クラフト" });
+    // All categories are now visible without needing to click tabs
+    // Wait for shop to load and find craft buttons
+    const craftButtons = await screen.findAllByRole("button", { name: /クラフト|Craft/i });
     await userEventInstance.click(craftButtons[0]);
 
     await act(async () => {
@@ -43,7 +37,9 @@ describe("Shop crafting", () => {
     });
 
     expect(craftMock).toHaveBeenCalled();
-    const payload = craftMock.mock.calls[0]?.[0] as Record<string, unknown>;
-    expect(payload).toEqual({ recipeId: expectedItem.id, qty: 1 });
+    const payload = (craftMock.mock.calls[0] as any)?.[0] as Record<string, unknown>;
+    // First craft button corresponds to first craftable item in the list
+    const craftableItems = SHOP_ITEMS.filter(item => typeof item.tokenCost === "number");
+    expect(payload).toEqual({ recipeId: craftableItems[0].id, qty: 1 });
   });
 });

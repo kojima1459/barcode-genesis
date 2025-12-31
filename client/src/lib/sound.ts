@@ -70,7 +70,7 @@ export const unlock = () => {
   try {
     const audio = new Audio(silentWav);
     audio.volume = 0;
-    audio.play().catch(() => {});
+    audio.play().catch(() => { });
   } catch {
     // Ignore unlock failures.
   }
@@ -85,7 +85,7 @@ export const unlock = () => {
       gain.connect(ctx.destination);
       osc.start(0);
       osc.stop(0.01);
-      ctx.resume().catch(() => {});
+      ctx.resume().catch(() => { });
     } catch {
       // Ignore unlock failures.
     }
@@ -122,7 +122,7 @@ export const play = (name: SoundName, options: PlayOptions = {}) => {
   if (typeof options.rate === "number") {
     audio.playbackRate = options.rate;
   }
-  audio.play().catch(() => {});
+  audio.play().catch(() => { });
 };
 
 export const setMuted = (next: boolean) => {
@@ -138,3 +138,64 @@ export const setMuted = (next: boolean) => {
 };
 
 export const getMuted = () => muted;
+
+// ========================================
+// WebAudio Sound Generation (no external files)
+// ========================================
+
+let audioContext: AudioContext | null = null;
+
+const getAudioContext = () => {
+  if (!audioContext && typeof AudioContext !== "undefined") {
+    audioContext = new AudioContext();
+  }
+  return audioContext;
+};
+
+type GeneratedSoundType = "ui_click" | "ui_skip";
+
+export const playGenerated = (type: GeneratedSoundType) => {
+  if (muted) return;
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  // Resume context if suspended (mobile)
+  if (ctx.state === "suspended") {
+    ctx.resume().catch(() => { });
+  }
+
+  const now = ctx.currentTime;
+
+  switch (type) {
+    case "ui_click": {
+      // Short click sound: oscillator + noise burst
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(800, now);
+      osc.frequency.exponentialRampToValueAtTime(400, now + 0.05);
+      gain.gain.setValueAtTime(0.15, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.08);
+      break;
+    }
+    case "ui_skip": {
+      // Whoosh sound: filtered noise
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(200, now);
+      osc.frequency.exponentialRampToValueAtTime(1200, now + 0.1);
+      gain.gain.setValueAtTime(0.1, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.15);
+      break;
+    }
+  }
+};

@@ -2,6 +2,7 @@ import { Link } from "wouter";
 import { ArrowLeft, ScanBarcode, Swords, Skull, Zap, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import AdBanner from "@/components/AdBanner";
 
 export default function Guide() {
     return (
@@ -14,7 +15,7 @@ export default function Guide() {
                             戻る
                         </Button>
                     </Link>
-                    <h1 className="text-2xl font-bold text-primary font-orbitron">HOW TO PLAY</h1>
+                    <h1 className="text-2xl font-bold text-primary font-orbitron">あそびかた</h1>
                 </header>
 
                 <section className="space-y-6">
@@ -82,6 +83,7 @@ export default function Guide() {
                         </Button>
                     </Link>
                 </div>
+                <AdBanner />
             </div>
         </div>
     );

@@ -121,6 +121,56 @@ export const translations = {
 
     seo_shop_title: "ショップ | バーコードジェネシス",
     seo_shop_desc: "ロボットを強化するためのアイテムやカスタマイズパーツを手に入れよう。",
+
+    // Shop
+    shop_coins_title: "コイン購入",
+    shop_coins_unit: "コイン",
+    shop_items_title: "アイテムショップ",
+    shop_buy: "購入",
+    shop_craft: "クラフト",
+    shop_owned: "所持",
+    shop_material: "素材",
+    shop_credits: "クレジット",
+    shop_scan_token: "ScanToken",
+    shop_purchase_success: "購入完了！",
+    shop_craft_success: "クラフト完了！",
+    shop_load_error: "ショップの読み込みに失敗しました",
+    shop_checkout_error: "チェックアウトの開始に失敗しました",
+    shop_purchase_error: "購入に失敗しました",
+    shop_insufficient_credits: "クレジットが不足しています",
+    shop_insufficient_tokens: "ScanTokenが不足しています",
+    shop_invalid_recipe: "レシピ指定が不正です",
+    shop_insufficient_materials: "素材 or クレジットが足りません",
+
+    // Robot Roles
+    role_label: "ロール",
+    role_attacker: "アタッカー",
+    role_tank: "タンク",
+    role_speed: "スピード",
+    role_balance: "バランス",
+    role_tricky: "トリッキー",
+
+    // Profile
+    profile_title: "プロフィール",
+    user_profile: "ユーザー設定",
+    robots_count: "ロボット数",
+    wins_count: "勝利数",
+    win_rate: "勝率",
+    level_label: "ユーザーレベル",
+    xp_label: "累計XP",
+    factory_lines: "製造ライン",
+    ace_robot: "エース機体",
+    settings_info: "設定・情報",
+    how_to_play_guide: "使い方・ガイド",
+    premium_subscription: "プレミアム登録",
+    copied_to_clipboard: "クリップボードにコピーしました",
+    logout: "ログアウト",
+    name_no_name: "未設定",
+    edit_name_placeholder: "名前を入力",
+    save_profile: "保存",
+    upload_photo_success: "プロフィール写真を更新しました",
+    upload_photo_failed: "写真のアップロードに失敗しました",
+    image_too_large: "画像サイズが大きすぎます (最大5MB)",
   },
   en: {
     // Common
@@ -242,5 +292,32 @@ export const translations = {
 
     seo_shop_title: "Shop | Barcode Genesis",
     seo_shop_desc: "Get items and customization parts to strengthen your robots.",
+
+    // Shop
+    shop_coins_title: "Buy Coins",
+    shop_items_title: "Item Shop",
+    shop_buy: "Buy",
+    shop_craft: "Craft",
+    shop_owned: "Owned",
+    shop_material: "Materials",
+    shop_credits: "Credits",
+    shop_scan_token: "ScanToken",
+    shop_purchase_success: "Purchase Complete!",
+    shop_craft_success: "Craft Complete!",
+    shop_load_error: "Failed to load shop",
+    shop_checkout_error: "Failed to start checkout",
+    shop_purchase_error: "Purchase failed",
+    shop_insufficient_credits: "Insufficient credits",
+    shop_insufficient_tokens: "Insufficient ScanTokens",
+    shop_invalid_recipe: "Invalid recipe",
+    shop_insufficient_materials: "Insufficient materials or credits",
+
+    // Robot Roles
+    role_label: "Role",
+    role_attacker: "Attacker",
+    role_tank: "Tank",
+    role_speed: "Speed",
+    role_balance: "Balance",
+    role_tricky: "Tricky",
   }
 };

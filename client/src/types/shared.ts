@@ -73,6 +73,13 @@ export interface RobotData {
     familyName?: string;
     slot?: number;             // 0-19
     evolutionLevel?: number;   // 0+
+    epithet?: string;          // 二つ名
+    variantKey?: number;       // Visual variant seed (0-99)
+
+    // ロール情報
+    role?: 'ATTACKER' | 'TANK' | 'SPEED' | 'BALANCE' | 'TRICKY';
+    roleName?: string;
+    roleTitle?: string;
 
     // 統計
     totalBattles?: number;

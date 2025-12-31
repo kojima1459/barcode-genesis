@@ -13,6 +13,8 @@ import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
 import RobotSVG from "@/components/RobotSVG";
 import { RobotData } from "@/types/shared";
+import { Interactive } from "@/components/ui/interactive";
+import { SystemSkeleton } from "@/components/ui/SystemSkeleton";
 
 interface UserProfile {
   displayName?: string;
@@ -56,7 +58,7 @@ export default function Profile() {
         setRobots(robotData);
       } catch (error) {
         console.error(error);
-        toast.error("Failed to load profile");
+        toast.error(t('error'));
       } finally {
         setLoading(false);
       }
@@ -72,11 +74,11 @@ export default function Profile() {
       });
       setProfile(prev => ({ ...prev, displayName: newName.trim() }));
       setIsEditing(false);
-      toast.success("Profile updated");
+      toast.success(t('success'));
       playSE('se_click');
     } catch (error) {
       console.error(error);
-      toast.error("Failed to update profile");
+      toast.error(t('error'));
     }
   };
 
@@ -104,11 +106,11 @@ export default function Profile() {
       });
 
       setProfile(prev => ({ ...prev, photoURL: downloadURL }));
-      toast.success("Profile photo updated");
+      toast.success(t('upload_photo_success'));
       playSE('se_click');
     } catch (error) {
       console.error("Avatar upload failed:", error);
-      toast.error("Failed to upload photo");
+      toast.error(t('upload_photo_failed'));
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -129,7 +131,7 @@ export default function Profile() {
   const copyId = () => {
     if (user) {
       navigator.clipboard.writeText(user.uid);
-      toast.success("ID copied to clipboard");
+      toast.success(t('copied_to_clipboard'));
       playSE('se_click');
     }
   };
@@ -140,7 +142,15 @@ export default function Profile() {
   const displayBattles = profile.battles || 0;
   const winRate = displayBattles > 0 ? Math.round((displayWins / displayBattles) * 100) : 0;
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  if (loading) return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background p-8">
+      <SystemSkeleton
+        className="w-full max-w-2xl h-64 rounded-3xl"
+        text="RETRIEVING PROFILE..."
+        subtext="ACCESSING USER CLEARANCE LEVEL"
+      />
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-background p-4 pb-24 flex flex-col">
@@ -151,7 +161,7 @@ export default function Profile() {
             {t('back')}
           </Button>
         </Link>
-        <h1 className="text-2xl font-bold text-primary">Profile</h1>
+        <h1 className="text-2xl font-bold text-primary">{t('profile_title')}</h1>
       </header>
 
       <main className="flex-1 max-w-4xl mx-auto w-full space-y-8">
@@ -160,7 +170,7 @@ export default function Profile() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <User className="h-6 w-6" />
-              User Profile
+              {t('user_profile')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -207,7 +217,7 @@ export default function Profile() {
                       <Input
                         value={newName}
                         onChange={(e) => setNewName(e.target.value)}
-                        placeholder="Enter name"
+                        placeholder={t('edit_name_placeholder')}
                       />
                       <Button size="icon" onClick={handleSaveName}>
                         <Save className="h-4 w-4" />
@@ -215,7 +225,7 @@ export default function Profile() {
                     </div>
                   ) : (
                     <div className="flex items-center gap-4">
-                      <h2 className="text-3xl font-bold">{profile.displayName || "No Name"}</h2>
+                      <h2 className="text-3xl font-bold">{profile.displayName || t('name_no_name')}</h2>
                       <Button variant="ghost" size="icon" onClick={() => setIsEditing(true)}>
                         <Edit2 className="h-4 w-4" />
                       </Button>
@@ -233,34 +243,34 @@ export default function Profile() {
 
                 {/* Stats Grid */}
                 <div className="grid grid-cols-3 gap-4 pt-4">
-                  <div className="text-center p-4 bg-secondary/10 rounded-lg">
+                  <Interactive className="text-center p-4 bg-secondary/10 rounded-lg h-auto">
                     <div className="text-2xl font-bold text-primary">{robots.length}</div>
-                    <div className="text-xs text-muted-foreground">Robots</div>
-                  </div>
-                  <div className="text-center p-4 bg-secondary/10 rounded-lg">
+                    <div className="text-xs text-muted-foreground">{t('robots_count')}</div>
+                  </Interactive>
+                  <Interactive className="text-center p-4 bg-secondary/10 rounded-lg h-auto">
                     <div className="text-2xl font-bold text-yellow-500">{displayWins}</div>
-                    <div className="text-xs text-muted-foreground">Wins</div>
-                  </div>
-                  <div className="text-center p-4 bg-secondary/10 rounded-lg">
+                    <div className="text-xs text-muted-foreground">{t('wins_count')}</div>
+                  </Interactive>
+                  <Interactive className="text-center p-4 bg-secondary/10 rounded-lg h-auto">
                     <div className="text-2xl font-bold text-green-500">{winRate}%</div>
-                    <div className="text-xs text-muted-foreground">Win Rate</div>
-                  </div>
+                    <div className="text-xs text-muted-foreground">{t('win_rate')}</div>
+                  </Interactive>
                 </div>
 
                 {/* Level / XP / Lines */}
                 <div className="grid grid-cols-3 gap-4 pt-2">
-                  <div className="text-center p-4 bg-secondary/10 rounded-lg">
+                  <Interactive className="text-center p-4 bg-secondary/10 rounded-lg h-auto">
                     <div className="text-2xl font-bold text-blue-500">{profile.level || 1}</div>
-                    <div className="text-xs text-muted-foreground">Level</div>
-                  </div>
-                  <div className="text-center p-4 bg-secondary/10 rounded-lg">
+                    <div className="text-xs text-muted-foreground">{t('level_label')}</div>
+                  </Interactive>
+                  <Interactive className="text-center p-4 bg-secondary/10 rounded-lg h-auto">
                     <div className="text-2xl font-bold text-purple-500">{profile.xp || 0}</div>
-                    <div className="text-xs text-muted-foreground">XP</div>
-                  </div>
-                  <div className="text-center p-4 bg-secondary/10 rounded-lg">
+                    <div className="text-xs text-muted-foreground">{t('xp_label')}</div>
+                  </Interactive>
+                  <Interactive className="text-center p-4 bg-secondary/10 rounded-lg h-auto">
                     <div className="text-2xl font-bold text-orange-500">{profile.workshopLines || 1}</div>
-                    <div className="text-xs text-muted-foreground">Factory Lines</div>
-                  </div>
+                    <div className="text-xs text-muted-foreground">{t('factory_lines')}</div>
+                  </Interactive>
                 </div>
               </div>
             </div>
@@ -269,11 +279,11 @@ export default function Profile() {
 
         {/* Strongest Robot */}
         {robots.length > 0 && (
-          <Card>
+          <Interactive className="h-auto overflow-hidden rounded-xl">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Trophy className="h-6 w-6 text-yellow-500" />
-                Ace Robot
+                {t('ace_robot')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -306,25 +316,25 @@ export default function Profile() {
                 </div>
               </div>
             </CardContent>
-          </Card>
+          </Interactive>
         )}
 
         {/* Settings & Links */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              ⚙️ Settings & Info
+              ⚙️ {t('settings_info')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             <Link href="/guide">
               <Button variant="ghost" className="w-full justify-start gap-3">
-                📖 How to Play / 使い方ガイド
+                📖 {t('how_to_play_guide')}
               </Button>
             </Link>
             <Link href="/premium">
               <Button variant="ghost" className="w-full justify-start gap-3">
-                💎 Premium Subscription / プレミアム
+                💎 {t('premium_subscription')}
               </Button>
             </Link>
             <div className="border-t my-2" />
@@ -350,7 +360,7 @@ export default function Profile() {
               onClick={handleLogout}
             >
               <LogOut className="w-4 h-4" />
-              ログアウト
+              {t('logout')}
             </Button>
           </CardContent>
         </Card>

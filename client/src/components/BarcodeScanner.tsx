@@ -269,7 +269,8 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
       }
 
       try {
-        const result = await reader.decodeFromCanvas(canvas);
+        // Type casting to any because decodeFromCanvas exists in runtime but might be missing in types
+        const result = await (reader as any).decodeFromCanvas(canvas);
         if (result) return result.getText();
       } catch (e) {
         // Continue to next attempt

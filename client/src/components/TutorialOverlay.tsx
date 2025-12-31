@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useTutorial, TutorialStep } from '@/contexts/TutorialContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Fingerprint } from 'lucide-react';
+import { ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Fingerprint, X } from 'lucide-react';
 
 // Map steps to target element IDs and messages
 const TUTORIAL_Config: Record<TutorialStep, { targetId: string; message: string; position: 'top' | 'bottom' | 'center' }> = {
@@ -28,7 +28,7 @@ const TUTORIAL_Config: Record<TutorialStep, { targetId: string; message: string;
 };
 
 export default function TutorialOverlay() {
-    const { activeStep, isTutorialActive, nextStep } = useTutorial();
+    const { activeStep, isTutorialActive, nextStep, skipTutorial } = useTutorial();
     const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
 
     useEffect(() => {
@@ -114,7 +114,6 @@ export default function TutorialOverlay() {
                                 className={`absolute left-1/2 -translate-x-1/2 w-4 h-4 bg-black border-l border-t border-neon-cyan transform rotate-45 ${config.position === 'bottom' ? '-top-2.5' : '-bottom-2.5 rotate-[225deg]'
                                     }`}
                             />
-
                             <div className='flex gap-3'>
                                 <div className='mt-1'>
                                     <div className='w-10 h-10 rounded-full bg-neon-cyan/20 flex items-center justify-center border border-neon-cyan'>
@@ -131,10 +130,22 @@ export default function TutorialOverlay() {
                                     )}
                                 </div>
                             </div>
+
                         </div>
                     </motion.div>
                 )}
             </AnimatePresence>
-        </div>
+
+            {/* Skip Button - Always visible */}
+            <div className="fixed top-4 right-4 z-[60] pointer-events-auto">
+                <button
+                    onClick={skipTutorial}
+                    className="bg-black/80 text-white rounded-full p-2 border border-white/20 hover:bg-white/20 transition-colors"
+                    aria-label="スキップ"
+                >
+                    <X className="w-6 h-6" />
+                </button>
+            </div>
+        </div >
     );
 }

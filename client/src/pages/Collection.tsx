@@ -11,6 +11,9 @@ import { toast } from "sonner";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { RobotData } from "@/types/shared";
 import SEO from "@/components/SEO";
+import { Interactive } from "@/components/ui/interactive";
+import { ScrambleText } from "@/components/ui/ScrambleText";
+import { SystemSkeleton } from "@/components/ui/SystemSkeleton";
 
 // Constants for 図鑑
 const FAMILY_NAMES = ["DRINK", "SNACK", "DAILY", "BEAUTY", "OTHER"];
@@ -148,8 +151,12 @@ export default function Collection() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      <div className="min-h-screen flex items-center justify-center bg-background p-6">
+        <SystemSkeleton
+          className="w-full max-w-2xl aspect-square rounded-3xl"
+          text="ACCESSING ENCYCLOPEDIA..."
+          subtext="DOWNLOADING UNIT ARCHIVES FROM SERVER"
+        />
       </div>
     );
   }
@@ -229,12 +236,13 @@ export default function Collection() {
       <main className="flex-1 max-w-6xl mx-auto w-full">
         <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-2">
           {displaySlots.map((slotInfo, idx) => (
-            <Card
+            <Interactive
               key={`${slotInfo.familyIndex}-${slotInfo.rarityIndex}-${slotInfo.slot}-${idx}`}
-              className={`overflow-hidden transition-all ${slotInfo.robot
-                  ? 'cursor-pointer hover:border-primary'
-                  : 'opacity-50'
+              className={`overflow-hidden transition-all h-auto ${slotInfo.robot
+                ? 'cursor-pointer hover:border-primary'
+                : 'opacity-50'
                 }`}
+              disabled={!slotInfo.robot}
             >
               <CardContent className="p-2">
                 {slotInfo.robot ? (
@@ -248,7 +256,7 @@ export default function Collection() {
                       />
                     </div>
                     <div className="text-[10px] truncate text-center font-medium">
-                      {slotInfo.robot.name}
+                      <ScrambleText text={slotInfo.robot.name} duration={600} />
                     </div>
                     <div className="text-[8px] text-muted-foreground text-center">
                       {RARITY_NAMES[slotInfo.rarityIndex]}
@@ -270,7 +278,7 @@ export default function Collection() {
                   </>
                 )}
               </CardContent>
-            </Card>
+            </Interactive>
           ))}
         </div>
       </main>

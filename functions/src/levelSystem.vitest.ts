@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { applyUserXp, calculateNextLevelXp, getWorkshopLines, LEVEL_CAP } from './levelSystem';
+import { applyUserXp, calculateNextLevelXp, getWorkshopLines, LEVEL_CAP, getLevelMultiplier, STAT_MULTIPLIER_CAP } from './levelSystem';
 
 describe('Level System Logic', () => {
     it('should calculate next level xp correctly', () => {
@@ -83,3 +83,57 @@ describe('Level System Logic', () => {
         expect(res.newXp).toBe(100);
     });
 });
+
+describe('Level Stat Multiplier', () => {
+    it('returns 1.0 at level 1', () => {
+        expect(getLevelMultiplier(1)).toBe(1.0);
+    });
+
+    it('returns correct value at level 5 (tier 1)', () => {
+        // Tier 1: +2% per level for levels 2-5 (4 steps)
+        // 1 + 0.02 * 4 = 1.08
+        expect(getLevelMultiplier(5)).toBeCloseTo(1.08, 2);
+    });
+
+    it('returns correct value at level 10 (tier 2)', () => {
+        // Tier 1: +8% for levels 2-5
+        // Tier 2: +1% per level for levels 6-10 (5 steps = +5%)
+        // Total: 1 + 0.08 + 0.05 = 1.13
+        expect(getLevelMultiplier(10)).toBeCloseTo(1.13, 2);
+    });
+
+    it('returns correct value at level 20 (tier 3)', () => {
+        // Tier 1: +8%
+        // Tier 2: +5%
+        // Tier 3: +0.5% per level for levels 11-20 (10 steps = +5%)
+        // Total: 1 + 0.08 + 0.05 + 0.05 = 1.18
+        expect(getLevelMultiplier(20)).toBeCloseTo(1.18, 2);
+    });
+
+    it('returns correct value at level 30', () => {
+        // Tier 1: +8%, Tier 2: +5%, Tier 3: (20 steps) = +10%
+        // Total: 1 + 0.08 + 0.05 + 0.10 = 1.23
+        expect(getLevelMultiplier(30)).toBeCloseTo(1.23, 2);
+    });
+
+    it('caps at STAT_MULTIPLIER_CAP (1.30)', () => {
+        // At level 100, uncapped would be: 1 + 0.08 + 0.05 + 0.45 = 1.58
+        // Should cap at 1.30
+        expect(getLevelMultiplier(100)).toBe(STAT_MULTIPLIER_CAP);
+        expect(getLevelMultiplier(100)).toBe(1.30);
+    });
+
+    it('handles edge cases (null, 0, negative)', () => {
+        expect(getLevelMultiplier(0)).toBe(1.0);
+        expect(getLevelMultiplier(-1)).toBe(1.0);
+        // @ts-expect-error testing undefined
+        expect(getLevelMultiplier(undefined)).toBe(1.0);
+    });
+
+    it('is deterministic', () => {
+        // Same level always returns same multiplier
+        expect(getLevelMultiplier(15)).toBe(getLevelMultiplier(15));
+        expect(getLevelMultiplier(25)).toBe(getLevelMultiplier(25));
+    });
+});
+

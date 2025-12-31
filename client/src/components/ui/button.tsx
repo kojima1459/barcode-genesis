@@ -1,23 +1,26 @@
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
+import { motion, HTMLMotionProps } from "framer-motion";
+import { useHaptic } from "@/contexts/HapticContext";
+import { useSound } from "@/contexts/SoundContext";
 
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive interactive-glow",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        default: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_0_10px_rgba(var(--primary),0.2)] hover:shadow-[0_0_20px_rgba(var(--primary),0.4)] [clip-path:polygon(12px_0,100%_0,100%_calc(100%_-12px),calc(100%_-12px)_100%,0_100%,0_12px)] relative overflow-hidden after:absolute after:inset-0 after:bg-white/10 after:opacity-0 hover:after:opacity-100 after:transition-opacity",
         destructive:
-          "bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
+          "bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60 [clip-path:polygon(8px_0,100%_0,100%_calc(100%_-8px),calc(100%_-8px)_100%,0_100%,0_8px)]",
         outline:
-          "border bg-transparent shadow-xs hover:bg-accent dark:bg-transparent dark:border-input dark:hover:bg-input/50",
+          "border bg-transparent shadow-xs hover:bg-accent dark:bg-transparent dark:border-input dark:hover:bg-input/50 border-white/20 hover:border-accent/50",
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost:
-          "hover:bg-accent dark:hover:bg-accent/50",
+          "hover:bg-accent dark:hover:bg-accent/50 hover:text-accent",
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {
@@ -37,33 +40,39 @@ const buttonVariants = cva(
 );
 
 export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+  extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, keyof HTMLMotionProps<"button">>,
+  HTMLMotionProps<"button">,
   VariantProps<typeof buttonVariants> {
   asChild?: boolean;
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, onClick, ...props }, ref) => {
-    const Comp = asChild ? Slot : "button"
-
-    // Safety check for navigator vibration without context overhead if preferred, 
-    // but context gives us centralized control (e.g. disable setting).
-    // For now, let's just use direct navigator.vibrate for performance in this low-level component
-    // OR use the context properly. Context is safer for "disable" feature.
-    // However, we can't use hooks inside forwardRef easily if we want to keep it pure?
-    // Actually we can.
+    const { triggerHaptic } = useHaptic();
+    const { playSE } = useSound();
+    const Comp = asChild ? Slot : motion.button
 
     const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-      if (navigator.vibrate) navigator.vibrate(10); // Light tap
+      triggerHaptic('light'); // Centralized haptic
+      playSE('se_click');
       onClick?.(e);
     }
 
+    // framer-motion props
+    const motionProps = {
+      whileHover: { scale: 1.02 },
+      whileTap: { scale: 0.95 },
+      transition: { type: "spring", stiffness: 400, damping: 17 }
+    };
+
     return (
+      // @ts-ignore
       <Comp
         data-slot="button"
         className={cn(buttonVariants({ variant, size, className }))}
-        ref={ref}
+        ref={ref as any}
         onClick={handleClick}
+        {...(asChild ? {} : motionProps)}
         {...props}
       />
     )

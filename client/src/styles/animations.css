@@ -209,3 +209,318 @@
     transition: none !important;
   }
 }
+
+/* ========================================
+   ROLE REVEAL ANIMATIONS
+   ======================================== */
+
+@keyframes flashOut {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes popIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  60% {
+    transform: scale(1.1);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ========================================
+   BATTLE UX ENHANCEMENTS
+   ======================================== */
+
+/* Win Overlay - Neon glow pulse */
+.battle-win-overlay {
+  background: radial-gradient(ellipse at center, rgba(0, 243, 255, 0.15), transparent 70%);
+  animation: win-glow-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes win-glow-pulse {
+  0%, 100% {
+    box-shadow: inset 0 0 60px rgba(0, 243, 255, 0.2);
+  }
+  50% {
+    box-shadow: inset 0 0 120px rgba(0, 243, 255, 0.4);
+  }
+}
+
+/* Win Confetti Particles */
+.battle-win-overlay::before,
+.battle-win-overlay::after {
+  content: "";
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  background-image: 
+    radial-gradient(circle, #00f3ff 2px, transparent 2px),
+    radial-gradient(circle, #ff6aff 2px, transparent 2px),
+    radial-gradient(circle, #ffea00 2px, transparent 2px);
+  background-size: 80px 80px, 60px 60px, 70px 70px;
+  animation: confetti-fall 3s linear infinite;
+  opacity: 0.6;
+}
+
+.battle-win-overlay::after {
+  animation-delay: -1.5s;
+  background-position: 40px 40px, 30px 30px, 35px 35px;
+}
+
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(-100%) rotate(0deg);
+  }
+  100% {
+    transform: translateY(100%) rotate(360deg);
+  }
+}
+
+/* Lose Overlay - Darken + Glitch */
+.battle-lose-overlay {
+  background: radial-gradient(ellipse at center, rgba(255, 0, 0, 0.1), rgba(0, 0, 0, 0.8) 70%);
+  animation: lose-darken 0.5s ease-out forwards;
+}
+
+@keyframes lose-darken {
+  0% {
+    filter: brightness(1);
+  }
+  100% {
+    filter: brightness(0.7);
+  }
+}
+
+/* Lose Glitch Effect */
+.battle-lose-overlay::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(255, 0, 0, 0.03) 2px,
+    rgba(255, 0, 0, 0.03) 4px
+  );
+  animation: glitch-scanlines 0.1s steps(2) infinite;
+  pointer-events: none;
+}
+
+@keyframes glitch-scanlines {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(4px); }
+}
+
+/* Reward Bounce Animation */
+.reward-bounce {
+  animation: reward-bounce 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards;
+}
+
+@keyframes reward-bounce {
+  0% {
+    opacity: 0;
+    transform: translateY(30px) scale(0.8);
+  }
+  60% {
+    transform: translateY(-10px) scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Reward Glow */
+.reward-glow {
+  text-shadow: 0 0 10px rgba(250, 204, 21, 0.5), 0 0 20px rgba(250, 204, 21, 0.3);
+  animation: reward-glow-pulse 1s ease-in-out infinite alternate;
+}
+
+@keyframes reward-glow-pulse {
+  0% {
+    text-shadow: 0 0 10px rgba(250, 204, 21, 0.5), 0 0 20px rgba(250, 204, 21, 0.3);
+  }
+  100% {
+    text-shadow: 0 0 20px rgba(250, 204, 21, 0.8), 0 0 40px rgba(250, 204, 21, 0.5);
+  }
+}
+
+/* Speed Controls */
+.speed-controls {
+  backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.speed-btn-active {
+  background: linear-gradient(135deg, #00f3ff, #0088ff);
+  color: black;
+  box-shadow: 0 0 15px rgba(0, 243, 255, 0.5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .battle-win-overlay,
+  .battle-win-overlay::before,
+  .battle-win-overlay::after,
+  .battle-lose-overlay,
+  .battle-lose-overlay::before,
+  .reward-bounce,
+  .reward-glow {
+    animation: none !important;
+  }
+}
+
+/* ========================================
+   SPECIAL MOVE (必殺技) ANIMATIONS
+   ======================================== */
+
+.shake-heavy {
+  animation: shake-heavy 400ms ease-out;
+}
+
+@keyframes shake-heavy {
+  0%, 100% { transform: translateX(0) translateY(0); }
+  10% { transform: translateX(-8px) translateY(-4px); }
+  20% { transform: translateX(8px) translateY(4px); }
+  30% { transform: translateX(-6px) translateY(-2px); }
+  40% { transform: translateX(6px) translateY(2px); }
+  50% { transform: translateX(-4px) translateY(-1px); }
+  60% { transform: translateX(4px) translateY(1px); }
+  70% { transform: translateX(-2px); }
+  80% { transform: translateX(2px); }
+  90% { transform: translateX(-1px); }
+}
+
+.special-flash {
+  animation: special-flash 150ms ease-out;
+}
+
+@keyframes special-flash {
+  0% { filter: invert(0) brightness(1); }
+  50% { filter: invert(1) brightness(1.5); }
+  100% { filter: invert(0) brightness(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shake-heavy,
+  .special-flash {
+    animation: none !important;
+  }
+}
+
+/* ========================================
+   SYSTEM BOOTING SKELETON
+   ======================================== */
+
+.system-skeleton-frame {
+  position: relative;
+  overflow: hidden;
+  background: color-mix(in oklab, var(--surface) 35%, transparent);
+  border: 1px solid color-mix(in oklab, var(--accent) 20%, transparent);
+  backdrop-filter: blur(4px);
+}
+
+.system-skeleton-scanline {
+  position: absolute;
+  top: -100%;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    color-mix(in oklab, var(--accent) 15%, transparent) 50%,
+    transparent 100%
+  );
+  animation: system-scan-sweep 2s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes system-scan-sweep {
+  0% { top: -100%; }
+  100% { top: 100%; }
+}
+
+.system-boot-text {
+  font-family: var(--font-orbitron);
+  animation: system-text-blink 0.8s steps(2) infinite;
+  color: var(--accent);
+  text-shadow: 0 0 8px color-mix(in oklab, var(--accent) 40%, transparent);
+}
+
+@keyframes system-text-blink {
+  0% { opacity: 0.3; }
+  100% { opacity: 0.9; }
+}
+
+/* ========================================
+   PAGE TRANSITIONS
+   ======================================== */
+
+.cyber-shutter-container {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.cyber-shutter-half {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--accent);
+  box-shadow: 0 0 30px color-mix(in oklab, var(--accent) 30%, transparent);
+  transition: transform 0.4s cubic-bezier(0.7, 0, 0.3, 1);
+}
+
+.cyber-shutter-top {
+  transform: translateY(-100%);
+  border-bottom-width: 2px;
+}
+
+.cyber-shutter-bottom {
+  transform: translateY(100%);
+  border-top-width: 2px;
+}
+
+.cyber-shutter-active .cyber-shutter-top,
+.cyber-shutter-active .cyber-shutter-bottom {
+  transform: translateY(0);
+}
+
+.glitch-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  background: rgba(0, 0, 0, 0.1);
+  pointer-events: none;
+  opacity: 0;
+}
+
+.glitch-active .glitch-overlay {
+  opacity: 1;
+  animation: glitch-flash 0.3s steps(2) infinite;
+}
+
+@keyframes glitch-flash {
+  0% { background: rgba(0, 255, 255, 0.05); transform: translateX(-2px) skewX(2deg); }
+  50% { background: rgba(255, 0, 255, 0.05); transform: translateX(2px) skewX(-2deg); }
+  100% { background: rgba(0, 255, 255, 0.05); transform: translateX(0); }
+}
+
+.transition-content-wrapper {
+  will-change: transform, opacity;
+}
