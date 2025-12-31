@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.resolveVariantAppearance = exports.resolveVariantStats = exports.generateVariantRecipe = void 0;
+exports.resolveVariant = exports.resolveVariantAppearance = exports.resolveVariantStats = exports.generateVariantRecipe = void 0;
 const seededRandom_1 = require("./seededRandom");
 const generateVariantRecipe = (uid, robotAId, robotBId) => {
     const sortedIds = [robotAId, robotBId].sort();
@@ -87,4 +87,44 @@ const resolveVariantAppearance = (recipe, robotA, robotB) => {
     return { parts, colors };
 };
 exports.resolveVariantAppearance = resolveVariantAppearance;
+// Minimal implementation to make build pass. Using 'any' for db/transaction to avoid import issues.
+const resolveVariant = async (uid, variantId, db, transaction) => {
+    const userRef = db.collection('users').doc(uid);
+    const variantRef = userRef.collection('variants').doc(variantId);
+    // Fetch variant data
+    const variantSnap = transaction ? await transaction.get(variantRef) : await variantRef.get();
+    if (!variantSnap.exists) {
+        throw new Error('Variant not found'); // Should be handled by caller
+    }
+    const vData = variantSnap.data();
+    const rAId = vData.robotAId;
+    const rBId = vData.robotBId;
+    // Fetch parents
+    const rARef = userRef.collection('robots').doc(rAId);
+    const rBRef = userRef.collection('robots').doc(rBId);
+    let rASnap, rBSnap;
+    if (transaction) {
+        [rASnap, rBSnap] = await Promise.all([transaction.get(rARef), transaction.get(rBRef)]);
+    }
+    else {
+        [rASnap, rBSnap] = await Promise.all([rARef.get(), rBRef.get()]);
+    }
+    if (!rASnap.exists || !rBSnap.exists) {
+        // Fallback or error?
+        // For now throw error as parents are required for dynamic resolution
+        throw new Error('Parent robots not found');
+    }
+    const rA = rASnap.data();
+    const rB = rBSnap.data();
+    // Calculate Stats
+    const stats = (0, exports.resolveVariantStats)(rA, rB);
+    // Calculate Appearance
+    // If recipe is stored, use it. If not, generate (should be stored).
+    const recipe = vData.appearanceRecipe || (0, exports.generateVariantRecipe)(uid, rAId, rBId);
+    const appearance = (0, exports.resolveVariantAppearance)(recipe, rA, rB);
+    // Merge into complete RobotData
+    const resolvedRobot = Object.assign(Object.assign(Object.assign({}, rA), stats), { parts: appearance.parts, colors: appearance.colors, id: variantId, name: vData.name || `Variant-${variantId.substring(0, 4)}`, generatedAt: vData.createdAt, type: 'variant', variantId });
+    return resolvedRobot;
+};
+exports.resolveVariant = resolveVariant;
 //# sourceMappingURL=variantSystem.js.map

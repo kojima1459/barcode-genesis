@@ -5,6 +5,9 @@ import { Loader2, Swords, Factory, ChevronDown, ChevronRight } from "lucide-reac
 import { motion, AnimatePresence } from "framer-motion";
 
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { GlobalHeader } from "@/components/GlobalHeader";
+import { HelpCircle } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,6 +24,8 @@ import { LOGIN_BADGES, getBadgeLabel } from "@/lib/badges";
 import {
   ROLES,
   ROLE_LABELS,
+  ROLE_COLORS,
+  generateDexSlots,
   generateDexSlots,
   getSlotsByRole,
   getDexSlotId,
@@ -30,6 +35,7 @@ import {
   type DexSlot,
 } from "@/lib/dexRegistry";
 import AdBanner from "@/components/AdBanner";
+import LazyRender from "@/components/LazyRender";
 
 function shortId(id?: string) {
   if (!id) return "—";
@@ -103,14 +109,6 @@ function RoleSection({
   const roleLabel = ROLE_LABELS[role].ja;
   const unlockedCount = slots.filter(s => unlockedSlots.has(s.id)).length;
 
-  const roleColors: Record<RobotRole, string> = {
-    ATTACKER: "border-red-400/40 text-red-300 bg-red-400/10",
-    TANK: "border-blue-400/40 text-blue-300 bg-blue-400/10",
-    SPEED: "border-green-400/40 text-green-300 bg-green-400/10",
-    BALANCE: "border-amber-400/40 text-amber-300 bg-amber-400/10",
-    TRICKY: "border-purple-400/40 text-purple-300 bg-purple-400/10",
-  };
-
   return (
     <div className="space-y-2" data-testid={`role-section-${role}`}>
       {/* Section Header */}
@@ -119,7 +117,7 @@ function RoleSection({
         className="w-full flex items-center justify-between p-3 rounded-lg bg-black/30 border border-white/10 hover:bg-black/40 transition-colors"
       >
         <div className="flex items-center gap-3">
-          <Badge variant="outline" className={`${roleColors[role]} text-sm px-3 py-1`}>
+          <Badge variant="outline" className={`${ROLE_COLORS[role]} text-sm px-3 py-1`}>
             {roleLabel}
           </Badge>
           <span className="text-sm text-muted-foreground">
@@ -151,49 +149,54 @@ function RoleSection({
                 if (isUnlocked && robot) {
                   // Owned robot card (compact version)
                   return (
-                    <Interactive
-                      key={slot.id}
-                      className="bg-black/30 border-white/10 hover:border-neon-cyan/40 transition-colors h-auto overflow-hidden rounded-xl"
-                      data-testid="owned-robot-card"
-                    >
-                      <CardContent className="p-3 flex flex-col gap-2">
-                        <div className="flex items-center gap-2">
-                          <div className="shrink-0 w-[56px] h-[56px] flex items-center justify-center rounded border border-white/10 bg-black/20">
-                            <RobotSVG parts={robot.parts} colors={robot.colors} size={52} />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="font-bold text-xs truncate">{robot.name || "Unnamed"}</div>
-                            <div className="text-[9px] text-muted-foreground font-mono">
-                              Lv.{robot.level ?? 1}
+                    <LazyRender key={slot.id} minHeight="120px" className="h-full">
+                      <Interactive
+                        className="bg-black/30 border-white/10 hover:border-neon-cyan/40 transition-colors h-auto overflow-hidden rounded-xl"
+                        data-testid="owned-robot-card"
+                      >
+                        <CardContent className="p-3 flex flex-col gap-2">
+                          <div className="flex items-center gap-2">
+                            <div className="shrink-0 w-[56px] h-[56px] flex items-center justify-center rounded border border-white/10 bg-black/20">
+                              <RobotSVG parts={robot.parts} colors={robot.colors} size={52} simplified={true} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-bold text-xs truncate">{robot.name || "Unnamed"}</div>
+                              <div className="text-[9px] text-muted-foreground font-mono">
+                                Lv.{robot.level ?? 1}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        <div className="flex gap-1">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="flex-1 h-7 text-[10px] px-2"
-                            onClick={() => onBattle(robot.id)}
-                          >
-                            <Swords className="h-3 w-3 mr-1" />
-                            Battle
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="flex-1 h-7 text-[10px] px-2"
-                            onClick={() => onWorkshop(robot.id)}
-                          >
-                            <Factory className="h-3 w-3 mr-1" />
-                            WS
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Interactive>
+                          <div className="flex gap-1">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="flex-1 h-7 text-[10px] px-2"
+                              onClick={() => onBattle(robot.id)}
+                            >
+                              <Swords className="h-3 w-3 mr-1" />
+                              バトル
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="flex-1 h-7 text-[10px] px-2"
+                              onClick={() => onWorkshop(robot.id)}
+                            >
+                              <Factory className="h-3 w-3 mr-1" />
+                              WS
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Interactive>
+                    </LazyRender>
                   );
                 } else {
                   // Silhouette placeholder
-                  return <SilhouetteCard key={slot.id} slot={slot} lang="ja" />;
+                  return (
+                    <LazyRender key={slot.id} minHeight="120px" className="h-full">
+                      <SilhouetteCard slot={slot} lang="ja" />
+                    </LazyRender>
+                  );
                 }
               })}
             </div>
@@ -210,6 +213,7 @@ function RoleSection({
 
 export default function Dex() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [, setLocation] = useLocation();
 
   const [robots, setRobots] = useState<RobotData[]>([]);
@@ -329,113 +333,207 @@ export default function Dex() {
   );
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6 space-y-4">
-      <SEO title="Dex | Barcode Genesis" description="Your robots and variants." />
+    <div className="min-h-screen pb-24 bg-bg text-text relative overflow-hidden">
+      {/* Global Header */}
+      <GlobalHeader />
 
-      <h1 className="text-2xl font-bold text-primary">Dex</h1>
+      <main className="mx-auto max-w-6xl px-4 py-6 space-y-4 relative z-10">
+        <SEO title="Dex | Barcode Genesis" description="Your robots and variants." />
 
-      {/* Collection Progress */}
-      {!loadingRobots && (
-        <DexProgressBar
-          unlocked={dexProgress.unlocked}
-          total={dexProgress.total}
-          percent={dexProgress.percent}
-          remaining={dexProgress.remaining}
-        />
-      )}
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-primary">Dex</h1>
+          <Link href="/how-to">
+            <Button variant="ghost" size="icon">
+              <HelpCircle className="w-5 h-5 text-muted-foreground" />
+            </Button>
+          </Link>
+        </div>
 
-      <Card className="bg-black/30 border-white/10">
-        <CardContent className="p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="font-bold">称号・バッジ</div>
-            <div className="text-xs text-muted-foreground">
-              現在の称号: {getBadgeLabel(titleId) ?? "Rookie"}
-            </div>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-            {LOGIN_BADGES.map((badge) => {
-              const owned = badgeIds.includes(badge.id);
-              return (
-                <div
-                  key={badge.id}
-                  className={`rounded border px-3 py-2 text-xs ${owned ? "border-neon-cyan/40 bg-neon-cyan/10 text-neon-cyan" : "border-white/10 bg-black/20 text-muted-foreground"
-                    }`}
-                >
-                  <div className="font-bold">{owned ? badge.name : "LOCKED"}</div>
-                  <div className="text-[10px]">
-                    {owned ? badge.description : `連続${badge.threshold}日で解放`}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+        {/* Collection Progress */}
+        {!loadingRobots && (
+          <DexProgressBar
+            unlocked={dexProgress.unlocked}
+            total={dexProgress.total}
+            percent={dexProgress.percent}
+            remaining={dexProgress.remaining}
+          />
+        )}
 
-      <Tabs defaultValue="collection">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="collection">Collection</TabsTrigger>
-          <TabsTrigger value="robots">Robots ({robots.length})</TabsTrigger>
-          <TabsTrigger value="variants">Variants ({variants.length})</TabsTrigger>
-        </TabsList>
-
-        {/* Collection Tab - New! */}
-        <TabsContent value="collection" className="mt-4 space-y-4">
-          {loadingRobots ? (
-            <div className="space-y-4">
-              <SystemSkeleton className="h-40 w-full rounded-2xl" text="SCANNING REGISTRY..." subtext="MAPPING UNIT DISCOVERIES" />
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {[...Array(6)].map((_, i) => (
-                  <SystemSkeleton key={i} className="h-48 w-full rounded-xl" showText={false} />
-                ))}
+        <Card className="bg-black/30 border-white/10">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="font-bold">称号・バッジ</div>
+              <div className="text-xs text-muted-foreground">
+                現在の称号: {getBadgeLabel(titleId) ?? t('rookie')}
               </div>
             </div>
-          ) : (
-            <>
-              {ROLES.map(role => (
-                <RoleSection
-                  key={role}
-                  role={role}
-                  slots={getSlotsByRole(role)}
-                  unlockedSlots={unlockedSlots}
-                  robotMap={robotMap}
-                  onBattle={handleBattle}
-                  onWorkshop={(id) => useInWorkshop(id)}
-                />
-              ))}
-            </>
-          )}
-        </TabsContent>
-
-        {/* Robots Tab - Original List View */}
-        <TabsContent value="robots" className="mt-4">
-          {loadingRobots ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {[...Array(6)].map((_, i) => (
-                <SystemSkeleton key={i} className="h-32 w-full rounded-xl" text="LOADING UNIT..." showText={false} />
-              ))}
-            </div>
-          ) : robots.length === 0 ? (
-            <div className="text-sm text-muted-foreground py-10 text-center border border-dashed rounded bg-black/10">
-              まだロボットがありません。`/scan` から生成してください。
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {robots.map((r) => (
-                <Interactive key={r.id} className="bg-black/30 border-white/10 rounded-xl">
-                  <CardContent className="p-4 flex gap-4 h-full">
-                    <div className="shrink-0 w-[96px] h-[96px] flex items-center justify-center rounded border border-white/10 bg-black/20">
-                      {r.parts && r.colors ? <RobotSVG parts={r.parts} colors={r.colors} size={90} /> : <div className="text-xs text-muted-foreground">No preview</div>}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+              {LOGIN_BADGES.map((badge) => {
+                const owned = badgeIds.includes(badge.id);
+                return (
+                  <div
+                    key={badge.id}
+                    className={`rounded border px-3 py-2 text-xs ${owned ? "border-neon-cyan/40 bg-neon-cyan/10 text-neon-cyan" : "border-white/10 bg-black/20 text-muted-foreground"
+                      }`}
+                  >
+                    <div className="font-bold">{owned ? badge.name : "LOCKED"}</div>
+                    <div className="text-[10px]">
+                      {owned ? badge.description : `連続${badge.threshold}日で解放`}
                     </div>
-                    <div className="flex-1 min-w-0 space-y-2">
-                      <div className="flex items-center justify-between gap-2">
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Tabs defaultValue="collection">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="collection">Collection</TabsTrigger>
+            <TabsTrigger value="robots">Robots ({robots.length})</TabsTrigger>
+            <TabsTrigger value="variants">Variants ({variants.length})</TabsTrigger>
+          </TabsList>
+
+          {/* Collection Tab - New! */}
+          <TabsContent value="collection" className="mt-4 space-y-4">
+            {loadingRobots ? (
+              <div className="space-y-4">
+                <SystemSkeleton className="h-40 w-full rounded-2xl" text="SCANNING REGISTRY..." subtext="MAPPING UNIT DISCOVERIES" />
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {[...Array(6)].map((_, i) => (
+                    <SystemSkeleton key={i} className="h-48 w-full rounded-xl" showText={false} />
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <>
+                {ROLES.map(role => (
+                  <RoleSection
+                    key={role}
+                    role={role}
+                    slots={getSlotsByRole(role)}
+                    unlockedSlots={unlockedSlots}
+                    robotMap={robotMap}
+                    onBattle={handleBattle}
+                    onWorkshop={(id) => useInWorkshop(id)}
+                  />
+                ))}
+              </>
+            )}
+          </TabsContent>
+
+          {/* Robots Tab - Original List View */}
+          <TabsContent value="robots" className="mt-4">
+            {loadingRobots ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {[...Array(6)].map((_, i) => (
+                  <SystemSkeleton key={i} className="h-32 w-full rounded-xl" text="LOADING UNIT..." showText={false} />
+                ))}
+              </div>
+            ) : robots.length === 0 ? (
+              <div className="text-sm text-muted-foreground py-10 text-center border border-dashed rounded bg-black/10">
+                まだロボットがありません。`/scan` から生成してください。
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {robots.map((r) => (
+                  <Interactive key={r.id} className="bg-black/30 border-white/10 rounded-xl">
+                    <CardContent className="p-4 flex gap-4 h-full">
+                      <div className="shrink-0 w-[96px] h-[96px] flex items-center justify-center rounded border border-white/10 bg-black/20">
+                        {r.parts && r.colors ? <RobotSVG parts={r.parts} colors={r.colors} size={90} /> : <div className="text-xs text-muted-foreground">No preview</div>}
+                      </div>
+                      <div className="flex-1 min-w-0 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="font-bold truncate">{r.name || "Unnamed"}</div>
+                            <div className="text-[11px] text-muted-foreground font-mono">ID: {shortId(r.id)}</div>
+                            {r.parts && (
+                              <div className="flex flex-wrap gap-1 pt-1">
+                                {(() => {
+                                  const seed = getRobotSeed(r.parts);
+                                  const tier = getRarityTier(seed);
+                                  const motif = getMotif(seed);
+                                  return (
+                                    <>
+                                      <Badge
+                                        variant="outline"
+                                        className={`text-[10px] ${tier === "B_ACE"
+                                          ? "border-neon-cyan/40 text-neon-cyan bg-neon-cyan/10"
+                                          : "border-white/10 text-muted-foreground"
+                                          }`}
+                                      >
+                                        {getRarityLabel(tier)}
+                                      </Badge>
+                                      <Badge
+                                        variant="outline"
+                                        className={`text-[10px] ${motif === "EVA"
+                                          ? "border-neon-pink/40 text-neon-pink bg-neon-pink/10"
+                                          : "border-emerald-400/40 text-emerald-200 bg-emerald-400/10"
+                                          }`}
+                                      >
+                                        {getMotifLabel(motif)}
+                                      </Badge>
+                                      {r.roleName && (
+                                        <Badge
+                                          variant="outline"
+                                          className="text-[10px] border-amber-400/40 text-amber-300 bg-amber-400/10"
+                                        >
+                                          {r.roleName}
+                                        </Badge>
+                                      )}
+                                    </>
+                                  );
+                                })()}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-[11px] text-muted-foreground font-mono">{statsLine(r)}</div>
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          <Button size="sm" variant="default" onClick={() => handleBattle(r.id)}>
+                            <Swords className="h-4 w-4 mr-2" />
+                            {t('battle_with_this')}
+                          </Button>
+                          <Button size="sm" variant="secondary" onClick={() => useInWorkshop(r.id)}>
+                            <Factory className="h-4 w-4 mr-2" />
+                            {t('use_in_workshop')}
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Interactive>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="variants" className="mt-4">
+            {loadingVariants ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {[...Array(3)].map((_, i) => (
+                  <SystemSkeleton key={i} className="h-32 w-full rounded-xl" text="LOADING VARIANT..." showText={false} />
+                ))}
+              </div>
+            ) : variantsEmpty ? (
+              <div className="text-sm text-muted-foreground py-10 text-center border border-dashed rounded bg-black/10">
+                まだバリアントがありません。`/workshop` で作成できます。
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {variants.map((v) => (
+                  <Interactive key={v.id} className="bg-black/30 border-white/10 rounded-xl">
+                    <CardContent className="p-4 flex gap-4 h-full">
+                      <div className="shrink-0 w-[96px] h-[96px] flex items-center justify-center rounded border border-white/10 bg-black/20">
+                        {v.parts && v.colors ? <RobotSVG parts={v.parts} colors={v.colors} size={90} /> : <div className="text-xs text-muted-foreground">No preview</div>}
+                      </div>
+                      <div className="flex-1 min-w-0 space-y-2">
                         <div className="min-w-0">
-                          <div className="font-bold truncate">{r.name || "Unnamed"}</div>
-                          <div className="text-[11px] text-muted-foreground font-mono">ID: {shortId(r.id)}</div>
-                          {r.parts && (
+                          <div className="font-bold truncate">{v.name || `Variant ${shortId(v.id)}`}</div>
+                          <div className="text-[11px] text-muted-foreground font-mono">ID: {shortId(v.id)}</div>
+                          {v.parts && (
                             <div className="flex flex-wrap gap-1 pt-1">
                               {(() => {
-                                const seed = getRobotSeed(r.parts);
+                                const seed = getRobotSeed(v.parts);
                                 const tier = getRarityTier(seed);
                                 const motif = getMotif(seed);
                                 return (
@@ -458,123 +556,41 @@ export default function Dex() {
                                     >
                                       {getMotifLabel(motif)}
                                     </Badge>
-                                    {r.roleName && (
-                                      <Badge
-                                        variant="outline"
-                                        className="text-[10px] border-amber-400/40 text-amber-300 bg-amber-400/10"
-                                      >
-                                        {r.roleName}
-                                      </Badge>
-                                    )}
                                   </>
                                 );
                               })()}
                             </div>
                           )}
                         </div>
+                        <div className="text-[11px] text-muted-foreground font-mono">
+                          Parents: {shortId(v.parentRobotIds?.[0])} + {shortId(v.parentRobotIds?.[1])}
+                        </div>
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          <Button size="sm" variant="default" onClick={() => setLocation(`/battle?selected=${encodeURIComponent(v.id || "")}`)} disabled={!v.id}>
+                            <Swords className="h-4 w-4 mr-2" />
+                            {t('battle_with_this')}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => useInWorkshop(v.parentRobotIds?.[0], v.parentRobotIds?.[1])}
+                            disabled={!v.parentRobotIds?.[0] || !v.parentRobotIds?.[1]}
+                            title={!v.parentRobotIds?.[0] || !v.parentRobotIds?.[1] ? "親ロボットが未登録です" : undefined}
+                          >
+                            <Factory className="h-4 w-4 mr-2" />
+                            {t('use_in_workshop')}
+                          </Button>
+                        </div>
                       </div>
-                      <div className="text-[11px] text-muted-foreground font-mono">{statsLine(r)}</div>
-                      <div className="flex flex-wrap gap-2 pt-1">
-                        <Button size="sm" variant="default" onClick={() => handleBattle(r.id)}>
-                          <Swords className="h-4 w-4 mr-2" />
-                          Battle with this
-                        </Button>
-                        <Button size="sm" variant="secondary" onClick={() => useInWorkshop(r.id)}>
-                          <Factory className="h-4 w-4 mr-2" />
-                          Use in workshop
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Interactive>
-              ))}
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="variants" className="mt-4">
-          {loadingVariants ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {[...Array(3)].map((_, i) => (
-                <SystemSkeleton key={i} className="h-32 w-full rounded-xl" text="LOADING VARIANT..." showText={false} />
-              ))}
-            </div>
-          ) : variantsEmpty ? (
-            <div className="text-sm text-muted-foreground py-10 text-center border border-dashed rounded bg-black/10">
-              まだバリアントがありません。`/workshop` で作成できます。
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {variants.map((v) => (
-                <Interactive key={v.id} className="bg-black/30 border-white/10 rounded-xl">
-                  <CardContent className="p-4 flex gap-4 h-full">
-                    <div className="shrink-0 w-[96px] h-[96px] flex items-center justify-center rounded border border-white/10 bg-black/20">
-                      {v.parts && v.colors ? <RobotSVG parts={v.parts} colors={v.colors} size={90} /> : <div className="text-xs text-muted-foreground">No preview</div>}
-                    </div>
-                    <div className="flex-1 min-w-0 space-y-2">
-                      <div className="min-w-0">
-                        <div className="font-bold truncate">{v.name || `Variant ${shortId(v.id)}`}</div>
-                        <div className="text-[11px] text-muted-foreground font-mono">ID: {shortId(v.id)}</div>
-                        {v.parts && (
-                          <div className="flex flex-wrap gap-1 pt-1">
-                            {(() => {
-                              const seed = getRobotSeed(v.parts);
-                              const tier = getRarityTier(seed);
-                              const motif = getMotif(seed);
-                              return (
-                                <>
-                                  <Badge
-                                    variant="outline"
-                                    className={`text-[10px] ${tier === "B_ACE"
-                                      ? "border-neon-cyan/40 text-neon-cyan bg-neon-cyan/10"
-                                      : "border-white/10 text-muted-foreground"
-                                      }`}
-                                  >
-                                    {getRarityLabel(tier)}
-                                  </Badge>
-                                  <Badge
-                                    variant="outline"
-                                    className={`text-[10px] ${motif === "EVA"
-                                      ? "border-neon-pink/40 text-neon-pink bg-neon-pink/10"
-                                      : "border-emerald-400/40 text-emerald-200 bg-emerald-400/10"
-                                      }`}
-                                  >
-                                    {getMotifLabel(motif)}
-                                  </Badge>
-                                </>
-                              );
-                            })()}
-                          </div>
-                        )}
-                      </div>
-                      <div className="text-[11px] text-muted-foreground font-mono">
-                        Parents: {shortId(v.parentRobotIds?.[0])} + {shortId(v.parentRobotIds?.[1])}
-                      </div>
-                      <div className="flex flex-wrap gap-2 pt-1">
-                        <Button size="sm" variant="default" onClick={() => setLocation(`/battle?selected=${encodeURIComponent(v.id || "")}`)} disabled={!v.id}>
-                          <Swords className="h-4 w-4 mr-2" />
-                          Battle with this
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => useInWorkshop(v.parentRobotIds?.[0], v.parentRobotIds?.[1])}
-                          disabled={!v.parentRobotIds?.[0] || !v.parentRobotIds?.[1]}
-                          title={!v.parentRobotIds?.[0] || !v.parentRobotIds?.[1] ? "親ロボットが未登録です" : undefined}
-                        >
-                          <Factory className="h-4 w-4 mr-2" />
-                          Use in workshop
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Interactive>
-              ))}
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
-      <AdBanner />
+                    </CardContent>
+                  </Interactive>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
+        <AdBanner />
+      </main>
     </div>
   );
 }

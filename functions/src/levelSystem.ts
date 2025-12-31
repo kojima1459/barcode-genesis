@@ -62,26 +62,35 @@ export const STAT_MULTIPLIER_CAP = 1.30;
  * Step curve: Lv1-5 +2%/lvl, Lv6-10 +1%/lvl, Lv11+ +0.5%/lvl
  * Capped at 1.30x (30% max bonus)
  */
+/**
+ * Compute effective stats based on robot level (Fixed additive growth).
+ * hp = baseHp + floor(level * 1.0)
+ * atk = baseAtk + floor(level * 0.3)
+ * def = baseDef + floor(level * 0.3)
+ * spd = baseSpd + floor(level * 0.3)
+ */
+export const calculateEffectiveStats = (baseStats: { hp: number; isPlayer: boolean; attack: number; defense: number; speed: number; }, level: number = 1) => {
+    // Ensure level is at least 1
+    const safeLevel = Math.max(1, level);
+
+    return {
+        hp: baseStats.hp + Math.floor(safeLevel * 1.0),
+        attack: baseStats.attack + Math.floor(safeLevel * 0.3),
+        defense: baseStats.defense + Math.floor(safeLevel * 0.3),
+        speed: baseStats.speed + Math.floor(safeLevel * 0.3),
+    };
+};
+
+// Re-use existing level curve for robots but with separate function for clarity
+export const applyRobotXp = (currentLevel: number, currentXp: number, xpToAdd: number): LevelUpdateResult => {
+    // Currently same logic as user XP, but explicitly separated for future tuning
+    return applyUserXp(currentLevel, currentXp, xpToAdd);
+};
+
 export const getLevelMultiplier = (level: number): number => {
-    const safeLevel = Math.max(1, Math.floor(level || 1));
-    let bonus = 0;
-
-    // Lv 1-5: +2% per level (4 steps after lv1)
-    const tier1 = Math.min(safeLevel, 5) - 1;
-    bonus += tier1 * 0.02;
-
-    // Lv 6-10: +1% per level (5 steps)
-    if (safeLevel > 5) {
-        const tier2 = Math.min(safeLevel, 10) - 5;
-        bonus += tier2 * 0.01;
-    }
-
-    // Lv 11+: +0.5% per level
-    if (safeLevel > 10) {
-        const tier3 = safeLevel - 10;
-        bonus += tier3 * 0.005;
-    }
-
-    return Math.min(STAT_MULTIPLIER_CAP, 1 + bonus);
+    // Deprecated? Or used for something else?
+    // User requested "Fixed additive growth", so we use calculateEffectiveStats instead.
+    // Keeping this for backward compatibility if needed, or remove if unused.
+    return 1.0;
 };
 

@@ -20,6 +20,13 @@ export interface RobotColors {
   glow: string;      // HEX color
 }
 
+export interface RobotVisuals {
+  aura?: 'none' | 'burning' | 'electric' | 'digital' | 'psycho' | 'angel';
+  eyeGlow?: 'normal' | 'brilliant' | 'matrix';
+  decal?: 'none' | 'number' | 'warning' | 'star' | 'stripe' | 'camo';
+  weaponIcon?: 'none' | 'sword' | 'gun' | 'shield' | 'missile' | 'fist';
+}
+
 export interface Skill {
   id: string;
   name: string;
@@ -57,6 +64,8 @@ export interface RobotData {
   // 外観
   parts: RobotParts;
   colors: RobotColors;
+  visuals?: RobotVisuals;
+  rarityEffect?: 'none' | 'rare' | 'legendary';
 
   // スキル
   skills?: Array<string | Skill>; // skill IDs (string) or legacy skill objects
@@ -185,6 +194,19 @@ export interface BattleLog {
   specialRoleName?: string;
   specialImpact?: string;  // e.g., "DEF貫通×1.8", "回復15%"
   specialHits?: number;    // For multi-hit specials like RAPID_COMBO
+
+  // Daily Boss System (シールド)
+  bossShieldDamage?: number;
+  bossShieldRemaining?: number;
+  bossShieldBroken?: boolean;
+
+  // Finisher System (必殺の一撃)
+  finisherApplied?: boolean;
+  finisherMultiplier?: number;  // 1.35
+
+  // Sudden Death (環境崩壊)
+  suddenDeathTick?: boolean;
+  suddenDeathDamage?: number;
 }
 
 // ============================================

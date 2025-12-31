@@ -15,6 +15,11 @@ import RobotSVG from "@/components/RobotSVG";
 import { RobotData } from "@/types/shared";
 import { Interactive } from "@/components/ui/interactive";
 import { SystemSkeleton } from "@/components/ui/SystemSkeleton";
+import { ThemeSwitcher } from "@/components/ThemeSwitcher";
+import { SoundSettings } from "@/components/SoundSettings";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { Crown, Settings } from "lucide-react";
+import { GlobalHeader } from "@/components/GlobalHeader";
 
 interface UserProfile {
   displayName?: string;
@@ -153,18 +158,15 @@ export default function Profile() {
   );
 
   return (
-    <div className="min-h-screen bg-background p-4 pb-24 flex flex-col">
-      <header className="flex items-center mb-8 max-w-4xl mx-auto w-full">
-        <Link href="/" onClick={() => playSE('se_click')}>
-          <Button variant="ghost" className="mr-4">
-            <ArrowLeft className="h-5 w-5 mr-2" />
-            {t('back')}
-          </Button>
-        </Link>
-        <h1 className="text-2xl font-bold text-primary">{t('profile_title')}</h1>
-      </header>
+    <div className="min-h-screen bg-bg text-text pb-24 flex flex-col relative overflow-hidden">
+      {/* Global Header */}
+      <GlobalHeader />
 
-      <main className="flex-1 max-w-4xl mx-auto w-full space-y-8">
+      <main className="flex-1 max-w-4xl mx-auto w-full p-4 relative z-10 space-y-8">
+        <div className="flex items-center justify-between mb-8">
+          <h1 className="text-2xl font-bold font-orbitron text-primary">{t('profile_title')}</h1>
+        </div>
+
         {/* User Info Card */}
         <Card>
           <CardHeader>

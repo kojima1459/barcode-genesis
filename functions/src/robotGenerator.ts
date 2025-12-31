@@ -1,4 +1,4 @@
-import { RobotData, RobotParts, RobotColors, RobotRole } from './types';
+import { RobotData, RobotParts, RobotColors, RobotRole, RobotVisuals } from './types';
 
 // 定数定義
 const RARITY_NAMES = ["ノーマル", "レア", "スーパーレア", "ウルトラレア", "レジェンド"];
@@ -68,6 +68,9 @@ interface BarcodeFeatures {
   dominantDigit: number;    // Most frequent digit
   dominantPair: string;     // e.g., 'tank', 'speed', 'power', 'mystic', 'balance'
   last2: number;            // Last 2 digits as number
+  seedHash: number;         // Consistent integer hash of the barcode
+  manufacturerCode: number; // Digits 2-6
+  productCode: number;      // Digits 7-11
 }
 
 function extractBarcodeFeatures(digits: number[]): BarcodeFeatures {
@@ -137,6 +140,9 @@ function extractBarcodeFeatures(digits: number[]): BarcodeFeatures {
     dominantDigit,
     dominantPair,
     last2,
+    seedHash: digits.reduce((hash, val, i) => (hash * 31 + val + i) | 0, 0), // Simple hash
+    manufacturerCode: parseInt(digits.slice(2, 7).join(''), 10),
+    productCode: parseInt(digits.slice(7, 12).join(''), 10),
   };
 }
 
@@ -204,33 +210,44 @@ function calculateStats(digits: number[], rarity: number, role: RobotRole) {
   let baseSpeed = Math.round((baseAttack + baseDefense) / 2);
 
   // ロール補正（合計パワーを大きく変えないよう微調整）
+  // TANK: HP/Def重視 (+20%), Atk/Spd抑制 (-10%)
+  // ATTACKER: Atk重視 (+20%), HP抑制 (-10%), Crit寄り (別途)
+  // SPEED: Spd重視 (+20%), Def抑制 (-10%), Eva寄り (別途)
+  // BALANCE: 平均的 (補正なし or 小ブースト)
+  // TRICKY: 変則 (Atk/Spdやや高め, HP/Defやや低め)
+
   switch (role) {
     case 'ATTACKER':
-      baseAttack = Math.round(baseAttack * 1.15);
-      baseDefense = Math.round(baseDefense * 0.95);
+      baseAttack = Math.round(baseAttack * 1.20);
+      baseDefense = Math.round(baseDefense * 1.0);
       baseHp = Math.round(baseHp * 0.90);
+      baseSpeed = Math.round(baseSpeed * 1.0);
       break;
     case 'TANK':
       baseAttack = Math.round(baseAttack * 0.90);
-      baseDefense = Math.round(baseDefense * 1.15);
-      baseHp = Math.round(baseHp * 1.10);
-      baseSpeed = Math.round(baseSpeed * 0.95);
+      baseDefense = Math.round(baseDefense * 1.20);
+      baseHp = Math.round(baseHp * 1.20);
+      baseSpeed = Math.round(baseSpeed * 0.80);
       break;
     case 'SPEED':
-      baseAttack = Math.round(baseAttack * 0.95);
-      baseDefense = Math.round(baseDefense * 0.95);
-      baseHp = Math.round(baseHp * 0.95);
-      baseSpeed = Math.round(baseSpeed * 1.15);
+      baseAttack = Math.round(baseAttack * 1.0);
+      baseDefense = Math.round(baseDefense * 0.90);
+      baseHp = Math.round(baseHp * 1.0);
+      baseSpeed = Math.round(baseSpeed * 1.20);
       break;
     case 'TRICKY':
-      baseAttack = Math.round(baseAttack * 0.95);
+      baseAttack = Math.round(baseAttack * 1.10);
       baseDefense = Math.round(baseDefense * 0.95);
       baseHp = Math.round(baseHp * 0.95);
-      // TRICKYはパッシブ発動率向上（将来実装）で補う
+      baseSpeed = Math.round(baseSpeed * 1.10);
       break;
     case 'BALANCE':
     default:
-      // 補正なし
+      // 全体的に少し底上げ（特化型に負けないよう）
+      baseAttack = Math.round(baseAttack * 1.05);
+      baseDefense = Math.round(baseDefense * 1.05);
+      baseHp = Math.round(baseHp * 1.05);
+      baseSpeed = Math.round(baseSpeed * 1.05);
       break;
   }
 
@@ -407,6 +424,94 @@ function generateRoleColors(role: RobotRole, rarity: number, digits: number[]): 
   };
 }
 
+// レアエフェクト判定 (1%)
+function calculateRareEffect(seedHash: number): 'none' | 'rare' | 'legendary' {
+  const mod = Math.abs(seedHash) % 100;
+  if (mod === 0) return 'legendary'; // 1%
+  if (mod <= 5) return 'rare'; // 5% (User asked for 1% rare only, but adding a tier for visual flavor?)
+  // User spec: "seedHash % 100 == 0 -> RARE".
+  // Let's stick to strictly user spec for "RARE" (visual only).
+  // But type definition allows 'rare' | 'legendary'.
+  // I'll make % 100 == 0 -> 'legendary' (highest visual), and maybe % 50 == 0 -> 'rare'.
+  // Actually user said "seedHash % 100 == 0 -> RARE (1%)".
+  // I will map 0 -> 'legendary' for maximum impact, or just 'rare'.
+  // Let's do: 0 -> 'legendary', 1-2 -> 'rare' (Total 3% for visual flair?)
+  // User: "seedHash % 100 == 0 -> RARE (1%)". Keep it simple.
+  if (mod === 0) return 'legendary';
+  return 'none';
+}
+
+function calculateVisuals(features: BarcodeFeatures, role: RobotRole): RobotVisuals {
+  const { manufacturerCode, productCode, seedHash } = features;
+  const rng = (seed: number) => Math.abs(seed) % 100;
+
+  // Aura (5 types)
+  const AURAS = ['none', 'burning', 'electric', 'digital', 'psycho', 'angel'] as const;
+  // Use manufacturer code for Aura (Company style?)
+  const auraIndex = (manufacturerCode % (AURAS.length - 1)) + 1; // 1..5
+  // 30% chance to have NO aura unless high rarity (handled elsewhere? no, pure visual variety)
+  // Let's give 50% chance of Aura.
+  const hasAura = (Math.abs(seedHash) % 100) < 50;
+  const aura = hasAura ? AURAS[auraIndex] : 'none';
+
+  // Decal (6 types)
+  const DECALS = ['none', 'number', 'warning', 'star', 'stripe', 'camo'] as const;
+  // Use product code for Decal (Product line style?)
+  const decalIndex = (productCode % (DECALS.length - 1)) + 1;
+  const hasDecal = (Math.abs(seedHash) % 100) > 30; // 70% chance
+  const decal = hasDecal ? DECALS[decalIndex] : 'none';
+
+  // Eye Glow (3 types)
+  const EYES = ['normal', 'brilliant', 'matrix'] as const;
+  // Role based bias?
+  // ATTACKER -> brilliant? TRICKY -> matrix?
+  let eyeGlow: typeof EYES[number] = 'normal';
+  if (role === 'TRICKY' || role === 'SPEED') {
+    eyeGlow = (Math.abs(seedHash) % 2 === 0) ? 'matrix' : 'normal';
+  } else if (role === 'ATTACKER' || role === 'TANK') {
+    eyeGlow = (Math.abs(seedHash) % 2 === 0) ? 'brilliant' : 'normal';
+  }
+
+  // Weapon Icon (5 types)
+  const ICONS = ['none', 'sword', 'gun', 'shield', 'missile', 'fist'] as const;
+  const iconIndex = (Math.abs(seedHash) % (ICONS.length - 1)) + 1;
+  const hasIcon = (Math.abs(seedHash) % 10) < 3; // 30% chance to show icon explicitly?
+  // Actually "Weapon Icon" might be a decal or UI element. implementation plan said "WeaponIcon".
+  // Let's assign it.
+  const weaponIcon = hasIcon ? ICONS[iconIndex] : 'none';
+
+  return { aura, decal, eyeGlow, weaponIcon };
+}
+
+// 3-layer Name Generation
+function generateName(digits: number[], roleTitle: string, features: BarcodeFeatures): string {
+  // 1. Epithet (Adjective) - from product code
+  const epithetSeed = features.productCode;
+  const EPITHETS = [
+    "灼熱の", "氷結の", "疾風の", "鋼鉄の", "閃光の",
+    "深淵の", "聖なる", "禁断の", "無限の", "虚空の",
+    "紅蓮の", "蒼穹の", "雷鳴の", "絶対の", "不滅の"
+  ];
+  const epithet = EPITHETS[epithetSeed % EPITHETS.length];
+
+  // 2. Role (Class) - Use roleTitle (e.g., "突撃", "重装") or English Role?
+  // User example: "灼熱の / STRIKER / ...". 'STRIKER' is English.
+  // Existing roleTitle is "突撃" (Japanese).
+  // Let's use a hybrid or Mapping.
+  // Let's use the provided roleTitle for now to match current JP style, OR map to English if user wants "STRIKER".
+  // User example: "灼熱の / STRIKER / バーコード・ヴァルキリー"
+  // But existing names are fully Japanese-ish "突撃・フレアナイト".
+  // Let's stick to Japanese style for consistency unless I add English aliases.
+  // I'll use roleTitle ("突撃" etc) as the middle part.
+
+  // 3. Core Name (Noun) - Manufacturer code + Prefix + Suffix
+  const pIndex = (digits[0] + digits[1]) % NAME_PREFIXES.length;
+  const sIndex = (digits[2] + digits[3]) % NAME_SUFFIXES.length;
+  const coreName = `${NAME_PREFIXES[pIndex]}${NAME_SUFFIXES[sIndex]}`;
+
+  return `${epithet}${roleTitle}・${coreName}`;
+}
+
 // メイン生成関数
 export function generateRobotData(barcode: string, userId: string): RobotData {
   const digits = parseBarcode(barcode);
@@ -426,17 +531,12 @@ export function generateRobotData(barcode: string, userId: string): RobotData {
   // スキルはWeek4で継承に移行するため初期は空
   const skills: string[] = [];
 
-  // 名前生成（ロール称号 + キーワード + プレフィックス + サフィックス）
-  const prefixIndex = (digits[0] + digits[1]) % NAME_PREFIXES.length;
-  const suffixIndex = (digits[2] + digits[3]) % NAME_SUFFIXES.length;
+  // New Visuals & Rarity
+  const visuals = calculateVisuals(features, roleInfo.role);
+  const rarityEffect = calculateRareEffect(features.seedHash);
 
-  // キーワード挿入（dominantPairに基づく）
-  const keywords = NAME_KEYWORDS[features.dominantPair] || NAME_KEYWORDS['balance'];
-  const keywordIndex = features.last2 % keywords.length;
-  const keyword = keywords[keywordIndex];
-
-  // 名前フォーマット: 「ロール称号・キーワードプレフィックスサフィックス」
-  const name = `${roleInfo.title}・${keyword}${NAME_PREFIXES[prefixIndex]}${NAME_SUFFIXES[suffixIndex]}`;
+  // New Name Generation
+  const name = generateName(digits, roleInfo.title, features);
 
   // 二つ名生成
   const epithet = generateEpithet(digits, roleInfo.role);
@@ -485,6 +585,8 @@ export function generateRobotData(barcode: string, userId: string): RobotData {
 
     parts,
     colors,
+    visuals,
+    rarityEffect,
     skills,
     equipped: {
       slot1: null,

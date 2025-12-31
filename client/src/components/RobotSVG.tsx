@@ -1,5 +1,6 @@
 import { useMemo, memo } from "react";
 import { getMotif, getRarityTier, getRobotSeed, type Motif, type RarityTier, type RobotPartsSeed } from "@/lib/rarity";
+import type { RobotVisuals } from "@/types/shared";
 
 type RobotParts = RobotPartsSeed;
 
@@ -31,6 +32,9 @@ interface RobotSVGProps {
   variantKey?: number; // Visual seed (0-99)
   isRareVariant?: boolean; // Rarity >= 3 trigger for Type B visuals
   silhouette?: boolean;
+  visuals?: RobotVisuals;
+  rarityEffect?: 'none' | 'rare' | 'legendary';
+  simplified?: boolean;
 }
 
 const pickFromPalette = (palette: string[], seed: number, salt = 0) => {
@@ -50,12 +54,19 @@ function RobotSVG({
   fx,
   silhouette = false,
   variantKey = 0,
-  isRareVariant = false
+  isRareVariant = false,
+  simplified = false
 }: RobotSVGProps) {
+  const isLite = simplified || size < 100;
+
 
   // Use fx.variant/nonce if available
+  /* logic already added previously */
   const activeVariant = fx ? fx.variant : variant;
   const activeNonce = fx ? fx.nonce : 0;
+
+  const shouldAnimate = !isLite && animate;
+
 
   // Generate a deterministic seed from parts for style consistencies
   const seed = useMemo(() => getRobotSeed(parts), [parts]);
@@ -93,83 +104,128 @@ function RobotSVG({
   const { mainColor, subColor, accentColor, sensorColor, highlightColor } = colorTokens;
 
   // Use sensor glow for all glow effects to unify the MS sensor feel
+  // Use sensor glow for all glow effects to unify the MS sensor feel
   const activeGlow = sensorColor;
+  const { aura = 'none', decal = 'none', eyeGlow = 'normal', weaponIcon = 'none' } = props.visuals || {};
+
 
   // --- Constants (User Requirements) ---
-  const STROKE_OUTER = 2;
-  const STROKE_PANEL = 1;
-  const OP_PANEL = 0.22;
-  const OP_SHADOW = 0.20;
-  const OP_RIM = 0.35;
-  const COLOR_OUTLINE = "#1a1a1a";
+  const STROKE_OUTER = 1.8;
+  const STROKE_PANEL = 0.6;
+  const OP_PANEL = 0.35;
+  const OP_SHADOW = 0.35;
+  const OP_RIM = 0.6; // Sharper rim for metallic feel
+  const COLOR_OUTLINE = "#0F1115"; // Very dark gunmetal
 
   // --- Graphic Helpers ---
 
   // Gradient Definitions
   const Defs = () => (
     <defs>
-      {/* Main Metal Gradient: 3D feel with -35deg light source approx */}
-      <linearGradient id={`${instanceId}-metal-pri`} x1="20%" y1="0%" x2="80%" y2="100%">
-        <stop offset="0%" stopColor="white" stopOpacity="0.3" />
-        <stop offset="40%" stopColor="white" stopOpacity="0" />
-        <stop offset="100%" stopColor="black" stopOpacity="0.4" />
+      {/* Main Metal Gradient: High Contrast for "Chogokin" feel */}
+      <linearGradient id={`${instanceId}-metal-pri`} x1="30%" y1="0%" x2="70%" y2="100%">
+        <stop offset="0%" stopColor="white" stopOpacity="0.65" /> {/* Highlight */}
+        <stop offset="25%" stopColor="white" stopOpacity="0.1" />
+        <stop offset="50%" stopColor="black" stopOpacity="0.1" />
+        <stop offset="100%" stopColor="black" stopOpacity="0.7" /> {/* Shadow */}
       </linearGradient>
 
       <linearGradient id={`${instanceId}-metal-sec`} x1="20%" y1="0%" x2="80%" y2="100%">
-        <stop offset="0%" stopColor="white" stopOpacity="0.4" />
+        <stop offset="0%" stopColor="white" stopOpacity="0.5" />
         <stop offset="50%" stopColor="white" stopOpacity="0" />
-        <stop offset="100%" stopColor="black" stopOpacity="0.5" />
+        <stop offset="100%" stopColor="black" stopOpacity="0.6" />
       </linearGradient>
 
-      {/* Rim Light Gradient */}
-      <linearGradient id={`${instanceId}-rim`} x1="0%" y1="0%" x2="100%" y2="100%">
+      {/* Rim Light Gradient - Sharp Edge */}
+      <linearGradient id={`${instanceId}-rim`} x1="0%" y1="0%" x2="100%" y2="0%">
         <stop offset="0%" stopColor="white" stopOpacity={OP_RIM} />
-        <stop offset="20%" stopColor="white" stopOpacity="0" />
+        <stop offset="15%" stopColor="white" stopOpacity="0" />
+        <stop offset="85%" stopColor="black" stopOpacity="0" />
         <stop offset="100%" stopColor="black" stopOpacity={OP_SHADOW} />
       </linearGradient>
 
       {/* Thruster Gradient */}
       <linearGradient id={`${instanceId}-thruster`} x1="0%" y1="0%" x2="0%" y2="100%">
-        <stop offset="0%" stopColor="white" stopOpacity="0.8" />
-        <stop offset="30%" stopColor={activeGlow} stopOpacity="0.6" />
+        <stop offset="0%" stopColor="white" stopOpacity="0.9" />
+        <stop offset="20%" stopColor={activeGlow} stopOpacity="0.8" />
         <stop offset="100%" stopColor={activeGlow} stopOpacity="0" />
       </linearGradient>
 
-      {/* Scanline / Texture Overlay */}
-      <pattern id={`${instanceId}-grid`} width="4" height="4" patternUnits="userSpaceOnUse">
-        <path d="M 4 0 L 0 0 0 4" fill="none" stroke="black" strokeWidth="0.5" opacity="0.1" />
+      {/* Scanline / Texture Overlay - Tech */}
+      <pattern id={`${instanceId}-grid`} width="6" height="3" patternUnits="userSpaceOnUse">
+        <rect width="6" height="1" fill="black" opacity="0.08" />
       </pattern>
 
-      <filter id={`${instanceId}-glow`} width="200%" height="200%" x="-50%" y="-50%">
-        <feGaussianBlur stdDeviation="3.5" result="coloredBlur" />
-        <feMerge>
-          <feMergeNode in="coloredBlur" />
-          <feMergeNode in="SourceGraphic" />
-        </feMerge>
-      </filter>
 
-      {/* Silhouette filter: converts all colors to dark silhouette with noise */}
-      <filter id={`${instanceId}-silhouette`} x="0" y="0" width="100%" height="100%">
-        {/* Convert to grayscale then darken to near-black */}
-        <feColorMatrix
-          type="matrix"
-          values="0 0 0 0 0.12
-                  0 0 0 0 0.12
-                  0 0 0 0 0.15
-                  0 0 0 1 0"
-          result="darkened"
-        />
-        {/* Add subtle noise for mystery effect */}
-        <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" result="noise" />
-        <feBlend in="darkened" in2="noise" mode="overlay" result="noisy" />
-        {/* Reduce noise intensity */}
-        <feComponentTransfer in="noisy">
-          <feFuncR type="linear" slope="0.85" intercept="0.05" />
-          <feFuncG type="linear" slope="0.85" intercept="0.05" />
-          <feFuncB type="linear" slope="0.85" intercept="0.08" />
-        </feComponentTransfer>
-      </filter>
-    </defs>
+
+      {/* Heavy filters - skipped in lite mode */}
+      {
+        !isLite && (
+          <>
+            <filter id={`${instanceId}-glow`} width="250%" height="250%" x="-75%" y="-75%">
+              <feGaussianBlur stdDeviation="2.5" result="coloredBlur" />
+              <feMerge>
+                <feMergeNode in="coloredBlur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+
+            {/* Silhouette filter: converts all colors to dark silhouette with noise */}
+            <filter id={`${instanceId}-silhouette`} x="0" y="0" width="100%" height="100%">
+              {/* Convert to grayscale then darken to near-black */}
+              <feColorMatrix
+                type="matrix"
+                values="0 0 0 0 0.12
+                      0 0 0 0 0.12
+                      0 0 0 0 0.15
+                      0 0 0 1 0"
+                result="darkened"
+              />
+              {/* Add subtle noise for mystery effect */}
+              <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" result="noise" />
+              <feBlend in="darkened" in2="noise" mode="overlay" result="noisy" />
+              {/* Reduce noise intensity */}
+              <feComponentTransfer in="noisy">
+                <feFuncR type="linear" slope="0.85" intercept="0.05" />
+                <feFuncG type="linear" slope="0.85" intercept="0.05" />
+                <feFuncB type="linear" slope="0.85" intercept="0.08" />
+              </feComponentTransfer>
+            </filter>
+
+            {/* Aura Gradients */}
+            <radialGradient id={`${instanceId}-aura-burning`} cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#FF5500" stopOpacity="0" />
+              <stop offset="60%" stopColor="#FF5500" stopOpacity="0.1" />
+              <stop offset="90%" stopColor="#FF0000" stopOpacity="0.4" />
+              <stop offset="100%" stopColor="#FF0000" stopOpacity="0" />
+            </radialGradient>
+            <radialGradient id={`${instanceId}-aura-electric`} cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#FFFF00" stopOpacity="0" />
+              <stop offset="60%" stopColor="#00FFFF" stopOpacity="0.1" />
+              <stop offset="90%" stopColor="#00FFFF" stopOpacity="0.4" />
+              <stop offset="100%" stopColor="#00FFFF" stopOpacity="0" />
+            </radialGradient>
+            <radialGradient id={`${instanceId}-aura-digital`} cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#00FF00" stopOpacity="0" />
+              <stop offset="80%" stopColor="#00FF00" stopOpacity="0.1" />
+              <stop offset="100%" stopColor="#00FF00" stopOpacity="0" />
+            </radialGradient>
+            <radialGradient id={`${instanceId}-aura-psycho`} cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#FF00FF" stopOpacity="0" />
+              <stop offset="60%" stopColor="#FF00FF" stopOpacity="0.1" />
+              <stop offset="90%" stopColor="#8800FF" stopOpacity="0.4" />
+              <stop offset="100%" stopColor="#8800FF" stopOpacity="0" />
+            </radialGradient>
+            <radialGradient id={`${instanceId}-aura-angel`} cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0" />
+              <stop offset="60%" stopColor="#FFFFFF" stopOpacity="0.2" />
+              <stop offset="90%" stopColor="#FFFFDD" stopOpacity="0.5" />
+              <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
+            </radialGradient>
+          </>
+        )
+      }
+    </defs >
   );
 
 
@@ -225,6 +281,8 @@ function RobotSVG({
       stroke="none"
       filter={`url(#${instanceId}-glow)`}
       className={`glow-sensor variant-${activeVariant}`}
+      style={eyeGlow === 'brilliant' ? { filter: `url(#${instanceId}-glow) brightness(1.5)` }
+        : eyeGlow === 'matrix' ? { opacity: 0.8, filter: `url(#${instanceId}-glow) hue-rotate(90deg)` } : {}}
     />
   );
 
@@ -259,64 +317,97 @@ function RobotSVG({
   const Head = () => {
     // Proportions: Head -12% -> ~32x35
     const variants = [
-      // H1: Command (Angular) + Eye
+      // H1: Command (Gundam-like: Angular Helmet, Chin, Vents)
       <g key="h1">
-        <MechPart d="M85 30 L115 30 L120 45 L112 62 L88 62 L80 45 Z" fillColor={mainColor}>
-          <path d="M85 38 L115 38" />
-        </MechPart>
-        <SensorEye cx={100} cy={48} />
-      </g>,
-      // H2: Scout (Sensor Dome) + Eye
-      <g key="h2">
-        <MechPart d="M88 60 L112 60 L112 40 C112 32 100 28 88 40 Z" fillColor={mainColor}>
-          <path d="M88 50 L112 50" />
-        </MechPart>
-        <SensorEye cx={106} cy={40} />
-      </g>,
-      // H3: Assault (Visor) + Eye (Visor glow)
-      <g key="h3">
-        <MechPart d="M85 28 L115 28 L118 58 L82 58 Z" fillColor={subColor}>
-          {/* Visor Area */}
-        </MechPart>
-        <rect x="85" y="42" width="30" height="4" fill={activeGlow} fillOpacity="0.5" filter={`url(#${instanceId}-glow)`} className={`glow-sensor variant-${activeVariant}`} />
-      </g>,
-      // H4: Support + Eye
-      <g key="h4">
-        <MechPart d="M90 30 L110 30 L110 60 L90 60 Z" fillColor={mainColor}>
-          <path d="M110 30 L125 10 L122 10 L110 35" strokeWidth={2} stroke={accentColor} opacity="1" />
-          <rect x="92" y="38" width="16" height="12" fill={subColor} stroke="none" />
+        <MechPart d="M82 28 L118 28 L122 45 L114 65 L86 65 L78 45 Z" fillColor={mainColor}>
+          {/* Internal Structure */}
+          <path d="M82 36 L118 36" />
+          <path d="M78 45 L86 65" />
+          <path d="M122 45 L114 65" />
+          {/* Chin Guard */}
+          <path d="M94 65 L94 58 L106 58 L106 65" fill={subColor} stroke="none" />
+          <rect x="94" y="58" width="12" height="7" fill="none" stroke={COLOR_OUTLINE} strokeWidth={STROKE_PANEL} />
+          {/* Side Vents */}
+          <rect x="80" y="48" width="4" height="8" fill={subColor} stroke="none" />
+          <rect x="116" y="48" width="4" height="8" fill={subColor} stroke="none" />
         </MechPart>
         <SensorEye cx={100} cy={44} />
+      </g>,
+      // H2: Scout (Zaku-like: Dome, Tubing, Monocle Area)
+      <g key="h2">
+        <MechPart d="M86 62 L114 62 L116 42 C116 32 100 26 84 42 Z" fillColor={tier === 'B_ACE' ? accentColor : mainColor}>
+          <path d="M86 52 L114 52" />
+          <path d="M100 26 L100 42" strokeOpacity={0.5} />
+        </MechPart>
+        {/* Snout */}
+        <path d="M94 52 L94 64 L106 64 L106 52" fill={subColor} stroke={COLOR_OUTLINE} strokeWidth={1} />
+        <rect x="96" y="54" width="8" height="2" fill="black" opacity="0.5" />
+        <rect x="96" y="58" width="8" height="2" fill="black" opacity="0.5" />
+        <SensorEye cx={100} cy={42} />
+      </g>,
+      // H3: Assault (GM/Jegan: Visor, Ear Pods)
+      <g key="h3">
+        <MechPart d="M84 26 L116 26 L118 50 L112 66 L88 66 L82 50 Z" fillColor={subColor}>
+          {/* Antenna Mounting */}
+          <rect x="80" y="38" width="6" height="12" fill={mainColor} stroke={COLOR_OUTLINE} />
+          <rect x="114" y="38" width="6" height="12" fill={mainColor} stroke={COLOR_OUTLINE} />
+          {/* Visor Cutout */}
+        </MechPart>
+        <path d="M86 42 L114 42 L112 52 L88 52 Z" fill={activeGlow} filter={`url(#${instanceId}-glow)`} opacity="0.8" />
+        <path d="M96 66 L96 58 L104 58 L104 66" fill={mainColor} stroke={COLOR_OUTLINE} strokeWidth={1} />
+      </g>,
+      // H4: Support (Guncannon: Round, Hardened)
+      <g key="h4">
+        <MechPart d="M88 28 L112 28 L116 64 L84 64 Z" fillColor={mainColor}>
+          <path d="M88 28 L112 28" />
+          <rect x="86" y="36" width="28" height="14" rx="4" fill={activeGlow} opacity="0.4" stroke={COLOR_OUTLINE} />
+          <rect x="92" y="54" width="16" height="10" fill={subColor} stroke="none" />
+        </MechPart>
+        <SensorEye cx={100} cy={43} />
+        <rect x="76" y="34" width="6" height="20" rx="1" fill={subColor} stroke={COLOR_OUTLINE} strokeWidth={1} />
+        <rect x="118" y="34" width="6" height="20" rx="1" fill={subColor} stroke={COLOR_OUTLINE} strokeWidth={1} />
       </g>
     ];
     return variants[(parts.head - 1) % variants.length] || variants[0];
   };
 
   const Body = () => {
+    // Proportions: Body ~50x50 (65-115y)
     const variants = [
-      // B1: Standard Core + Slit
+      // B1: Standard (RX-78: Vents, Cockpit Block)
       <g key="b1">
-        <MechPart d="M75 65 L125 65 L120 115 L80 115 Z" fillColor={mainColor} texture>
-          <path d="M75 75 L125 75" />
-          <path d="M90 115 L90 95 L110 95 L110 115" />
+        <MechPart d="M70 65 L130 65 L125 90 L115 115 L85 115 L75 90 Z" fillColor={mainColor} texture>
+          {/* Chest Vents Area */}
+          <path d="M75 72 L95 72 L95 85 L78 85 Z" fill={subColor} stroke="none" opacity="0.9" />
+          <path d="M105 72 L125 72 L122 85 L105 85 Z" fill={subColor} stroke="none" opacity="0.9" />
+          {/* Cockpit Hatch */}
+          <path d="M95 70 L105 70 L105 90 L95 90 Z" fill={accentColor} stroke={COLOR_OUTLINE} strokeWidth={1} />
+          {/* Waist Armor */}
+          <path d="M85 115 L85 100 L115 100 L115 115" />
         </MechPart>
-        <EnergySlit x={85} y={80} width={30} />
+        <EnergySlit x={76} y={76} width={18} rotate={-5} />
+        <EnergySlit x={106} y={76} width={18} rotate={5} />
       </g>,
-      // B2: Heavy Plate + Slit
+      // B2: Heavy (Zaku: T-Chest, Pipes?)
       <g key="b2">
-        <MechPart d="M70 65 L130 65 L130 90 L120 120 L80 120 L70 90 Z" fillColor={subColor} texture>
-          <path d="M70 90 L130 90" />
-          <rect x="95" y="100" width="10" height="15" fill={subColor} stroke="none" />
+        <MechPart d="M65 65 L135 65 L135 85 L120 120 L80 120 L65 85 Z" fillColor={subColor} texture>
+          <path d="M65 85 L135 85" />
+          <rect x="90" y="65" width="20" height="55" fill={mainColor} opacity="0.2" stroke="none" />
         </MechPart>
-        <EnergySlit x={75} y={75} width={15} rotate={-10} />
-        <EnergySlit x={110} y={75} width={15} rotate={10} />
+        {/* Power Pipes */}
+        <path d="M65 85 C60 100 85 115 95 115" fill="none" stroke={highlightColor} strokeWidth="3" strokeDasharray="4 2" />
+        <path d="M135 85 C140 100 115 115 105 115" fill="none" stroke={highlightColor} strokeWidth="3" strokeDasharray="4 2" />
+        <EnergySlit x={90} y={75} width={20} />
       </g>,
-      // B3: Orb Core + Slit
+      // B3: High Mobility (Eva/Seed: Orb, Angular Plates)
       <g key="b3">
-        <MechPart d="M70 90 L130 90 L120 120 L80 120 Z" fillColor={mainColor} />
-        <circle cx="100" cy="90" r="16" fill={subColor} />
-        <circle cx="100" cy="90" r="8" fill={activeGlow} className={`glow-sensor variant-${activeVariant}`} filter={`url(#${instanceId}-glow)`} />
-        <MechPart d="M70 65 L130 65 L130 75 L70 75 Z" fillColor={mainColor} />
+        <MechPart d="M70 60 L130 60 L120 95 L110 115 L90 115 L80 95 Z" fillColor={mainColor}>
+          <path d="M70 60 L80 95" />
+          <path d="M130 60 L120 95" />
+        </MechPart>
+        <circle cx="100" cy="85" r="10" fill={subColor} stroke={COLOR_OUTLINE} />
+        <circle cx="100" cy="85" r="6" fill={activeGlow} className={`glow-sensor variant-${activeVariant}`} filter={`url(#${instanceId}-glow)`} />
+        <path d="M75 60 L125 60 L115 75 L85 75 Z" fill={subColor} opacity="0.5" stroke="none" />
       </g>
     ];
     return variants[(parts.body - 1) % variants.length] || variants[0];
@@ -324,20 +415,110 @@ function RobotSVG({
 
   // --- Visual Variant Components ---
 
+  const Aura = () => {
+    if (isLite || aura === 'none') return null;
+    return (
+      <circle cx="100" cy="100" r="140" fill={`url(#${instanceId}-aura-${aura})`} opacity="0.6" style={{ mixBlendMode: 'screen' }} />
+    );
+  };
+
+  const DecalOverlay = () => {
+    if (decal === 'none') return null;
+
+    // Decal on Chest
+    const center = { x: 100, y: 75 };
+
+    if (decal === 'number') {
+      // Determine number from seed?
+      const num = (seed % 99) + 1;
+      return (
+        <text x="115" y="85" fontSize="10" fontFamily="Arial" fontWeight="bold" fill="white" opacity="0.7" style={{ mixBlendMode: 'overlay' }}>{num.toString().padStart(2, '0')}</text>
+      );
+    }
+    if (decal === 'warning') {
+      return (
+        <g transform="translate(75, 75) rotate(-5)">
+          <rect width="20" height="4" fill="yellow" opacity="0.6" />
+          <path d="M0 0 L20 0 L20 4 L0 4 Z" fill="url(#stripe-pattern)" /> {/* No stripe pattern defined, simple rect for now */}
+          <rect width="4" height="4" x="0" fill="black" opacity="0.5" />
+          <rect width="4" height="4" x="10" fill="black" opacity="0.5" />
+        </g>
+      );
+    }
+    if (decal === 'star') {
+      return (
+        <path transform="translate(115, 80) scale(0.4)" d="M10 0 L13 7 L20 7 L15 12 L17 19 L10 15 L3 19 L5 12 L0 7 L7 7 Z" fill="white" opacity="0.8" />
+      );
+    }
+    if (decal === 'stripe') {
+      return (
+        <rect x="90" y="65" width="20" height="60" fill="white" opacity="0.15" transform="skewX(-10)" />
+      );
+    }
+    if (decal === 'camo') {
+      // Simple splotches
+      return (
+        <g opacity="0.3" fill="black">
+          <circle cx="80" cy="80" r="5" />
+          <circle cx="95" cy="70" r="4" />
+          <circle cx="110" cy="85" r="6" />
+        </g>
+      );
+    }
+    return null;
+  };
+
+  const RareEffect = () => {
+    if (!props.rarityEffect || props.rarityEffect === 'none') return null;
+    // Legendary/Rare sparkle
+    return (
+      <circle cx="100" cy="100" r="90" fill="none" stroke={props.rarityEffect === 'legendary' ? 'gold' : 'cyan'} strokeWidth="1" strokeDasharray="4 4" opacity="0.5" className="animate-spin-slow" />
+    );
+  };
+
+
   const ShoulderArmor = () => {
-    // variantKey determines style: 0-2=None, 3-4=Round, 5-6=Spike, 7-8=Plate
+    // variantKey determines style: 0-2=None (Light), 3-8=Armor
     const style = variantKey % 9;
 
-    if (style < 3) return null;
+    // Small fix: Ensure "Heavy" types always get shoulders? 
+    // For now stick to variantKey RNG but upgrade the shapes.
+
+    if (style < 2) return null; // Reduced "No Armor" chance
 
     const shape = (() => {
-      if (style <= 4) { // Round
-        return <MechPart d="M-10 0 L30 0 L30 35 L10 50 L-10 35 Z" fillColor={mainColor}><circle cx="10" cy="20" r="5" fill={subColor} opacity="0.5" stroke="none" /></MechPart>;
+      // Round (Zaku Spiked / Soft)
+      if (style <= 4) {
+        return (
+          <MechPart d="M-10 0 L40 0 L45 35 L30 55 L0 55 L-15 30 Z" fillColor={mainColor}>
+            <path d="M-10 15 L40 15" strokeOpacity={0.5} />
+            <circle cx="15" cy="25" r="4" fill={subColor} stroke={COLOR_OUTLINE} />
+            {/* Spikes if applicable - let's add them subtly */}
+            <path d="M15 0 L15 -10 L25 0" fill={subColor} />
+          </MechPart>
+        );
       }
-      if (style <= 6) { // Spike
-        return <MechPart d="M-5 0 L25 0 L35 25 L10 60 L-15 25 Z" fillColor={subColor}><path d="M-15 25 L10 25" stroke={accentColor} /></MechPart>;
+      // Spike / Heavy Slat
+      if (style <= 6) {
+        return (
+          <MechPart d="M-5 -5 L35 -5 L45 25 L35 60 L10 65 L-15 25 Z" fillColor={subColor}>
+            <path d="M-5 10 L35 10" />
+            <path d="M-15 25 L45 25" />
+            {/* Thruster vent */}
+            <rect x="5" y="45" width="20" height="10" fill={activeGlow} opacity="0.5" />
+            <rect x="5" y="45" width="20" height="2" fill="black" />
+            <rect x="5" y="50" width="20" height="2" fill="black" />
+          </MechPart>
+        );
       }
-      return <MechPart d="M-15 -10 L35 -10 L35 20 L20 40 L0 40 L-15 20 Z" fillColor={mainColor}><rect x="0" y="0" width="20" height="10" fill={subColor} stroke="none" /></MechPart>;
+      // Box (Gundam/GM)
+      return (
+        <MechPart d="M-20 -10 L50 -10 L50 25 L30 45 L0 45 L-20 25 Z" fillColor={mainColor}>
+          <path d="M-20 5 L50 5" />
+          <rect x="5" y="15" width="20" height="10" fill={subColor} stroke={COLOR_OUTLINE} />
+          <rect x="8" y="18" width="14" height="4" fill={activeGlow} opacity="0.8" />
+        </MechPart>
+      );
     })();
 
     return (
@@ -354,16 +535,20 @@ function RobotSVG({
 
     if (style < 3) return null;
 
-    if (style <= 4) { // Wings
+    if (style <= 4) { // Wings (Binder)
       return (
         <>
           <g transform="translate(0, 20)">
-            <MechPart d="M20 20 L0 0 L-20 40 L20 60 Z" fillColor={subColor} />
-            <path d="M0 10 L10 30" stroke={activeGlow} filter={`url(#${instanceId}-glow)`} />
+            <MechPart d="M20 20 L0 0 L-25 45 L15 70 Z" fillColor={subColor}>
+              <path d="M-10 25 L10 45" stroke={activeGlow} filter={`url(#${instanceId}-glow)`} />
+              <rect x="-15" y="40" width="10" height="20" fill={mainColor} stroke="none" />
+            </MechPart>
           </g>
           <g transform="translate(200, 20) scale(-1, 1)">
-            <MechPart d="M20 20 L0 0 L-20 40 L20 60 Z" fillColor={subColor} />
-            <path d="M0 10 L10 30" stroke={activeGlow} filter={`url(#${instanceId}-glow)`} />
+            <MechPart d="M20 20 L0 0 L-25 45 L15 70 Z" fillColor={subColor}>
+              <path d="M-10 25 L10 45" stroke={activeGlow} filter={`url(#${instanceId}-glow)`} />
+              <rect x="-15" y="40" width="10" height="20" fill={mainColor} stroke="none" />
+            </MechPart>
           </g>
         </>
       );
@@ -373,12 +558,16 @@ function RobotSVG({
       return (
         <>
           <g transform="translate(45, 10) rotate(-10)">
-            <MechPart d="M0 0 L15 0 L15 50 L0 50 Z" fillColor={subColor} />
-            <rect x="3" y="2" width="9" height="15" fill={accentColor} stroke="none" />
+            <MechPart d="M-5 -10 L20 -10 L20 60 L-5 60 Z" fillColor={subColor}>
+              <rect x="0" y="-10" width="15" height="50" fill={mainColor} stroke="none" opacity="0.3" />
+              <circle cx="7.5" cy="-10" r="5" fill="black" />
+            </MechPart>
           </g>
           <g transform="translate(155, 10) rotate(10) scale(-1, 1)">
-            <MechPart d="M0 0 L15 0 L15 50 L0 50 Z" fillColor={subColor} />
-            <rect x="3" y="2" width="9" height="15" fill={accentColor} stroke="none" />
+            <MechPart d="M-5 -10 L20 -10 L20 60 L-5 60 Z" fillColor={subColor}>
+              <rect x="0" y="-10" width="15" height="50" fill={mainColor} stroke="none" opacity="0.3" />
+              <circle cx="7.5" cy="-10" r="5" fill="black" />
+            </MechPart>
           </g>
         </>
       );
@@ -387,8 +576,10 @@ function RobotSVG({
     // Radome
     return (
       <g transform="translate(140, 20)">
-        <MechPart d="M0 0 L30 0 L35 25 L-5 25 Z" fillColor={subColor} />
-        <circle cx="15" cy="12" r="6" fill={activeGlow} filter={`url(#${instanceId}-glow)`} />
+        <MechPart d="M0 0 L30 0 L40 30 L-10 30 Z" fillColor={subColor} />
+        <circle cx="15" cy="15" r="8" fill={activeGlow} filter={`url(#${instanceId}-glow)`} />
+        <path d="M15 7 L15 23" stroke="black" opacity="0.5" />
+        <path d="M7 15 L23 15" stroke="black" opacity="0.5" />
       </g>
     );
   };
@@ -396,27 +587,36 @@ function RobotSVG({
   const Arms = () => {
     const shape = (() => {
       const idx = (parts.armLeft - 1) % 4;
-      if (idx === 0) return ( // Blocky
-        <MechPart d="M0 0 L25 0 L22 35 L25 65 L0 65 L-5 35 Z" fillColor={subColor}>
-          <rect x="0" y="10" width="20" height="5" fill={accentColor} stroke="none" opacity="0.8" />
-          <path d="M-10 25 L35 25" />
+      if (idx === 0) return ( // Blocky (Gundam)
+        <MechPart d="M0 0 L25 0 L24 40 L28 70 L-3 70 L-4 40 Z" fillColor={subColor}>
+          {/* Shoulder Joint Cover */}
+          <path d="M-2 0 L27 0 L27 15 L-2 15 Z" fill={mainColor} stroke={COLOR_OUTLINE} />
+          {/* Elbow Joint */}
+          <circle cx="12" cy="40" r="6" fill={mainColor} stroke={COLOR_OUTLINE} />
+          <path d="M-3 70 L28 70" strokeWidth={2} />
         </MechPart>
       );
-      if (idx === 1) return ( // Piston
+      if (idx === 1) return ( // Piston/Rounded (Zaku)
         <g>
-          <MechPart d="M0 0 L20 0 L20 20 L0 20 Z" fillColor={subColor} />
-          <rect x="5" y="20" width="10" height="20" fill={subColor} />
-          <MechPart d="M-5 40 L25 40 L20 70 L0 70 Z" fillColor={subColor} />
+          <MechPart d="M2 0 L23 0 L20 25 L5 25 Z" fillColor={subColor} /> {/* Upper */}
+          <rect x="8" y="25" width="9" height="15" fill="#333" /> {/* Joint */}
+          <MechPart d="M0 40 L25 40 L22 75 L3 75 Z" fillColor={subColor}>  {/* Lower */}
+            <path d="M0 55 L25 55" strokeOpacity={0.5} />
+          </MechPart>
         </g>
       );
-      if (idx === 2) return ( // Shielded
-        <MechPart d="M-5 0 L30 0 L35 25 L20 65 L0 65 L-10 25 Z" fillColor={subColor}>
-          <path d="M-10 25 L35 25" />
+      if (idx === 2) return ( // Shielded/Asymmetric
+        <MechPart d="M-5 0 L30 0 L35 30 L25 70 L0 70 L-10 30 Z" fillColor={subColor}>
+          <path d="M-10 30 L35 30" />
+          <rect x="5" y="40" width="15" height="20" fill={accentColor} stroke="none" opacity="0.8" />
         </MechPart>
       );
-      return ( // Claw
-        <MechPart d="M0 0 L20 0 L20 45 L25 65 L-5 65 L0 45 Z" fillColor={subColor}>
-          <path d="M5 65 L10 80 L15 65" fill={accentColor} stroke="none" />
+      return ( // Claw (Z'Gok)
+        <MechPart d="M2 0 L23 0 L25 45 L30 70 L-5 70 L0 45 Z" fillColor={subColor}>
+          <path d="M2 45 L23 45" />
+          <path d="M5 70 L0 85 L5 70" fill="gray" stroke={COLOR_OUTLINE} />
+          <path d="M20 70 L25 85 L20 70" fill="gray" stroke={COLOR_OUTLINE} />
+          <path d="M12 70 L12 90" stroke={activeGlow} strokeWidth={2} />
         </MechPart>
       );
     })();
@@ -432,26 +632,36 @@ function RobotSVG({
   const Legs = () => {
     const shape = (() => {
       const idx = (parts.legLeft - 1) % 4;
-      if (idx === 0) return ( // Standard
-        <MechPart d="M0 0 L25 0 L20 40 L30 90 L-5 90 L0 40 Z" fillColor={mainColor}>
-          <path d="M0 40 L25 40" />
-          <rect x="5" y="50" width="15" height="30" fill={subColor} opacity="0.2" stroke="none" />
+      if (idx === 0) return ( // Standard (Gundam: Knee, Ankle Guard)
+        <MechPart d="M0 0 L25 0 L22 40 L35 95 L-10 95 L3 40 Z" fillColor={mainColor}>
+          {/* Knee Armor */}
+          <path d="M-2 35 L27 35 L25 55 L0 55 Z" fill={mainColor} stroke={COLOR_OUTLINE} strokeWidth={STROKE_OUTER} />
+          <rect x="5" y="40" width="15" height="5" fill={subColor} stroke="none" />
+          {/* Ankle Guard */}
+          <path d="M-5 85 L30 85 L35 95 L-10 95 Z" fill={subColor} stroke="none" />
+          <path d="M0 0 L25 0" strokeWidth={2} />
         </MechPart>
       );
-      if (idx === 1) return ( // Reverse Joint
-        <MechPart d="M0 0 L20 0 L28 40 L35 20 L40 50 L25 90 L-5 90 L0 40 Z" fillColor={mainColor}>
-          <circle cx="28" cy="40" r="5" fill={subColor} stroke="none" />
+      if (idx === 1) return ( // High Mobility (Dom/Gelgoog: Flared)
+        <MechPart d="M5 0 L20 0 L25 30 L45 95 L-20 95 L0 30 Z" fillColor={mainColor}>
+          <path d="M0 30 L25 30" />
+          <path d="M-20 95 L45 95" strokeWidth={3} />
+          <rect x="5" y="70" width="15" height="25" fill={subColor} opacity="0.5" stroke="none" />
         </MechPart>
       );
-      if (idx === 2) return ( // Heavy
-        <MechPart d="M-5 0 L30 0 L30 90 L-5 90 Z" fillColor={mainColor}>
-          <path d="M-5 60 L30 60" />
+      if (idx === 2) return ( // Heavy (Guntank-ish treads or just thick blocks)
+        <MechPart d="M-5 0 L30 0 L35 40 L40 95 L-15 95 L-10 40 Z" fillColor={mainColor}>
+          <rect x="-15" y="80" width="55" height="15" fill={subColor} stroke={COLOR_OUTLINE} /> {/* Tread/Foot */}
+          <path d="M-5 40 L30 40" strokeWidth={2} />
         </MechPart>
       );
-      return ( // Hover
-        <MechPart d="M0 0 L20 0 L15 70 L5 70 Z" fillColor={mainColor}>
+      return ( // Hover/Bio (Eva legs: Thin then foot)
+        <MechPart d="M5 0 L20 0 L18 60 L25 90 L0 90 L7 60 Z" fillColor={mainColor}>
+          {/* Knee ball */}
+          <circle cx="12.5" cy="40" r="6" fill={subColor} stroke={COLOR_OUTLINE} />
+          <path d="M7 60 L18 60" />
           {/* Hover Glow */}
-          <ellipse cx="10" cy="80" rx="15" ry="4" fill={activeGlow} stroke="none" filter={`url(#${instanceId}-glow)`} className={`variant-${activeVariant}`} />
+          <path d="M-5 95 L30 95" stroke={activeGlow} strokeWidth={3} filter={`url(#${instanceId}-glow)`} opacity="0.6" />
         </MechPart>
       );
     })();
@@ -506,79 +716,66 @@ function RobotSVG({
     }
   };
 
+  // Overlay Variables
   const markOnLeft = (Math.abs(seed) + 7) % 2 === 0;
-  const antennaBaseY = 30;
-  const antennaWidth = tier === "B_ACE" ? 34 : 22;
-  const antennaHeight = tier === "B_ACE" ? 14 : 8;
-  const antennaStroke = tier === "B_ACE" ? 2.4 : 1.6;
-  const ventWidth = tier === "B_ACE" ? 26 : 20;
-  const ventX = 100 - ventWidth / 2;
-  const plateWidth = tier === "B_ACE" ? 20 : 16;
-  const plateHeight = 12;
-  const plateGap = 4;
-  const plateTopY = 112;
-  const plateInset = tier === "B_ACE" ? 4 : 3;
+  const antennaBaseY = 32;
   const markX = markOnLeft ? 38 : 146;
-
-  const leftPlatePath = `M${100 - plateGap / 2 - plateWidth} ${plateTopY} L${100 - plateGap / 2} ${plateTopY} L${100 - plateGap / 2 - plateInset} ${plateTopY + plateHeight} L${100 - plateGap / 2 - plateWidth + plateInset} ${plateTopY + plateHeight} Z`;
-  const rightPlatePath = `M${100 + plateGap / 2} ${plateTopY} L${100 + plateGap / 2 + plateWidth} ${plateTopY} L${100 + plateGap / 2 + plateWidth - plateInset} ${plateTopY + plateHeight} L${100 + plateGap / 2 + plateInset} ${plateTopY + plateHeight} Z`;
-
+  const shieldTransform = markOnLeft ? undefined : "translate(200,0) scale(-1,1)";
   const monoEyeOffset = ((Math.abs(seed) + 13) % 3) - 1;
   const monoEyeX = 100 + monoEyeOffset * 4;
-  const shieldTransform = markOnLeft ? undefined : "translate(200,0) scale(-1,1)";
 
   const msOverlay = (
     <g id="msOverlay">
-      <g id="ms-antenna">
-        <path
-          d={`M100 ${antennaBaseY} L${100 - antennaWidth / 2} ${antennaBaseY - antennaHeight}`}
-          stroke={accentColor}
-          strokeWidth={antennaStroke}
-          strokeLinecap="square"
-        />
-        <path
-          d={`M100 ${antennaBaseY} L${100 + antennaWidth / 2} ${antennaBaseY - antennaHeight}`}
-          stroke={accentColor}
-          strokeWidth={antennaStroke}
-          strokeLinecap="square"
-        />
-        <rect x="94" y={antennaBaseY - 2} width="12" height="3" fill={subColor} />
-        {tier === "B_ACE" && (
-          <rect x="96" y={antennaBaseY - antennaHeight - 4} width="8" height="4" fill={highlightColor} opacity="0.8" />
-        )}
-      </g>
+      {/* V-Fin (Antenna) - Polygon Style */}
+      {motif !== "ZAKU" && (
+        <g id="ms-antenna" transform={`translate(100, ${antennaBaseY})`}>
+          {/* Main V-Fin */}
+          <path d="M0 0 L-28 -22 L-32 -18 L-8 5 Z" fill={highlightColor} stroke={COLOR_OUTLINE} strokeWidth={0.5} />
+          <path d="M0 0 L28 -22 L32 -18 L8 5 Z" fill={highlightColor} stroke={COLOR_OUTLINE} strokeWidth={0.5} />
 
-      <g id="ms-ducts">
-        <rect x={ventX} y="88" width={ventWidth} height="2" fill={subColor} opacity="0.9" />
-        <rect x={ventX - 2} y="92" width={ventWidth + 4} height="2" fill={subColor} opacity="0.8" />
-        <rect x={ventX} y="96" width={ventWidth} height="2" fill={subColor} opacity="0.7" />
-      </g>
+          {/* Jewel Block */}
+          <path d="M-6 -2 L6 -2 L5 8 L-5 8 Z" fill={accentColor} stroke={COLOR_OUTLINE} strokeWidth={1} />
+          <rect x="-2" y="1" width="4" height="4" rx="1" fill={activeGlow} filter={`url(#${instanceId}-glow)`} />
 
-      <g id="ms-waist">
-        <path d={leftPlatePath} fill={mainColor} stroke={COLOR_OUTLINE} strokeWidth={STROKE_PANEL} />
-        <path d={rightPlatePath} fill={mainColor} stroke={COLOR_OUTLINE} strokeWidth={STROKE_PANEL} />
-      </g>
-
-      <g id="ms-mark">
-        <rect x={markX} y="74" width="16" height="6" fill="none" stroke={accentColor} strokeWidth="1" opacity="0.8" />
-        <rect x={markX + 2} y="76" width="6" height="2" fill={accentColor} opacity="0.8" />
-      </g>
-
-      {tier === "B_ACE" && (
-        <g id="ms-ace-extra">
-          <path d="M18 66 L52 66 L62 90 L50 112 L18 112 Z" fill={subColor} stroke={COLOR_OUTLINE} strokeWidth={STROKE_PANEL} />
-          <path d="M148 66 L182 66 L192 90 L180 112 L148 112 Z" fill={subColor} stroke={COLOR_OUTLINE} strokeWidth={STROKE_PANEL} />
-          <g id="ace-pack">
-            <rect x="78" y="44" width="44" height="16" fill={subColor} stroke={COLOR_OUTLINE} strokeWidth={STROKE_PANEL} />
-            <circle cx="78" cy="52" r="6" fill={subColor} stroke={COLOR_OUTLINE} strokeWidth={STROKE_PANEL} />
-            <circle cx="122" cy="52" r="6" fill={subColor} stroke={COLOR_OUTLINE} strokeWidth={STROKE_PANEL} />
-            <circle cx="78" cy="52" r="2.5" fill={activeGlow} filter={`url(#${instanceId}-glow)`} />
-            <circle cx="122" cy="52" r="2.5" fill={activeGlow} filter={`url(#${instanceId}-glow)`} />
-          </g>
-          <circle cx="100" cy="98" r="2.5" fill={highlightColor} opacity="0.85" />
-          <circle cx={markOnLeft ? 54 : 146} cy="86" r="2" fill={activeGlow} filter={`url(#${instanceId}-glow)`} />
+          {/* Ace Commander Antenna (Vertical) */}
+          {tier === "B_ACE" && (
+            <path d="M0 -2 L0 -28 L-3 -22 L-3 -2 Z" fill={subColor} stroke={COLOR_OUTLINE} strokeWidth={0.5} />
+          )}
         </g>
       )}
+
+      {/* Chest Vents (if not covered by body) - mostly handled by Body variants now, but we add extra detail if standard */}
+      {true && ( // Always add subtle intake detail
+        <g id="ms-ducts">
+          <rect x="75" y="74" width="20" height="1" fill="black" opacity="0.3" />
+          <rect x="75" y="78" width="20" height="1" fill="black" opacity="0.3" />
+          <rect x="105" y="74" width="20" height="1" fill="black" opacity="0.3" />
+          <rect x="105" y="78" width="20" height="1" fill="black" opacity="0.3" />
+        </g>
+      )}
+
+      {/* Waist Armor / Skirts */}
+      <g id="ms-waist">
+        {/* Front Skirts */}
+        <MechPart d="M82 110 L98 110 L98 135 L85 130 L82 110 Z" fillColor={mainColor}>
+          <path d="M82 115 L98 115" strokeWidth={0.5} />
+        </MechPart>
+        <MechPart d="M118 110 L102 110 L102 135 L115 130 L118 110 Z" fillColor={mainColor}>
+          <path d="M118 115 L102 115" strokeWidth={0.5} />
+        </MechPart>
+        {/* Center Crotch Piece */}
+        <path d="M98 110 L102 110 L102 125 L100 130 L98 125 Z" fill={accentColor} stroke={COLOR_OUTLINE} />
+        <path d="M100 115 L100 120" stroke={subColor} />
+      </g>
+
+      {/* Shoulder Markings */}
+      <g id="ms-mark">
+        <rect x={markX} y="68" width="20" height="40" rx="2" fill="none" stroke={highlightColor} strokeWidth="1" opacity="0.4" strokeDasharray="2 2" />
+        <rect x={markX} y="72" width="20" height="8" fill={highlightColor} opacity="0.6" />
+        <text x={markX + 10} y="78" textAnchor="middle" fontSize="6" fill="black" fontWeight="bold" fontFamily="Arial">
+          {tier === "B_ACE" ? "ACE" : "MS"}
+        </text>
+      </g>
     </g>
   );
 
@@ -696,12 +893,12 @@ function RobotSVG({
           .mech-anim-${instanceId} {
             animation: ${activeVariant === 'maintenance'
           ? `maintenance-jitter-${instanceId} 0.2s steps(2) infinite`
-          : animate
+          : shouldAnimate
             ? `hover-${instanceId} 4s ease-in-out infinite`
             : 'none'};
           }
           .thruster-anim {
-             animation: ${animate ? `thruster-breath-${instanceId} 2.2s ease-in-out infinite` : 'none'};
+             animation: ${shouldAnimate ? `thruster-breath-${instanceId} 2.2s ease-in-out infinite` : 'none'};
           }
           
           /* Glow Elements Base States */
@@ -715,7 +912,7 @@ function RobotSVG({
           
           .variant-battle .glow-sensor { opacity: 0.9; }
           .variant-battle .glow-thruster { opacity: 1; filter: brightness(1.3); }
-          .variant-battle .thruster-anim { animation: ${animate ? `thruster-boost-${instanceId} 0.6s ease-out` : 'none'}; }
+          .variant-battle .thruster-anim { animation: ${shouldAnimate ? `thruster-boost-${instanceId} 0.6s ease-out` : 'none'}; }
           
           .variant-evolve .glow-sensor { opacity: 0; animation: high-alert-pulse-${instanceId} 0.3s infinite; }
           .variant-evolve .glow-thruster { opacity: 0.2; }
@@ -738,6 +935,7 @@ function RobotSVG({
       <g filter={silhouette ? `url(#${instanceId}-silhouette)` : undefined}>
         {/* Render Order: Back -> Thrusters -> Legs -> Arms -> Body -> Head -> Weapon */}
         <g className={silhouette ? undefined : `mech-anim-${instanceId}`}>
+          <Aura />
           <ExtraBackpack />
           <Backpack />
           <Thrusters />
@@ -745,8 +943,10 @@ function RobotSVG({
           <Arms />
           <ShoulderArmor />
           <Body />
+          <DecalOverlay />
           <Head />
           <Weapon />
+          <RareEffect />
         </g>
 
         <g id="msShadow" opacity="0.12">

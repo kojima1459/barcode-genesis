@@ -39,6 +39,7 @@ const SpecifiedCommercial = lazy(() => import("@/pages/legal/SpecifiedCommercial
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const Scan = lazy(() => import("@/pages/Scan"));
 const Workshop = lazy(() => import("@/pages/Workshop"));
+const BossBattle = lazy(() => import("@/pages/BossBattle"));
 
 // Loading fallback component
 function PageLoader() {
@@ -95,6 +96,9 @@ function Router() {
             </Route>
             <Route path="/battle">
               <ProtectedRoute component={withShell(Battle)} />
+            </Route>
+            <Route path="/boss">
+              <ProtectedRoute component={withShell(BossBattle)} />
             </Route>
             <Route path="/collection">
               <ProtectedRoute component={withShell(Collection)} />

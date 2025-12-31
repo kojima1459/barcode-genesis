@@ -14,6 +14,7 @@ import { SHOP_ITEMS, ShopItemCategory, getCategoryLabel, getItemLabel, getItemDe
 import { PRODUCTS } from "../../../shared/products";
 import { toast } from "sonner";
 import { Interactive } from "@/components/ui/interactive";
+import { GlobalHeader } from "@/components/GlobalHeader";
 
 type InventoryMap = Record<string, number>;
 
@@ -236,24 +237,11 @@ export default function Shop() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-4 flex flex-col pb-24">
-      <header className="flex items-center mb-6 max-w-4xl mx-auto w-full">
-        <Link href="/">
-          <Button variant="ghost" className="mr-4">
-            <ArrowLeft className="h-5 w-5 mr-2" />
-            {t('back')}
-          </Button>
-        </Link>
-        <h1 className="text-2xl font-bold text-primary">{t('shop')}</h1>
-        <div className="ml-auto text-xs font-bold bg-primary/10 text-primary px-3 py-1 rounded-full flex flex-wrap items-center gap-3">
-          <span>Lv {level}</span>
-          <span>XP {xp}</span>
-          <span className="flex items-center gap-1">💰 <CountUp value={credits} /> {t('shop_credits')}</span>
-          <span className="flex items-center gap-1">🧩 <CountUp value={scanTokens} /> {t('shop_scan_token')}</span>
-        </div>
-      </header>
+    <div className="min-h-screen pb-24 relative overflow-hidden bg-bg text-text">
+      {/* Global Header */}
+      <GlobalHeader />
 
-      <main className="flex-1 max-w-4xl mx-auto w-full space-y-8">
+      <main className="flex-1 max-w-4xl mx-auto w-full px-4 pt-4 relative z-10 space-y-8">
         {/* Coin Shop Section */}
         <section>
           <h2 className="text-xl font-bold mb-4 text-primary">{t('shop_coins_title')}</h2>
@@ -299,7 +287,15 @@ export default function Shop() {
             </div>
           ))}
         </section>
+        {/* Premium Link */}
+        <div className="flex justify-center mt-8 mb-4">
+          <Link href="/premium">
+            <span className="text-xs text-muted-foreground/50 underline cursor-pointer hover:text-accent transition-colors">
+              広告非表示 / 上限UP (Premium)
+            </span>
+          </Link>
+        </div>
       </main>
-    </div>
+    </div >
   );
 }

@@ -16,6 +16,12 @@ import ShareButton from "@/components/ShareButton";
 import AdBanner from "@/components/AdBanner";
 import { useSound } from "@/contexts/SoundContext";
 import {
+  StatIconATK,
+  StatIconDEF,
+  RoleIconSpeed,
+  RoleIconTricky
+} from "@/components/StatIcons";
+import {
   getMuted as getBattleSfxMuted,
   play as playBattleSfx,
   preload as preloadBattleSfx,
@@ -457,7 +463,7 @@ export default function Battle() {
                   <div className="glass-panel p-4 rounded-lg space-y-3">
                     <div className="flex justify-between items-center text-sm border-b border-white/10 pb-2">
                       <span className="font-bold flex items-center gap-2">
-                        <Sword className="w-4 h-4 text-primary" /> バトルアイテム（所持から1個予約）
+                        <StatIconATK className="w-4 h-4 text-primary" /> バトルアイテム（所持から1個予約）
                       </span>
                       <Link href="/shop">
                         <span className="text-xs text-muted-foreground hover:text-primary underline underline-offset-4">
@@ -496,7 +502,7 @@ export default function Battle() {
                         className={`h-20 flex flex-col gap-1 relative overflow-hidden ${selectedBattleItem === 'BOOST' ? 'bg-amber-500/20 border-amber-500 text-amber-500 hover:bg-amber-500/30' : 'hover:border-amber-500/50'}`}
                         disabled={!itemSlotsUnlocked || (!canUseBattleItem('BOOST') && selectedBattleItem !== 'BOOST')}
                       >
-                        <Zap className="w-5 h-5" />
+                        <RoleIconSpeed className="w-5 h-5" />
                         <span className="text-xs font-bold">ブースト</span>
                         <span className="text-[10px] opacity-80">初撃ダメージ x1.15</span>
                         <span className="text-[10px] opacity-60">所持: {battleItemStock.BOOST}</span>
@@ -520,7 +526,7 @@ export default function Battle() {
                         className={`h-20 flex flex-col gap-1 relative overflow-hidden ${selectedBattleItem === 'SHIELD' ? 'bg-blue-500/20 border-blue-500 text-blue-500 hover:bg-blue-500/30' : 'hover:border-blue-500/50'}`}
                         disabled={!itemSlotsUnlocked || (!canUseBattleItem('SHIELD') && selectedBattleItem !== 'SHIELD')}
                       >
-                        <Shield className="w-5 h-5" />
+                        <StatIconDEF className="w-5 h-5" />
                         <span className="text-xs font-bold">シールド</span>
                         <span className="text-[10px] opacity-80">初撃軽減 x0.85</span>
                         <span className="text-[10px] opacity-60">所持: {battleItemStock.SHIELD}</span>
@@ -544,7 +550,7 @@ export default function Battle() {
                         className={`h-20 flex flex-col gap-1 relative overflow-hidden ${selectedBattleItem === 'JAMMER' ? 'bg-purple-500/20 border-purple-500 text-purple-500 hover:bg-purple-500/30' : 'hover:border-purple-500/50'}`}
                         disabled={!itemSlotsUnlocked || (!canUseBattleItem('JAMMER') && selectedBattleItem !== 'JAMMER')}
                       >
-                        <Heart className="w-5 h-5" />
+                        <RoleIconTricky className="w-5 h-5" />
                         <span className="text-xs font-bold">ジャマー</span>
                         <span className="text-[10px] opacity-80">次のクリティカル無効</span>
                         <span className="text-[10px] opacity-60">所持: {battleItemStock.JAMMER}</span>
@@ -603,7 +609,7 @@ export default function Battle() {
                   {/* Special Move Reservation */}
                   <div className="flex flex-wrap gap-4 items-center glass-panel px-6 py-4 rounded-lg justify-center md:justify-start border border-orange-500/30 bg-gradient-to-r from-orange-500/10 to-transparent">
                     <span className="text-sm font-bold flex items-center gap-2">
-                      <Zap className="w-4 h-4 text-orange-400" /> 必殺技 (1戦1回):
+                      <StatIconATK className="w-4 h-4 text-orange-400" /> 必殺技 (1戦1回):
                     </span>
                     <label className="flex items-center gap-2 cursor-pointer hover:bg-orange-500/10 p-2 rounded transition-colors">
                       <input

@@ -10,16 +10,14 @@ interface LanguageContextType {
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  // デフォルトは日本語
-  const [language, setLanguage] = useState<Language>('ja');
-
-  // ローカルストレージから言語設定を読み込む
-  useEffect(() => {
+  // デフォルトは日本語 - localStorageから直接読み込んで競合状態を防ぐ
+  const [language, setLanguage] = useState<Language>(() => {
     const savedLang = localStorage.getItem('language') as Language;
     if (savedLang && (savedLang === 'ja' || savedLang === 'en')) {
-      setLanguage(savedLang);
+      return savedLang;
     }
-  }, []);
+    return 'ja';
+  });
 
   // 言語設定を保存
   const handleSetLanguage = (lang: Language) => {

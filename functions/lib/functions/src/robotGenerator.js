@@ -173,33 +173,43 @@ function calculateStats(digits, rarity, role) {
     let baseHp = Math.min(3000, Math.max(100, Math.round((totalPoints * ratioHp / safeTotalRatio) * 100)));
     let baseSpeed = Math.round((baseAttack + baseDefense) / 2);
     // ロール補正（合計パワーを大きく変えないよう微調整）
+    // TANK: HP/Def重視 (+20%), Atk/Spd抑制 (-10%)
+    // ATTACKER: Atk重視 (+20%), HP抑制 (-10%), Crit寄り (別途)
+    // SPEED: Spd重視 (+20%), Def抑制 (-10%), Eva寄り (別途)
+    // BALANCE: 平均的 (補正なし or 小ブースト)
+    // TRICKY: 変則 (Atk/Spdやや高め, HP/Defやや低め)
     switch (role) {
         case 'ATTACKER':
-            baseAttack = Math.round(baseAttack * 1.15);
-            baseDefense = Math.round(baseDefense * 0.95);
+            baseAttack = Math.round(baseAttack * 1.20);
+            baseDefense = Math.round(baseDefense * 1.0);
             baseHp = Math.round(baseHp * 0.90);
+            baseSpeed = Math.round(baseSpeed * 1.0);
             break;
         case 'TANK':
             baseAttack = Math.round(baseAttack * 0.90);
-            baseDefense = Math.round(baseDefense * 1.15);
-            baseHp = Math.round(baseHp * 1.10);
-            baseSpeed = Math.round(baseSpeed * 0.95);
+            baseDefense = Math.round(baseDefense * 1.20);
+            baseHp = Math.round(baseHp * 1.20);
+            baseSpeed = Math.round(baseSpeed * 0.80);
             break;
         case 'SPEED':
-            baseAttack = Math.round(baseAttack * 0.95);
-            baseDefense = Math.round(baseDefense * 0.95);
-            baseHp = Math.round(baseHp * 0.95);
-            baseSpeed = Math.round(baseSpeed * 1.15);
+            baseAttack = Math.round(baseAttack * 1.0);
+            baseDefense = Math.round(baseDefense * 0.90);
+            baseHp = Math.round(baseHp * 1.0);
+            baseSpeed = Math.round(baseSpeed * 1.20);
             break;
         case 'TRICKY':
-            baseAttack = Math.round(baseAttack * 0.95);
+            baseAttack = Math.round(baseAttack * 1.10);
             baseDefense = Math.round(baseDefense * 0.95);
             baseHp = Math.round(baseHp * 0.95);
-            // TRICKYはパッシブ発動率向上（将来実装）で補う
+            baseSpeed = Math.round(baseSpeed * 1.10);
             break;
         case 'BALANCE':
         default:
-            // 補正なし
+            // 全体的に少し底上げ（特化型に負けないよう）
+            baseAttack = Math.round(baseAttack * 1.05);
+            baseDefense = Math.round(baseDefense * 1.05);
+            baseHp = Math.round(baseHp * 1.05);
+            baseSpeed = Math.round(baseSpeed * 1.05);
             break;
     }
     // 再度上下限を適用

@@ -6,6 +6,7 @@ import { Coins, Factory, Gift, Crown, BookOpen } from "lucide-react";
 import { BattleIcon, HomeIcon, ShopIcon, ProfileIcon, UnitsIcon } from "@/components/icons/AppIcons";
 
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { db, functions } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -17,6 +18,7 @@ function getJstDateKey(): string {
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [location] = useLocation();
 
   const [credits, setCredits] = useState<number | null>(null);
@@ -109,7 +111,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
             {/* Left: Rank & Badge */}
             <div className="flex items-center gap-2 text-xs md:text-sm shrink-0">
               <span className="font-mono text-primary font-bold text-sm">
-                {titleId ? getBadgeLabel(titleId) ?? titleId : "Rookie"}
+                {titleId ? getBadgeLabel(titleId) ?? titleId : t('rookie')}
               </span>
               <div className="flex items-center gap-1 border-l border-white/10 pl-2">
                 <span>🔥</span>
@@ -134,7 +136,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
               <Link href="/premium">
                 <Button variant="default" size="sm" className="shrink-0 bg-gradient-to-r from-yellow-500 to-orange-500 text-black hover:from-yellow-400 hover:to-orange-400 font-bold whitespace-nowrap text-xs px-2">
                   <Crown className="h-4 w-4" aria-hidden="true" />
-                  <span className="hidden sm:inline ml-1">Premium</span>
+                  <span className="hidden sm:inline ml-1">{t('premium')}</span>
                 </Button>
               </Link>
             </nav>
@@ -154,7 +156,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
                 </Link>
                 <Link href="/premium" className="text-yellow-500 hover:text-yellow-400 transition-colors flex items-center gap-1 font-bold">
                   <Crown className="h-4 w-4" />
-                  Premium
+                  {t('premium')}
                 </Link>
                 <Link href="/terms" className="text-muted hover:text-primary transition-colors">
                   利用規約
@@ -167,7 +169,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
                 </Link>
               </div>
               <div className="text-center text-xs text-muted mt-4">
-                © 2024 Barcode Genesis. All rights reserved.
+                © 2024 Barcode Genesis. All rights reserved. v1.0.0
               </div>
             </div>
           </footer>

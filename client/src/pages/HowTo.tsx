@@ -32,12 +32,12 @@ export default function HowTo() {
         <Card className="glass-panel border-border/60">
           <CardHeader>
             <CardTitle className="text-xl font-semibold tracking-tight">
-              30秒で理解 → 1分でスキャン → 3分で初バトル
+              3ステップで始めるバーコード生活
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              まずはバーコードを撮る。その瞬間の高揚感が、この世界の入口です。
+              日常のバーコードが、最強のロボットに変わる瞬間を体験しよう。
             </p>
             <div className="grid grid-cols-2 gap-3">
               {flowSteps.map((step) => (
@@ -50,123 +50,107 @@ export default function HowTo() {
           </CardContent>
         </Card>
 
+        {/* STEP 1: Scan & Generate */}
         <Card className="glass-panel border-border/60">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg font-bold">
-              <ScanLine className="h-5 w-5 text-accent" />
-              0) まずは撮る（スキャン）
+            <CardTitle className="flex items-center gap-2 text-lg font-bold text-neon-cyan">
+              <ScanLine className="h-5 w-5" />
+              STEP 1: スキャンして生成
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              カメラでバーコードを1本。読み取りの快感が、最初のロボを生む。
+          <CardContent className="space-y-4 text-sm text-muted-foreground">
+            <p>
+              まずは手近な商品のバーコード（JANコード）をカメラで読み取ります。
+              13桁の数字が設計図となり、世界に1体だけのロボットが生成されます。
             </p>
+            <ul className="list-disc list-inside space-y-1 pl-2 text-xs">
+              <li>バーコードごとに性能・パーツ・色が固定（決定論）</li>
+              <li>レア演出やシークレット機体も存在</li>
+            </ul>
             <Link href="/scan">
-              <Button className="w-full bg-accent text-bg hover:bg-accent/90">
+              <Button className="w-full bg-accent text-bg hover:bg-accent/90 mt-2">
                 スキャンへ
               </Button>
             </Link>
           </CardContent>
         </Card>
 
+        {/* STEP 2: Battle */}
         <Card className="glass-panel border-border/60">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg font-bold">
-              <Sparkles className="h-5 w-5 text-accent2" />
-              1) ロボが生まれる
+            <CardTitle className="flex items-center gap-2 text-lg font-bold text-neon-orange">
+              <Swords className="h-5 w-5" />
+              STEP 2: バトルで成長
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2 text-sm text-muted-foreground">
-            <p>・13桁の数字が設計図になる</p>
-            <p>・色、パーツ、スキルが決まる</p>
-            <p>・同じバーコードは同じロボ（唯一）</p>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-panel border-border/60">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg font-bold">
-              <Swords className="h-5 w-5 text-accent" />
-              2) バトルする
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
-            <p>練習: 自分のロボ同士で試せる（報酬なし）</p>
-            <p>対戦: 勝てばクレジットとXPが手に入る</p>
+          <CardContent className="space-y-4 text-sm text-muted-foreground">
+            <p>
+              生成したロボットで対戦（PvP/PvE）を行います。
+              相性を考えて相手を選び、クレジットとXP（経験値）を獲得しましょう。
+            </p>
+            <ul className="list-disc list-inside space-y-1 pl-2 text-xs">
+              <li>勝てば報酬GET、負けても少し貰える</li>
+              <li>XPが溜まるとレベルアップしてステータス上昇</li>
+            </ul>
             <Link href="/battle">
-              <Button className="w-full bg-accent text-bg hover:bg-accent/90">
+              <Button className="w-full bg-accent2 text-white hover:bg-accent2/90 mt-2">
                 バトルへ
               </Button>
             </Link>
           </CardContent>
         </Card>
 
+        {/* STEP 3: Workshop & Dex */}
         <Card className="glass-panel border-border/60">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg font-bold">
-              <BookOpen className="h-5 w-5 text-accent" />
-              3) 図鑑で集める
+            <CardTitle className="flex items-center gap-2 text-lg font-bold text-neon-purple">
+              <Factory className="h-5 w-5" />
+              STEP 3: 工房と図鑑
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
-            <p>ロボと派生機をコレクション。出会いは全部、現実のバーコードから。</p>
-            <Link href="/dex">
-              <Button variant="outline" className="w-full border-border/70">
-                図鑑へ
-              </Button>
-            </Link>
+          <CardContent className="space-y-4 text-sm text-muted-foreground">
+            <p>
+              集めたクレジットで「派生機（Variant）」を作成したり、図鑑を埋めたりします。
+            </p>
+            <ul className="list-disc list-inside space-y-1 pl-2 text-xs">
+              <li>工房: コスメアイテムを使って見た目をカスタマイズ</li>
+              <li>図鑑: コレクション率を上げて称号を獲得</li>
+            </ul>
+            <div className="grid grid-cols-2 gap-3 mt-2">
+              <Link href="/workshop">
+                <Button variant="outline" className="w-full border-border/70">
+                  工房へ
+                </Button>
+              </Link>
+              <Link href="/dex">
+                <Button variant="outline" className="w-full border-border/70">
+                  図鑑へ
+                </Button>
+              </Link>
+            </div>
           </CardContent>
         </Card>
 
-        <Card className="glass-panel border-border/60">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg font-bold">
-              <Factory className="h-5 w-5 text-accent2" />
-              4) 工房で派生機
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
-            <p>コスメ合成で見た目を進化。強さは変わらないので安心。</p>
-            <Link href="/workshop">
-              <Button variant="outline" className="w-full border-border/70">
-                工房へ
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-panel border-border/60">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg font-bold">
-              <Coins className="h-5 w-5 text-accent2" />
-              5) クレジット / XP
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm text-muted-foreground">
-            <p>スキャンが主役。クレジットは準備（クラフト）に使う。</p>
-            <p>XPはバトルでどんどん増える。毎日少しずつ強くなる。</p>
-          </CardContent>
-        </Card>
-
+        {/* FAQ Section */}
         <Card className="glass-panel border-border/60">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg font-bold">
               <HelpCircle className="h-5 w-5 text-accent" />
-              FAQ
+              よくある質問
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 text-sm text-muted-foreground">
             <div>
-              <p className="font-semibold text-foreground">Q. 13桁じゃないバーコードは？</p>
-              <p>A. できるだけ13桁を探す。ISBNなどは対応外。</p>
+              <p className="font-semibold text-foreground">Q. 13桁以外のバーコードは？</p>
+              <p>A. 現在はJANコード(13桁)が基本です。その他はエラーになる場合があります。</p>
             </div>
             <div>
-              <p className="font-semibold text-foreground">Q. 読み取れない時は？</p>
-              <p>A. 光を当てる/影を減らす/ピントを合わせ直す。</p>
+              <p className="font-semibold text-foreground">Q. 読み取りにくいときは？</p>
+              <p>A. 明るい場所で、反射を避けて撮影してください。</p>
             </div>
             <div>
-              <p className="font-semibold text-foreground">Q. 勝てない…</p>
-              <p>A. まずは練習で相性確認。バーコードを変えると世界が変わる。</p>
+              <p className="font-semibold text-foreground">Q. プレミアムプランとは？</p>
+              <p>A. 広告非表示、所持枠拡張などがセットになった有料プランです。</p>
             </div>
           </CardContent>
         </Card>

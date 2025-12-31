@@ -11,7 +11,7 @@ var __rest = (this && this.__rest) || function (s, e) {
     return t;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.resolveFighterData = exports.createVariant = exports.scanBarcodeFromImage = exports.checkMatchStatus = exports.leaveMatchmaking = exports.joinMatchmaking = exports.stripeWebhook = exports.createPortalSession = exports.createSubscriptionSession = exports.createCheckoutSession = exports.applyCosmeticItem = exports.useUpgradeItem = exports.craftItem = exports.checkAchievements = exports.updateRanking = exports.followUser = exports.claimMissionReward = exports.getDailyMissions = exports.claimLoginBonus = exports.claimDailyLogin = exports.equipItem = exports.purchaseItem = exports.inheritSkill = exports.synthesizeRobots = exports.matchBattle = exports.evolveRobot = exports.batchDisassemble = exports.awardScanToken = exports.generateRobot = exports.ping = exports.debugPing = exports.testFunctionHealth = void 0;
+exports.executeBossBattle = exports.getDailyBoss = exports.resolveFighterData = exports.createVariant = exports.scanBarcodeFromImage = exports.checkMatchStatus = exports.leaveMatchmaking = exports.joinMatchmaking = exports.stripeWebhook = exports.createPortalSession = exports.createSubscriptionSession = exports.createCheckoutSession = exports.applyCosmeticItem = exports.useUpgradeItem = exports.craftItem = exports.checkAchievements = exports.updateRanking = exports.followUser = exports.claimMissionReward = exports.getDailyMissions = exports.claimLoginBonus = exports.claimDailyLogin = exports.equipItem = exports.purchaseItem = exports.inheritSkill = exports.synthesizeRobots = exports.matchBattle = exports.evolveRobot = exports.batchDisassemble = exports.awardScanToken = exports.generateRobot = exports.ping = exports.debugPing = exports.testFunctionHealth = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
@@ -30,6 +30,7 @@ const battleEntryFee_1 = require("./battleEntryFee");
 const ledger_1 = require("./ledger");
 const dateKey_1 = require("./dateKey");
 const dailyLogin_1 = require("./dailyLogin");
+const dailyBoss_1 = require("./dailyBoss");
 // Node.js 20 has native fetch - no need for node-fetch
 // Use a version constant to help track deployments and identify cache issues
 const VERSION = "2.1.0-fixed-cors-v3";
@@ -690,12 +691,14 @@ exports.matchBattle = functions.https.onCall(async (data, context) => {
         const txnReward = await db.runTransaction(async (transaction) => {
             var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r;
             const userRef = db.collection('users').doc(userId);
+            const robotRef = db.collection('robots').doc(playerRobot.id);
             const battleRef = db.collection('battles').doc(battleId);
             const battleResultRef = userRef.collection('battleResults').doc(battleId);
-            const [userSnap, battleSnap, battleResultSnap] = await Promise.all([
+            const [userSnap, battleSnap, battleResultSnap, robotSnap] = await Promise.all([
                 transaction.get(userRef),
                 transaction.get(battleRef),
-                transaction.get(battleResultRef)
+                transaction.get(battleResultRef),
+                transaction.get(robotRef)
             ]);
             if (!userSnap.exists)
                 throw new functions.https.HttpsError('not-found', 'User not found in transaction');
@@ -758,6 +761,19 @@ exports.matchBattle = functions.https.onCall(async (data, context) => {
             const scanTokensGained = (_g = rewardResult.reward.scanTokensGained) !== null && _g !== void 0 ? _g : 0;
             const leveledUp = rewardResult.reward.levelAfter > rewardResult.reward.levelBefore;
             const newWorkshopLines = (0, levelSystem_1.getWorkshopLines)(rewardResult.levelAfter);
+            // Robot Leveling Logic
+            const robotData = robotSnap.exists ? robotSnap.data() : {};
+            const robotCurrentLevel = (robotData === null || robotData === void 0 ? void 0 : robotData.level) || 1;
+            const robotCurrentXp = (robotData === null || robotData === void 0 ? void 0 : robotData.xp) || 0;
+            const robotXpToAdd = winnerIsPlayer ? battleRewards_1.XP_REWARD : 0; // Use same base allocation as user
+            const robotLevelResult = (0, levelSystem_1.applyRobotXp)(robotCurrentLevel, robotCurrentXp, robotXpToAdd);
+            if (robotSnap.exists && robotXpToAdd > 0) {
+                transaction.update(robotRef, {
+                    level: robotLevelResult.newLevel,
+                    xp: robotLevelResult.newXp,
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+            }
             // Pre-battle item consumption (inventory only)
             if (normalizedBattleItem) {
                 const inventoryCollection = userRef.collection('inventory');
@@ -835,7 +851,11 @@ exports.matchBattle = functions.https.onCall(async (data, context) => {
                     xpBefore: rewardResult.reward.xpBefore,
                     xpAfter: rewardResult.reward.xpAfter,
                     levelBefore: rewardResult.reward.levelBefore,
-                    levelAfter: rewardResult.reward.levelAfter
+                    levelAfter: rewardResult.reward.levelAfter,
+                    // Robot Rewards
+                    robotLevel: robotLevelResult.newLevel,
+                    robotXpEarned: robotXpToAdd,
+                    robotLevelUp: robotLevelResult.leveledUp
                 },
                 entryFeeCharged,
                 rewardGranted: rewardResult.granted,
@@ -2358,4 +2378,186 @@ async function resolveFighterData(uid, ref, transaction) {
     }
 }
 exports.resolveFighterData = resolveFighterData;
+// ============================================
+// Daily Boss (PvE) System
+// ============================================
+// Boss battle reward constants
+const BOSS_XP_WIN = 50;
+const BOSS_XP_LOSE = 15;
+const BOSS_CREDITS_WIN = 10;
+const BOSS_SCAN_TOKENS_WIN_MIN = 1;
+const BOSS_SCAN_TOKENS_WIN_MAX = 3;
+/**
+ * Get today's daily boss information
+ * Returns boss data and whether user can challenge
+ */
+exports.getDailyBoss = functions
+    .runWith({ memory: '256MB', timeoutSeconds: 30 })
+    .https.onCall(async (_data, context) => {
+    const db = admin.firestore();
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
+    }
+    const uid = context.auth.uid;
+    const todayKey = (0, dateKey_1.getJstDateKey)();
+    // Generate today's boss (deterministic)
+    const boss = (0, dailyBoss_1.generateDailyBoss)(todayKey);
+    // Check if user has already attempted today
+    const userDoc = await db.collection('users').doc(uid).get();
+    const userData = userDoc.data() || {};
+    const lastDateKey = userData.dailyBossLastDateKey || '';
+    const attempts = lastDateKey === todayKey ? (userData.dailyBossAttempts || 0) : 0;
+    const canChallenge = attempts < 1;
+    return {
+        boss,
+        canChallenge,
+        attempts,
+        todayKey,
+    };
+});
+/**
+ * Execute a boss battle
+ * Validates 1-per-day limit, runs battle, grants rewards
+ */
+exports.executeBossBattle = functions
+    .runWith({ memory: '512MB', timeoutSeconds: 60 })
+    .https.onCall(async (data, context) => {
+    const db = admin.firestore();
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
+    }
+    const uid = context.auth.uid;
+    const { robotId, variantId, useCheer, useSpecial } = data;
+    if (!robotId && !variantId) {
+        throw new functions.https.HttpsError('invalid-argument', 'robotId or variantId required');
+    }
+    const todayKey = (0, dateKey_1.getJstDateKey)();
+    const boss = (0, dailyBoss_1.generateDailyBoss)(todayKey);
+    const battleId = `boss_${uid}_${todayKey}`;
+    // Run transaction for atomicity
+    const result = await db.runTransaction(async (transaction) => {
+        var _a;
+        const userRef = db.collection('users').doc(uid);
+        const battleRef = db.collection('bossBattles').doc(battleId);
+        const [userSnap, battleSnap] = await Promise.all([
+            transaction.get(userRef),
+            transaction.get(battleRef)
+        ]);
+        if (!userSnap.exists) {
+            throw new functions.https.HttpsError('not-found', 'User not found');
+        }
+        const userData = userSnap.data() || {};
+        // Check idempotency - already completed this battle
+        if (battleSnap.exists && ((_a = battleSnap.data()) === null || _a === void 0 ? void 0 : _a.rewardGranted)) {
+            const existingResult = battleSnap.data();
+            return Object.assign({ alreadyCompleted: true }, existingResult);
+        }
+        // Check 1-per-day limit
+        const lastDateKey = userData.dailyBossLastDateKey || '';
+        const attempts = lastDateKey === todayKey ? (userData.dailyBossAttempts || 0) : 0;
+        if (attempts >= 1) {
+            throw new functions.https.HttpsError('failed-precondition', 'already-challenged-today');
+        }
+        // Get player's robot
+        let playerRobot;
+        if (variantId) {
+            const variantRef = userRef.collection('variants').doc(variantId);
+            const variantSnap = await transaction.get(variantRef);
+            if (!variantSnap.exists) {
+                throw new functions.https.HttpsError('not-found', 'Variant not found');
+            }
+            // Resolve variant to robot data
+            playerRobot = await (0, variantSystem_1.resolveVariant)(uid, variantId, db, transaction);
+        }
+        else {
+            const robotRef = userRef.collection('robots').doc(robotId);
+            const robotSnap = await transaction.get(robotRef);
+            if (!robotSnap.exists) {
+                throw new functions.https.HttpsError('not-found', 'Robot not found');
+            }
+            playerRobot = Object.assign(Object.assign({}, robotSnap.data()), { id: robotSnap.id });
+        }
+        // Convert boss to RobotData for battle engine
+        const bossRobot = (0, dailyBoss_1.bossToRobotData)(boss);
+        const bossTraits = (0, dailyBoss_1.getBossTraits)(boss);
+        // Cheer input (player only)
+        const cheerInput = useCheer ? { p1: true, p2: false } : undefined;
+        // Special move input (player only)
+        const specialMoveInput = useSpecial ? { p1Used: true, p2Used: false } : undefined;
+        // Execute battle
+        const battleResult = (0, battleSystem_1.simulateBattle)(playerRobot, bossRobot, battleId, [], // No legacy items
+        cheerInput, undefined, // No battle items for boss
+        specialMoveInput, bossTraits // Pass boss traits for SHIELD mechanics
+        );
+        const isWin = battleResult.winnerId === playerRobot.id;
+        // Calculate rewards
+        const rng = new seededRandom_1.SeededRandom(`${battleId}_reward`);
+        const xpReward = isWin ? BOSS_XP_WIN : BOSS_XP_LOSE;
+        let creditsReward = 0;
+        let scanTokensReward = 0;
+        if (isWin) {
+            // Check daily credits cap
+            const dailyCreditsEarned = userData.dailyBattleCreditsEarned || 0;
+            const dailyDateKey = userData.dailyBattleDateKey || '';
+            const effectiveCredits = dailyDateKey === todayKey ? dailyCreditsEarned : 0;
+            const creditsRemaining = Math.max(0, battleRewards_1.DAILY_CREDITS_CAP - effectiveCredits);
+            creditsReward = Math.min(BOSS_CREDITS_WIN, creditsRemaining);
+            // Scan tokens (1-3 for boss win)
+            scanTokensReward = rng.nextInt(BOSS_SCAN_TOKENS_WIN_MIN, BOSS_SCAN_TOKENS_WIN_MAX);
+        }
+        // Calculate new XP and level
+        const currentXp = typeof userData.xp === 'number' ? userData.xp : 0;
+        const newXp = currentXp + xpReward;
+        const newLevel = (0, battleRewards_1.levelFromXp)(newXp);
+        // Update user document
+        const userUpdate = {
+            dailyBossLastDateKey: todayKey,
+            dailyBossAttempts: 1,
+            xp: admin.firestore.FieldValue.increment(xpReward),
+            level: newLevel,
+        };
+        if (creditsReward > 0) {
+            userUpdate.credits = admin.firestore.FieldValue.increment(creditsReward);
+            userUpdate.dailyBattleDateKey = todayKey;
+            userUpdate.dailyBattleCreditsEarned = admin.firestore.FieldValue.increment(creditsReward);
+        }
+        if (scanTokensReward > 0) {
+            userUpdate.scanTokens = admin.firestore.FieldValue.increment(scanTokensReward);
+        }
+        transaction.update(userRef, userUpdate);
+        // Create battle record
+        const battleRecord = {
+            bossId: boss.bossId,
+            bossName: boss.name,
+            bossType: boss.type,
+            playerId: uid,
+            playerRobotId: robotId || variantId,
+            result: isWin ? 'win' : 'loss',
+            winnerId: battleResult.winnerId,
+            logs: battleResult.logs,
+            rewards: {
+                xp: xpReward,
+                credits: creditsReward,
+                scanTokens: scanTokensReward,
+            },
+            rewardGranted: true,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        };
+        transaction.set(battleRef, battleRecord);
+        return {
+            battleId,
+            result: isWin ? 'win' : 'loss',
+            winnerId: battleResult.winnerId,
+            logs: battleResult.logs,
+            rewards: {
+                xp: xpReward,
+                credits: creditsReward,
+                scanTokens: scanTokensReward,
+            },
+            bossShieldBroken: boss.type === 'SHIELD' && battleResult.logs.some(l => l.bossShieldBroken),
+            turnCount: battleResult.turnCount,
+        };
+    });
+    return result;
+});
 //# sourceMappingURL=index.js.map

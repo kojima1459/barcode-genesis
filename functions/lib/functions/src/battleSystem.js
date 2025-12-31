@@ -147,17 +147,19 @@ const getSpecialMove = (role) => {
         return null;
     return (_a = SPECIAL_MOVES[role]) !== null && _a !== void 0 ? _a : null;
 };
-const simulateBattle = (robot1, robot2, battleId, robot1Items = [], cheer, battleItems, specialInput // NEW: Special move input (optional, backward compatible)
+const simulateBattle = (robot1, robot2, battleId, robot1Items = [], cheer, battleItems, specialInput, bossTraits // NEW: Boss traits for PvE boss battles
 ) => {
     var _a, _b, _c, _d;
     // Level-based stat scaling
-    const level1 = (_a = robot1.level) !== null && _a !== void 0 ? _a : 1;
-    const level2 = (_b = robot2.level) !== null && _b !== void 0 ? _b : 1;
-    const levelMult1 = (0, levelSystem_1.getLevelMultiplier)(level1);
-    const levelMult2 = (0, levelSystem_1.getLevelMultiplier)(level2);
+    const effectiveStats1 = (0, levelSystem_1.calculateEffectiveStats)({
+        hp: robot1.baseHp, attack: robot1.baseAttack, defense: robot1.baseDefense, speed: robot1.baseSpeed, isPlayer: true
+    }, (_a = robot1.level) !== null && _a !== void 0 ? _a : 1);
+    const effectiveStats2 = (0, levelSystem_1.calculateEffectiveStats)({
+        hp: robot2.baseHp, attack: robot2.baseAttack, defense: robot2.baseDefense, speed: robot2.baseSpeed, isPlayer: false
+    }, (_b = robot2.level) !== null && _b !== void 0 ? _b : 1);
     // Max HP with level scaling
-    const maxHp1 = Math.floor(robot1.baseHp * levelMult1);
-    const maxHp2 = Math.floor(robot2.baseHp * levelMult2);
+    const maxHp1 = effectiveStats1.hp;
+    const maxHp2 = effectiveStats2.hp;
     let hp1 = maxHp1;
     let hp2 = maxHp2;
     const logs = [];
@@ -201,11 +203,19 @@ const simulateBattle = (robot1, robot2, battleId, robot1Items = [], cheer, battl
     // Track total damage for tiebreaker
     let totalDamageP1 = 0;
     let totalDamageP2 = 0;
+    // Finisher System: Track once-per-side usage
+    let p1FinisherUsed = false;
+    let p2FinisherUsed = false;
+    // Boss Shield System: P2 is the boss
+    let bossShieldHp = (bossTraits === null || bossTraits === void 0 ? void 0 : bossTraits.type) === 'SHIELD' && bossTraits.shieldHp ? bossTraits.shieldHp : 0;
+    const hasBossShield = bossShieldHp > 0;
     // ステータス補正関数 (includes level multiplier)
     const getStat = (robot, stat) => {
-        const levelMult = robot.id === robot1.id ? levelMult1 : levelMult2;
-        let val = robot[stat] * levelMult;
-        if (robot.id === robot1.id) {
+        const isP1 = robot.id === robot1.id;
+        const effStats = isP1 ? effectiveStats1 : effectiveStats2;
+        // Map 'baseAttack' -> 'attack', 'baseDefense' -> 'defense'
+        let val = stat === 'baseAttack' ? effStats.attack : effStats.defense;
+        if (isP1) {
             if (stat === 'baseAttack' && robot1Items.includes('attack_boost'))
                 val *= 1.2;
             if (stat === 'baseDefense' && robot1Items.includes('defense_boost'))
@@ -214,8 +224,8 @@ const simulateBattle = (robot1, robot2, battleId, robot1Items = [], cheer, battl
         return Math.floor(val);
     };
     // 素早さ (with level scaling for fair first-strike determination)
-    const effectiveSpeed1 = Math.floor(robot1.baseSpeed * levelMult1);
-    const effectiveSpeed2 = Math.floor(robot2.baseSpeed * levelMult2);
+    const effectiveSpeed1 = effectiveStats1.speed;
+    const effectiveSpeed2 = effectiveStats2.speed;
     // 素早さで先攻後攻を決定 (using effective speed with level scaling)
     let attacker = effectiveSpeed1 >= effectiveSpeed2 ? robot1 : robot2;
     let defender = effectiveSpeed1 >= effectiveSpeed2 ? robot2 : robot1;
@@ -557,6 +567,30 @@ const simulateBattle = (robot1, robot2, battleId, robot1Items = [], cheer, battl
             }
         }
         // ============================================
+        // FINISHER SYSTEM: Apply 1.35x multiplier when HP < 40%
+        // ============================================
+        let finisherApplied = false;
+        const FINISHER_MULTIPLIER = 1.35;
+        const FINISHER_HP_THRESHOLD = 0.4;
+        if (damage > 0) {
+            const attackerIsP1 = attacker.id === robot1.id;
+            const attackerMaxHp = attackerIsP1 ? maxHp1 : maxHp2;
+            const attackerCurrentHp = attackerIsP1 ? hp1 : hp2;
+            // Check if finisher should activate (HP < 40% and not used yet)
+            if (attackerIsP1 && !p1FinisherUsed && attackerCurrentHp < attackerMaxHp * FINISHER_HP_THRESHOLD) {
+                damage = toDamage(damage * FINISHER_MULTIPLIER);
+                p1FinisherUsed = true;
+                finisherApplied = true;
+                message += ` 💥必殺の一撃！（×${FINISHER_MULTIPLIER}）`;
+            }
+            else if (!attackerIsP1 && !p2FinisherUsed && attackerCurrentHp < attackerMaxHp * FINISHER_HP_THRESHOLD) {
+                damage = toDamage(damage * FINISHER_MULTIPLIER);
+                p2FinisherUsed = true;
+                finisherApplied = true;
+                message += ` 💥必殺の一撃！（×${FINISHER_MULTIPLIER}）`;
+            }
+        }
+        // ============================================
         // CHEER SYSTEM: Apply 1.2x multiplier (AFTER all other calculations)
         // ============================================
         let cheerApplied = false;
@@ -644,15 +678,36 @@ const simulateBattle = (robot1, robot2, battleId, robot1Items = [], cheer, battl
         let stunApplied = false;
         let counterDamage = 0;
         let counterMessage = "";
+        // Boss Shield tracking for this turn
+        let bossShieldDamageThisTurn = 0;
+        let bossShieldBrokenThisTurn = false;
         if (damage > 0) {
             if (attacker.id === robot1.id) {
-                hp2 -= damage;
+                // Player attacking Boss - check for SHIELD
+                let actualHpDamage = damage;
+                if (hasBossShield && bossShieldHp > 0) {
+                    // Route damage through shield first
+                    const shieldDamage = Math.min(damage, bossShieldHp);
+                    bossShieldHp -= shieldDamage;
+                    bossShieldDamageThisTurn = shieldDamage;
+                    actualHpDamage = damage - shieldDamage;
+                    // Check for shield break
+                    if (bossShieldHp <= 0) {
+                        bossShieldBrokenThisTurn = true;
+                        bossShieldHp = 0;
+                        message += ` 💥シールドが砕け散った！`;
+                    }
+                    else {
+                        message += ` (シールド -${shieldDamage})`;
+                    }
+                }
+                hp2 -= actualHpDamage;
                 defenderHp = hp2;
-                totalDamageP1 += damage; // Track P1's damage
+                totalDamageP1 += damage; // Track P1's total damage (including to shield)
                 // Update defender overdrive (took damage)
                 const defOverdrive = getOverdrive(defender.id);
                 const stanceLost = stanceOutcome === "WIN"; // Defender lost stance
-                setOverdrive(defender.id, (0, battleOverdrive_1.addOverdrive)(defOverdrive, damage, maxHp2, stanceLost));
+                setOverdrive(defender.id, (0, battleOverdrive_1.addOverdrive)(defOverdrive, actualHpDamage, maxHp2, stanceLost));
             }
             else {
                 hp1 -= damage;
@@ -837,6 +892,13 @@ const simulateBattle = (robot1, robot2, battleId, robot1Items = [], cheer, battl
             specialRoleName: specialRoleName,
             specialImpact: specialImpact,
             specialHits: specialHits > 1 ? specialHits : undefined,
+            // Boss Shield System
+            bossShieldDamage: bossShieldDamageThisTurn || undefined,
+            bossShieldRemaining: hasBossShield ? bossShieldHp : undefined,
+            bossShieldBroken: bossShieldBrokenThisTurn || undefined,
+            // Finisher System
+            finisherApplied: finisherApplied || undefined,
+            finisherMultiplier: finisherApplied ? FINISHER_MULTIPLIER : undefined,
         });
         if (counterDamage > 0) {
             const counterAttackerHp = defenderHp;
@@ -863,6 +925,29 @@ const simulateBattle = (robot1, robot2, battleId, robot1Items = [], cheer, battl
                 attackerHp: Math.max(0, counterAttackerHp),
                 defenderHp: Math.max(0, attackerHp),
                 message: counterMessage,
+            });
+        }
+        // ============================================
+        // SUDDEN_DEATH: Environmental damage after turn 20
+        // ============================================
+        if (turn > 20 && hp1 > 0 && hp2 > 0) {
+            const SUDDEN_DEATH_RATIO = 0.03;
+            const envDamageP1 = toDamage(maxHp1 * SUDDEN_DEATH_RATIO);
+            const envDamageP2 = toDamage(maxHp2 * SUDDEN_DEATH_RATIO);
+            hp1 = Math.max(0, hp1 - envDamageP1);
+            hp2 = Math.max(0, hp2 - envDamageP2);
+            logs.push({
+                turn,
+                attackerId: '',
+                defenderId: '',
+                action: 'SUDDEN_DEATH',
+                damage: 0,
+                isCritical: false,
+                attackerHp: hp1,
+                defenderHp: hp2,
+                message: `⚠環境が崩壊していく… P1:-${envDamageP1} P2:-${envDamageP2}`,
+                suddenDeathTick: true,
+                suddenDeathDamage: envDamageP1, // Store P1's damage for reference
             });
         }
         if (hp1 <= 0 || hp2 <= 0)

@@ -150,6 +150,62 @@ export const translations = {
     role_balance: "バランス",
     role_tricky: "トリッキー",
 
+    // Common UI
+    rookie: "ルーキー",
+    premium: "プレミアム",
+    system_upgrade: "システムアップグレード",
+    unlock_full_capability: "全機能解放",
+    limit_break: "スキャン上限解放",
+    ad_block: "広告非表示",
+    efficiency: "高効率運用",
+    visuals: "特別演出",
+    maintenance_cost: "維持コスト",
+    activate_license: "ライセンス有効化",
+    month: "月額",
+    cancel_anytime: "いつでも解約可能",
+    resource_supply: "資源補給 (クレジット購入)",
+    current_plan: "現在のプラン",
+    restore_purchase: "購入の復元",
+    manage_subscription: "契約管理",
+
+    // Benefits details
+    benefit_scan_desc: "1日のスキャン上限数が大幅アップ (5回 → 100回)",
+    benefit_ad_desc: "広告を完全に非表示にし、没入感を向上",
+    benefit_efficiency_desc: "ログインボーナス2倍、バトルXP+50%",
+    benefit_visual_desc: "限定スキン・エフェクトの使用権",
+
+    // FAQ
+    faq_cancel_title: "解約方法は？",
+    faq_cancel_desc: "設定画面またはこのページの「契約管理」からいつでも解約可能です。",
+    faq_data_title: "データは消えますか？",
+    faq_data_desc: "プレミアムを解約しても、獲得したロボットやアイテムは保持されます。",
+
+
+    battle_with_this: "これで戦う",
+    use_in_workshop: "工房で使用",
+    go_home: "ホームへ",
+    victory: "勝利",
+    defeat: "敗北",
+    continue_button: "続ける",
+    player_label: "プレイヤー",
+    opponent_label: "相手",
+
+    // Daily Boss
+    boss_alert: "ボスアラート",
+    boss_challenge: "挑戦する",
+    boss_completed: "本日の挑戦済み",
+    boss_victory: "ボス撃破！",
+    boss_defeat: "ボス敗北...",
+    boss_shield_break: "シールド破壊！",
+    boss_type_tank: "重装型",
+    boss_type_speed: "高速型",
+    boss_type_shield: "障壁型",
+    boss_type_reflect: "反射型",
+    boss_type_berserk: "狂戦型",
+    boss_reward_xp: "XP獲得",
+    boss_reward_credits: "クレジット獲得",
+    boss_reward_tokens: "トークン獲得",
+
     // Profile
     profile_title: "プロフィール",
     user_profile: "ユーザー設定",

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2, Zap } from "lucide-react";
+import { ArrowLeft, Loader2, Zap, HelpCircle } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -22,6 +22,7 @@ import RoleReveal from "@/components/RoleReveal";
 import { isSpecialRare } from "@/lib/rarity";
 import { Interactive } from "@/components/ui/interactive";
 import { ScrambleText } from "@/components/ui/ScrambleText";
+import { ROLE_COLORS, ROLE_LABELS } from "@/lib/dexRegistry";
 
 const getCallableErrorCode = (error: unknown) => {
     if (error && typeof error === "object" && "code" in error) {
@@ -151,6 +152,11 @@ export default function Scan() {
                     </Button>
                 </Link>
                 <h1 className="text-2xl font-semibold text-accent font-orbitron">GENERATE</h1>
+                <Link href="/how-to">
+                    <Button variant="ghost" size="icon" className="rounded-full">
+                        <HelpCircle className="w-6 h-6 text-accent" />
+                    </Button>
+                </Link>
             </header>
 
             <main className="flex-1 max-w-4xl mx-auto w-full flex flex-col items-center justify-center relative z-10">
@@ -215,6 +221,12 @@ export default function Scan() {
                                 <ScrambleText text={robot.name} duration={1200} />
                             </h2>
                             <div className="flex gap-3 justify-center">
+                                {/* Role Badge */}
+                                {robot.role && (
+                                    <span className={`px-3 py-1 rounded-full text-sm font-bold border ${ROLE_COLORS[robot.role].replace('/10', '/20')}`}>
+                                        <ScrambleText text={robot.roleName || ROLE_LABELS[robot.role].ja} delay={200} />
+                                    </span>
+                                )}
                                 <span className="px-3 py-1 rounded-full bg-neon-cyan/20 text-neon-cyan text-sm font-bold border border-neon-cyan/50">
                                     <ScrambleText text={robot.rarityName} delay={400} />
                                 </span>
@@ -266,7 +278,7 @@ export default function Scan() {
                                     GENERATE ANOTHER
                                 </Button>
 
-                                <Link href={`/robots/${robot.id}`}>
+                                <Link href={"/robots/" + robot.id}>
                                     <Button variant="outline" className="w-full border-white/20">
                                         VIEW DETAILS
                                     </Button>

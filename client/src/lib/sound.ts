@@ -152,7 +152,7 @@ const getAudioContext = () => {
   return audioContext;
 };
 
-type GeneratedSoundType = "ui_click" | "ui_skip";
+type GeneratedSoundType = "ui_click" | "ui_skip" | "hit_light" | "hit_heavy" | "win" | "lose";
 
 export const playGenerated = (type: GeneratedSoundType) => {
   if (muted) return;
@@ -183,7 +183,7 @@ export const playGenerated = (type: GeneratedSoundType) => {
       break;
     }
     case "ui_skip": {
-      // Whoosh sound: filtered noise
+      // Whoosh sound
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = "sawtooth";
@@ -195,6 +195,97 @@ export const playGenerated = (type: GeneratedSoundType) => {
       gain.connect(ctx.destination);
       osc.start(now);
       osc.stop(now + 0.15);
+      break;
+    }
+    case "hit_light": {
+      // White noise burst
+      const bufferSize = ctx.sampleRate * 0.1; // 0.1s
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = Math.random() * 2 - 1;
+      }
+      const noise = ctx.createBufferSource();
+      noise.buffer = buffer;
+      const gain = ctx.createGain();
+
+      // Filter for crunchiness
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = 1000;
+
+      gain.gain.setValueAtTime(0.3, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+      noise.start(now);
+      break;
+    }
+    case "hit_heavy": {
+      // Heavy impact: Low square wave + noise
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = "square";
+      osc.frequency.setValueAtTime(150, now);
+      osc.frequency.exponentialRampToValueAtTime(40, now + 0.2);
+
+      gain.gain.setValueAtTime(0.4, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.3);
+      break;
+    }
+    case "win": {
+      // Victory Fanfare (C Major Arpeggio)
+      const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+      const times = [0, 0.1, 0.2, 0.4];
+      const durations = [0.1, 0.1, 0.2, 0.6];
+
+      notes.forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(freq, now + times[i]);
+
+        gain.gain.setValueAtTime(0.2, now + times[i]);
+        gain.gain.linearRampToValueAtTime(0.001, now + times[i] + durations[i]);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + times[i]);
+        osc.stop(now + times[i] + durations[i] + 0.05);
+      });
+      break;
+    }
+    case "lose": {
+      // Defeat: Descending Sawtooth
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(300, now);
+      osc.frequency.linearRampToValueAtTime(50, now + 1.0);
+
+      // Tremolo effect
+      const lfo = ctx.createOscillator();
+      lfo.frequency.value = 10;
+      const lfoGain = ctx.createGain();
+      lfoGain.gain.value = 500;
+      lfo.connect(lfoGain);
+      // Not connecting LFO for simplicity/safety
+
+      gain.gain.setValueAtTime(0.3, now);
+      gain.gain.linearRampToValueAtTime(0.001, now + 1.0);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 1.0);
       break;
     }
   }

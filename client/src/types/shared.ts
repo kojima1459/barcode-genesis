@@ -21,6 +21,13 @@ export interface RobotColors {
     glow: string;
 }
 
+export interface RobotVisuals {
+    aura?: 'none' | 'burning' | 'electric' | 'digital' | 'psycho' | 'angel';
+    eyeGlow?: 'normal' | 'brilliant' | 'matrix';
+    decal?: 'none' | 'number' | 'warning' | 'star' | 'stripe' | 'camo';
+    weaponIcon?: 'none' | 'sword' | 'gun' | 'shield' | 'missile' | 'fist';
+}
+
 export interface Skill {
     id: string;
     name: string;
@@ -55,6 +62,8 @@ export interface RobotData {
     // 外観
     parts: RobotParts;
     colors: RobotColors;
+    visuals?: RobotVisuals;
+    rarityEffect?: 'none' | 'rare' | 'legendary';
 
     // スキル
     skills?: Array<string | Skill | { id?: string }>; // Client handles partial objects sometimes
@@ -138,6 +147,10 @@ export interface BattleResult {
         exp: number;
         coins: number;
         newSkill?: string;
+        // Robot Leveling
+        robotLevel?: number;
+        robotXpEarned?: number;
+        robotLevelUp?: boolean;
         upgradedSkill?: string;
         credits?: number; // Server uses credits
         dailyCapApplied?: boolean;

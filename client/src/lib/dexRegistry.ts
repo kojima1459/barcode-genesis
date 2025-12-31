@@ -29,12 +29,22 @@ export interface DexSlot {
 // Role Display Names
 // ============================================
 
+// Role Display Names (Unified with Server)
 export const ROLE_LABELS: Record<RobotRole, { ja: string; en: string }> = {
-    ATTACKER: { ja: 'アタッカー', en: 'Attacker' },
+    ATTACKER: { ja: 'アサルト', en: 'Assault' }, // Was アタッカー
     TANK: { ja: 'タンク', en: 'Tank' },
-    SPEED: { ja: 'スピード', en: 'Speed' },
-    BALANCE: { ja: 'バランス', en: 'Balance' },
-    TRICKY: { ja: 'トリッキー', en: 'Tricky' },
+    SPEED: { ja: 'ランナー', en: 'Runner' },     // Was スピード
+    BALANCE: { ja: 'サポート', en: 'Support' },   // Was バランス
+    TRICKY: { ja: 'デストロイヤー', en: 'Destroyer' }, // Was トリッキー/ジャガーノート
+};
+
+// Role Colors (Shared)
+export const ROLE_COLORS: Record<RobotRole, string> = {
+    ATTACKER: "border-red-400/40 text-red-300 bg-red-400/10",
+    TANK: "border-blue-400/40 text-blue-300 bg-blue-400/10",
+    SPEED: "border-green-400/40 text-green-300 bg-green-400/10",
+    BALANCE: "border-amber-400/40 text-amber-300 bg-amber-400/10",
+    TRICKY: "border-purple-400/40 text-purple-300 bg-purple-400/10",
 };
 
 export const RARITY_LABELS: Record<number, { ja: string; en: string }> = {
