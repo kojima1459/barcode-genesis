@@ -15,6 +15,15 @@ import {
     RoleIconBalance
 } from './StatIcons';
 
+// Rarity Names for display
+const RARITY_NAMES: Record<number, string> = {
+    1: "N",
+    2: "R",
+    3: "SR",
+    4: "UR",
+    5: "LR"
+};
+
 interface RobotCardProps {
     robot: RobotData;
     userName?: string;

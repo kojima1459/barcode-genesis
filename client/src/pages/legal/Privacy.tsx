@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 
 export default function Privacy() {
     return (
-        <div className="min-h-screen bg-background py-10 px-4 animate-in fade-in duration-500">
+        <div className="min-h-screen bg-background py-10 px-4 animate-in fade-in duration-500" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 32px)" }}>
             <div className="max-w-3xl mx-auto space-y-8 bg-card border rounded-lg p-8 shadow-sm">
                 <h1 className="text-2xl font-bold mb-6">プライバシーポリシー</h1>
                 <div className="space-y-6 text-sm">

@@ -61,7 +61,18 @@ export function SoundProvider({ children }: { children: React.ReactNode }) {
   }, [volume, isMuted]);
 
   const playBGM = (type: 'bgm_menu' | 'bgm_battle', loop: boolean = true) => {
-    if (currentBGM === type && bgmRef.current && !bgmRef.current.paused) return;
+    // If same BGM is already playing...
+    if (currentBGM === type && bgmRef.current) {
+      // Update loop setting if changed
+      if (bgmRef.current.loop !== loop) {
+        bgmRef.current.loop = loop;
+      }
+      // If paused, resume
+      if (bgmRef.current.paused) {
+        bgmRef.current.play().catch(e => console.log('Audio resume failed:', e));
+      }
+      return;
+    }
 
     if (bgmRef.current) {
       bgmRef.current.pause();

@@ -22,7 +22,7 @@ import { generateDailyBoss, bossToRobotData, getBossTraits } from "./dailyBoss";
 
 
 // Use a version constant to help track deployments and identify cache issues
-const VERSION = "2.1.0-fixed-cors-v3";
+const VERSION = "2.1.1-force-refresh";
 
 // Simple test function to verify Cloud Functions are working
 export const testFunctionHealth = functions
@@ -2147,7 +2147,7 @@ const STRIPE_PRICES = {
   credits_100: { priceId: 'price_1SjPcuRy3cnjpOGFNMSku9Op', credits: 100 },
   credits_500: { priceId: 'price_1SjPsxRy3cnjpOGFK5rCDh9q', credits: 500 },
   credits_1200: { priceId: 'price_1SjPqhRy3cnjpOGF1EIsZba4', credits: 1200 },
-  premium_monthly: { priceId: 'price_1SjPgiRy3cnjpOGFbq8hgztq' },
+  premium_monthly: { priceId: 'price_1SkiWvRy3cnjpOGFW3lhDJSZ' },
 } as const;
 
 type CreditPackId = 'credits_100' | 'credits_500' | 'credits_1200';
@@ -2779,6 +2779,40 @@ export const createVariant = functions.https.onCall(async (data: any, context) =
       remainingLines: limit - (vSnap.size + 1)
     };
   });
+});
+
+/**
+ * Delete a variant from user's collection
+ * Frees up workshop capacity
+ */
+export const deleteVariant = functions.https.onCall(async (data: any, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
+  }
+
+  const { variantId } = data;
+  if (!variantId || typeof variantId !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', 'variantId is required');
+  }
+
+  const uid = context.auth.uid;
+  const db = admin.firestore();
+  const variantRef = db.collection('users').doc(uid).collection('variants').doc(variantId);
+
+  const variantDoc = await variantRef.get();
+  if (!variantDoc.exists) {
+    throw new functions.https.HttpsError('not-found', 'Variant not found');
+  }
+
+  // Delete the variant
+  await variantRef.delete();
+
+  console.log(`[deleteVariant] User ${uid} deleted variant ${variantId}`);
+
+  return {
+    success: true,
+    deletedVariantId: variantId
+  };
 });
 
 export async function resolveFighterData(

@@ -156,24 +156,27 @@ export default function AppShell({ children }: { children: ReactNode }) {
           {/* Footer - inside main for proper spacing */}
           <footer className="border-t border-border/50 bg-surface/50 backdrop-blur-sm mt-8 mb-4" style={{ marginBottom: "calc(var(--bottom-nav-h, 84px) + env(safe-area-inset-bottom) + 24px)" }}>
             <div className="mx-auto max-w-6xl px-4 py-6">
-              <div className="flex flex-wrap justify-center gap-3 md:gap-6 text-sm">
-                <Link href="/guide" className="text-muted hover:text-primary transition-colors flex items-center gap-1">
-                  <BookOpen className="h-4 w-4" />
-                  {t('footer_guide')}
-                </Link>
-                <Link href="/premium" className="text-yellow-500 hover:text-yellow-400 transition-colors flex items-center gap-1 font-bold">
-                  <Crown className="h-4 w-4" />
-                  {t('premium')}
-                </Link>
-                <Link href="/terms" className="text-muted hover:text-primary transition-colors">
-                  {t('footer_terms')}
-                </Link>
-                <Link href="/privacy" className="text-muted hover:text-primary transition-colors">
-                  {t('footer_privacy')}
-                </Link>
-                <Link href="/law" className="text-muted hover:text-primary transition-colors">
-                  {t('footer_law')}
-                </Link>
+              <div className="flex flex-col items-center gap-4 text-sm">
+                {/* Footer links - single row with Premium larger */}
+                <div className="flex flex-wrap justify-center items-center gap-3 md:gap-6">
+                  <Link href="/how-to" className="text-muted hover:text-primary transition-colors flex items-center gap-1">
+                    <BookOpen className="h-4 w-4" />
+                    {t('footer_guide')}
+                  </Link>
+                  <Link href="/terms" className="text-muted hover:text-primary transition-colors">
+                    {t('footer_terms')}
+                  </Link>
+                  <Link href="/law" className="text-muted hover:text-primary transition-colors">
+                    {t('footer_law')}
+                  </Link>
+                  <Link href="/privacy" className="text-muted hover:text-primary transition-colors">
+                    {t('footer_privacy')}
+                  </Link>
+                  <Link href="/premium" className="text-yellow-500 hover:text-yellow-400 transition-colors flex items-center gap-1 font-bold text-lg transform scale-110">
+                    <Crown className="h-5 w-5" />
+                    {t('premium')}
+                  </Link>
+                </div>
               </div>
               <div className="text-center text-xs text-muted mt-4">
                 © 2024 Barcode Genesis. All rights reserved. v1.0.0

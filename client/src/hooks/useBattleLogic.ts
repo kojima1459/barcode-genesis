@@ -113,12 +113,8 @@ export function useBattleLogic({
 
         // Training Mode
         if (isTrainingMode) {
-            if (variants.some(v => v.id === selectedRobotId)) {
-                toast.error("Variants not supported in Training Mode yet");
-                setIsBattling(false);
-                return;
-            }
-            const myRobot = robots.find(r => r.id === selectedRobotId);
+            // Variants are now allowed (experimental)
+            const myRobot = robots.find(r => r.id === selectedRobotId) || variants.find(v => v.id === selectedRobotId);
             const enemy = robots.find(r => r.id === enemyRobotIdForTraining);
 
             if (!myRobot || !enemy) {
@@ -129,8 +125,17 @@ export function useBattleLogic({
             setEnemyRobot(enemy); // Set immediately for training
 
             // Logic
+            // Note: Variants might be missing stats. We rely on toBattleRobotData to handle defaults or the data to be present.
             const rawP1 = toBattleRobotData(myRobot);
             const rawP2 = toBattleRobotData(enemy);
+
+            // Safety check for HP to prevent instant game over
+            if (rawP1.baseHp <= 0) {
+                toast.error("ユニットの戦闘データが不完全です (HP 0)");
+                setIsBattling(false);
+                return;
+            }
+
             const { p1, p2, normalizedCheer } = normalizeTrainingInput(rawP1, rawP2, { p1: cheerP1, p2: cheerP2 });
             const battleId = getTrainingBattleId(p1.id!, p2.id!);
             const battleItemsInput = selectedBattleItem ? { p1: selectedBattleItem, p2: null } : undefined;

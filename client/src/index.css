@@ -3,30 +3,11 @@
 @import "./theme.css";
 @import "./styles/animations.css";
 
+@import "./styles/tokens.css";
+
 @custom-variant dark (&:is(.dark *, [data-theme="dark"] *));
 
 @theme inline {
-  /* Spacing Scale (Rem based) */
-  --spacing-1: 0.25rem;  /* 4px */
-  --spacing-2: 0.5rem;   /* 8px */
-  --spacing-3: 0.75rem;  /* 12px */
-  --spacing-4: 1rem;     /* 16px */
-  --spacing-6: 1.5rem;   /* 24px */
-  
-  /* Radius Scale */
-  --radius-sm: 0.5rem;   /* 8px */
-  --radius-md: 0.75rem;  /* 12px */
-  --radius-lg: 1rem;     /* 16px */
-  --radius-xl: 1.25rem;  /* 20px */
-  --radius-2xl: 1.5rem;  /* 24px */
-
-  /* Typography Scale */
-  --text-xs: 0.75rem;    /* 12px */
-  --text-sm: 0.875rem;   /* 14px */
-  --text-base: 1rem;     /* 16px */
-  --text-lg: 1.25rem;    /* 20px */
-  --text-xl: 1.5rem;     /* 24px */
-
   /* Font Families */
   --font-display: "Orbitron", "Oxanium", "Rajdhani", system-ui, sans-serif;
   --font-body: "IBM Plex Sans JP", "Inter", "Noto Sans JP", system-ui, sans-serif;
@@ -165,6 +146,7 @@
   --tracking-wide: 0.06em;
   --icon-size: 1.25rem;
   --icon-stroke: 1.75;
+  --bottom-nav-height: 88px;
   --background: var(--bg);
   --foreground: var(--text);
   --card: var(--surface);

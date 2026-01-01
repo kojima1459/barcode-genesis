@@ -96,7 +96,18 @@ export default function Shop() {
     setBuyingProduct(productId);
     try {
       const createCheckoutSession = httpsCallable(functions, "createCheckoutSession");
-      const result = await createCheckoutSession({ productId });
+      // Map product IDs to pack IDs expected by the Cloud Function
+      const packIdMap: Record<string, string> = {
+        'coin_pack_small': 'credits_100',
+        'coin_pack_medium': 'credits_500',
+        'coin_pack_large': 'credits_1200',
+      };
+      const packId = packIdMap[productId] || productId;
+      const result = await createCheckoutSession({
+        packId,
+        successUrl: `${window.location.origin}/?purchase=success`,
+        cancelUrl: `${window.location.origin}/shop?canceled=true`,
+      });
       const { url } = result.data as { url: string };
       if (url) {
         window.location.href = url;
@@ -187,7 +198,7 @@ export default function Shop() {
         <section>
           <h2 className="text-xl font-bold mb-4 text-primary">{t('shop_coins_title')}</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {PRODUCTS.map((product) => (
+            {PRODUCTS.filter(p => p.type === 'coin').map((product) => (
               <Interactive key={product.id} className="border-primary/20 h-auto overflow-hidden rounded-xl">
                 <CardHeader>
                   <CardTitle className="text-lg">{product.name}</CardTitle>

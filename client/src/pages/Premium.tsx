@@ -113,7 +113,8 @@ export default function Premium() {
     };
 
     return (
-        <div className="flex-1 flex flex-col relative pb-32 md:pb-8 bg-background text-foreground pt-[env(safe-area-inset-top)]">
+        <div className="flex-1 flex flex-col relative bg-background text-foreground pt-[env(safe-area-inset-top)]"
+            style={{ paddingBottom: "calc(var(--bottom-nav-height) + 2rem)" }}>
             <SEO title={t('premium')} description={t('premium_desc')} />
 
             {/* Header / Hero */}
@@ -141,6 +142,48 @@ export default function Premium() {
             </div>
 
             <main className="max-w-4xl mx-auto px-4 py-8 space-y-12">
+
+                {/* Subscription Action Card - MOVED TO TOP */}
+                <TechCard className={isPremium ? 'border-yellow-500/50' : 'border-neon-cyan/50'}>
+                    <div className="text-center">
+                        <h3 className="font-orbitron text-lg text-muted-foreground mb-4">{t('maintenance_cost')}</h3>
+                        <div className="flex items-end justify-center gap-1 mb-6">
+                            <span className="text-4xl font-bold font-orbitron text-white">¥390</span>
+                            <span className="text-muted-foreground mb-1">/ {t('month')}</span>
+                        </div>
+                        {isPremium ? (
+                            <Button
+                                variant="outline"
+                                onClick={handlePortal}
+                                className="w-full border-yellow-500/30 text-yellow-500 hover:bg-yellow-500/10 h-12 font-bold"
+                                disabled={loadingPortal}
+                            >
+                                {loadingPortal && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                {t('manage_subscription')}
+                            </Button>
+                        ) : (
+                            <Button
+                                size="lg"
+                                className="w-full bg-neon-cyan text-black hover:bg-cyan-400 font-bold text-lg h-12 relative overflow-hidden group shadow-[0_0_20px_rgba(0,243,255,0.3)]"
+                                onClick={handleSubscribe}
+                                disabled={loadingSubscription}
+                            >
+                                <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
+                                {loadingSubscription ? (
+                                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                                ) : (
+                                    <span className="relative z-10 flex items-center justify-center gap-2">
+                                        <Zap className="w-4 h-4 fill-current" />
+                                        {t('activate_license')}
+                                    </span>
+                                )}
+                            </Button>
+                        )}
+                        <p className="text-[10px] text-muted-foreground mt-3 text-center">
+                            * {t('maintenance_cost')} ¥390 / {t('month')}
+                        </p>
+                    </div>
+                </TechCard>
 
                 {/* Benefits Grid */}
                 <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -204,77 +247,21 @@ export default function Premium() {
                     </div>
                 </section>
 
-                {/* Pricing & CTA Section */}
-                <TechCard className={isPremium ? 'border-yellow-500/30' : 'border-neon-cyan/30'}>
-                    <div className="text-center space-y-4">
-                        <h3 className="font-orbitron text-lg text-muted-foreground">{t('maintenance_cost')}</h3>
-
-                        <div className="flex items-end justify-center gap-1">
-                            <span className="text-4xl font-bold font-orbitron text-white">¥980</span>
-                            <span className="text-muted-foreground mb-1">/ {t('month')}</span>
-                        </div>
-
-                        {/* FAQ Simple */}
-                        <div className="pt-6 border-t border-white/10 text-left space-y-4 text-[11px] text-muted-foreground leading-relaxed">
-                            <div>
-                                <strong className="text-white block mb-1">{t('faq_cancel_title')}</strong>
-                                {t('faq_cancel_desc')}
-                            </div>
-                            <div>
-                                <strong className="text-white block mb-1">{t('faq_data_title')}</strong>
-                                {t('faq_data_desc')}
-                            </div>
-                        </div>
+                {/* FAQ Section */}
+                <div className="pt-6 border-t border-white/10 text-left space-y-4 text-[11px] text-muted-foreground leading-relaxed">
+                    <div>
+                        <strong className="text-white block mb-1">{t('faq_cancel_title')}</strong>
+                        {t('faq_cancel_desc')}
                     </div>
-                </TechCard>
-
-                <div className="h-24"></div>
-            </main>
-
-            {/* Fixed Bottom CTA */}
-            <div className="fixed bottom-0 left-0 right-0 bg-black/80 backdrop-blur-md border-t border-white/5 p-4 z-50 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-                <div className="max-w-4xl mx-auto flex items-center gap-4 justify-between">
-                    <div className="hidden sm:block">
-                        <div className="text-xs text-muted-foreground">{t('maintenance_cost')}</div>
-                        <div className="flex items-baseline gap-1">
-                            <span className="text-xl font-bold font-orbitron text-white">¥980</span>
-                            <span className="text-xs text-muted-foreground">/ {t('month')}</span>
-                        </div>
-                    </div>
-
-                    <div className="flex-1 sm:max-w-xs ml-auto">
-                        {isPremium ? (
-                            <Button
-                                variant="outline"
-                                onClick={handlePortal}
-                                className="w-full border-yellow-500/30 text-yellow-500 hover:bg-yellow-500/10 h-12 font-bold"
-                                disabled={loadingPortal}
-                            >
-                                {loadingPortal && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                {t('manage_subscription')}
-                            </Button>
-                        ) : (
-                            <Button
-                                size="lg"
-                                className="w-full bg-neon-cyan text-black hover:bg-cyan-400 font-bold text-lg h-12 relative overflow-hidden group shadow-[0_0_20px_rgba(0,243,255,0.3)]"
-                                onClick={handleSubscribe}
-                                disabled={loadingSubscription}
-                            >
-                                <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
-                                {loadingSubscription ? (
-                                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                                ) : (
-                                    <span className="relative z-10 flex items-center justify-center gap-2">
-                                        <Zap className="w-4 h-4 fill-current" />
-                                        {t('activate_license')}
-                                    </span>
-                                )}
-                            </Button>
-                        )}
+                    <div>
+                        <strong className="text-white block mb-1">{t('faq_data_title')}</strong>
+                        {t('faq_data_desc')}
                     </div>
                 </div>
-            </div>
-        </div>
+
+                <div style={{ height: "calc(var(--bottom-nav-height) + env(safe-area-inset-bottom) + 16px)" }}></div>
+            </main >
+        </div >
     );
 }
 

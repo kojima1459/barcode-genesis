@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import React from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { RobotData } from "@/types/shared";
@@ -13,7 +13,7 @@ interface HangarCardProps {
     className?: string;
 }
 
-export default function HangarCard({ robot, loading, className }: HangarCardProps) {
+function HangarCard({ robot, loading, className }: HangarCardProps) {
     if (loading) {
         return (
             <SystemSkeleton
@@ -139,3 +139,5 @@ export default function HangarCard({ robot, loading, className }: HangarCardProp
         </div>
     );
 }
+
+export default React.memo(HangarCard);

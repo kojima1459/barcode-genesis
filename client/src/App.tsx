@@ -18,6 +18,30 @@ import OfflineBanner from "@/components/OfflineBanner";
 import { Loader2 } from "lucide-react";
 import AppShell from "@/components/AppShell";
 import { SystemSkeleton } from "@/components/ui/SystemSkeleton";
+import { APP_VERSION } from "./version";
+
+// Cache busting / Version check
+const useVersionCheck = () => {
+  useEffect(() => {
+    const storedVersion = localStorage.getItem("app_version");
+    if (storedVersion !== APP_VERSION) {
+      console.log(`Version mismatch: ${storedVersion} -> ${APP_VERSION}. Clearing cache...`);
+      localStorage.clear(); // Clear all localized state just to be safe
+      localStorage.setItem("app_version", APP_VERSION);
+
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function (registrations) {
+          for (let registration of registrations) {
+            registration.unregister();
+          }
+        });
+      }
+
+      // Force reload ignoring cache
+      window.location.reload();
+    }
+  }, []);
+};
 
 // Lazy load pages for better performance
 const Home = lazy(() => import("@/pages/Home"));
@@ -154,6 +178,7 @@ function Router() {
 import { HelmetProvider } from "react-helmet-async";
 
 function App() {
+  useVersionCheck();
   return (
     <ErrorBoundary>
       <LanguageProvider>

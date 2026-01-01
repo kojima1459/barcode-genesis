@@ -6,7 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { db, functions } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
 import { collection, orderBy, query, onSnapshot } from "firebase/firestore";
-import { ArrowLeft, Loader2, Plus, RefreshCw, AlertCircle } from "lucide-react";
+import { ArrowLeft, Loader2, Plus, RefreshCw, AlertCircle, Trash2 } from "lucide-react";
 import RobotSVG from "@/components/RobotSVG";
 import { Link } from "wouter";
 import { toast } from "sonner";
@@ -51,6 +51,9 @@ export default function Workshop() {
     // Renaming
     const [variantName, setVariantName] = useState("");
 
+    // Deleting
+    const [deletingId, setDeletingId] = useState<string | null>(null);
+
     // Preview preset (client-side only)
     const [previewPreset, setPreviewPreset] = useState<"A_DOMINANT" | "B_DOMINANT" | "HALF" | "ALT">("HALF");
 
@@ -92,7 +95,7 @@ export default function Workshop() {
             },
             (error) => {
                 console.error(error);
-                toast.error("Failed to load workshop data");
+                toast.error(t('workshop_error_load'));
                 setLoadingVariants(false);
             }
         );
@@ -131,11 +134,11 @@ export default function Workshop() {
     useEffect(() => {
         if (!robots.length) return;
         if (robotAId && !robots.some(r => r.id === robotAId)) {
-            toast.message("親Aに指定されたIDはロボットではありません（無視しました）", { duration: 2000 });
+            toast.message(t('workshop_error_parent_invalid_a'), { duration: 2000 });
             setRobotAId("");
         }
         if (robotBId && !robots.some(r => r.id === robotBId)) {
-            toast.message("親Bに指定されたIDはロボットではありません（無視しました）", { duration: 2000 });
+            toast.message(t('workshop_error_parent_invalid_b'), { duration: 2000 });
             setRobotBId("");
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -144,23 +147,23 @@ export default function Workshop() {
     const mapCreateVariantError = (e: any) => {
         const code = e?.code || e?.details?.code;
         const message = String(e?.message || "");
-        if (code === "already-exists") return "その組み合わせのバリアントは既に存在します";
+        if (code === "already-exists") return t('workshop_error_exists');
         if (code === "resource-exhausted" || message.includes("Workshop full") || message.includes("WORKSHOP_LIMIT_REACHED")) {
-            return "製造ラインが満杯です（上限を解放してください）";
+            return t('workshop_error_limit');
         }
-        if (code === "failed-precondition" || message.includes("Insufficient credits")) return "クレジットが不足しています";
-        if (code === "not-found") return "親ロボットが見つかりません";
-        return "製造に失敗しました。時間をおいて再度お試しください。";
+        if (code === "failed-precondition" || message.includes("Insufficient credits")) return t('workshop_error_no_credits');
+        if (code === "not-found") return t('workshop_error_not_found');
+        return t('workshop_error_generic');
     };
 
     const handleCreate = async () => {
         if (!robotAId || !robotBId) return;
         if (robotAId === robotBId) {
-            toast.error("Choose two different robots");
+            toast.error(t('workshop_error_same_robot'));
             return;
         }
         if (variants.length >= userLimit) {
-            toast.error("製造ラインが満杯です (Workshop Full)");
+            toast.error(t('workshop_error_full'));
             return;
         }
 
@@ -256,30 +259,61 @@ export default function Workshop() {
     const canAfford = isFreeToday === true || (isFreeToday === null && (userCredits == null || userCredits >= VARIANT_COST)) || (isFreeToday === false && userCredits != null && userCredits >= VARIANT_COST);
     const isFull = userLimit > 0 ? variants.length >= userLimit : false;
 
+    // Calculate next capacity level threshold
+    const getNextCapacityLevel = (currentLimit: number): number | null => {
+        if (currentLimit < 1) return 5;
+        if (currentLimit < 2) return 5;
+        if (currentLimit < 3) return 10;
+        if (currentLimit < 4) return 15;
+        if (currentLimit < 5) return 20;
+        if (currentLimit < 6) return 25;
+        if (currentLimit < 7) return 30;
+        return null; // Max capacity reached
+    };
+    const nextCapacityLevel = getNextCapacityLevel(userLimit);
+
+    // Handle variant deletion
+    const handleDeleteVariant = async (variantId: string) => {
+        if (!confirm(t('workshop_confirm_delete'))) return;
+
+        setDeletingId(variantId);
+        try {
+            const deleteVariantFn = httpsCallable(functions, 'deleteVariant');
+            await deleteVariantFn({ variantId });
+            toast.success(t('workshop_variant_deleted'));
+        } catch (e: any) {
+            console.error('Delete variant error:', e);
+            toast.error(t('workshop_delete_failed'));
+        } finally {
+            setDeletingId(null);
+        }
+    };
+
     if (loading) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-dark-bg p-6">
                 <SystemSkeleton
                     className="w-full max-w-2xl aspect-video rounded-3xl"
-                    text="CALIBRATING WORKSHOP..."
-                    subtext="INITIALIZING FUSION PROTOCOLS"
+                    text={t('workshop_loading_text')}
+                    subtext={t('workshop_loading_subtext')}
                 />
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-dark-bg text-foreground p-4 pb-24 relative overflow-hidden">
-            <SEO title="Workshop | Barcode Genesis" description="Combine robots to create cosmetic variants." />
+        <div className="min-h-screen bg-background pb-20 pt-[env(safe-area-inset-top)]"
+            style={{ paddingBottom: "calc(var(--bottom-nav-height) + 2rem)" }}>
+            <SEO title={t('workshop')} description={t('workshop_desc')} />
             {/* Backgrounds */}
             <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-10 pointer-events-none" />
 
             {/* Header */}
             <header className="flex items-center mb-8 max-w-4xl mx-auto w-full z-10 relative">
                 <Link href="/profile">
-                    <Button variant="ghost" className="mr-4"><ArrowLeft className="mr-2 h-5 w-5" /> 戻る</Button>
+                    <Button variant="ghost" className="mr-4"><ArrowLeft className="mr-2 h-5 w-5" /> {t('button_back')}</Button>
                 </Link>
-                <h1 className="text-2xl font-bold text-primary">融合ワークショップ</h1>
+                <h1 className="text-2xl font-bold text-primary">{t('workshop_title')}</h1>
             </header>
 
             <main className="max-w-4xl mx-auto w-full space-y-8 z-10 relative">
@@ -289,17 +323,23 @@ export default function Workshop() {
                     {/* Status Banner */}
                     <div className="absolute top-0 right-0 p-4 text-xs font-mono text-right space-y-1 bg-black/50 rounded-bl-xl border-b border-l border-white/10">
                         <div className={isFull ? "text-red-400" : "text-neon-cyan"}>
-                            CAPACITY: {variants.length} / {userLimit} <span className="text-[10px] text-muted-foreground">{isFull ? '(FULL)' : ''}</span>
+                            {t('workshop_variant_holdings')} {variants.length} / {userLimit}
+                            {isFull && <span className="text-[10px] ml-1">({t('workshop_full')})</span>}
                         </div>
+                        {isFull && nextCapacityLevel && (
+                            <div className="text-[10px] text-yellow-400">
+                                {t('workshop_level_up_hint').replace('{level}', String(nextCapacityLevel))}
+                            </div>
+                        )}
                         <div className={canAfford ? "text-green-400" : "text-red-400"}>
-                            CREDITS: {userCredits == null ? "…" : userCredits}
+                            {t('label_credits_label')} {userCredits == null ? "…" : userCredits}
                         </div>
                     </div>
 
                     <CardHeader>
                         <CardTitle className="flex flex-col gap-1">
-                            <span>製造バリアント作成</span>
-                            <span className="text-sm font-normal text-muted-foreground">2体のユニットを選択して、新たな見た目のバリアントを製造します。</span>
+                            <span>{t('workshop_create_variant')}</span>
+                            <span className="text-sm font-normal text-muted-foreground">{t('workshop_create_desc')}</span>
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-6">
@@ -308,10 +348,10 @@ export default function Workshop() {
                         <div className="bg-secondary/10 border border-white/5 rounded-lg p-3 flex justify-between items-center text-sm">
                             <span className="flex items-center gap-2">
                                 <RefreshCw className="w-4 h-4 text-primary" />
-                                製造コスト:
+                                {t('workshop_craft_cost')}
                             </span>
                             <span className={`font-bold ${isFreeToday ? "text-green-400" : "text-amber-400"}`}>
-                                {isFreeToday === true ? "0 (1日1回無料!)" : isFreeToday === null ? "…" : `${VARIANT_COST} クレジット`}
+                                {isFreeToday === true ? t('workshop_free_daily') : isFreeToday === null ? "…" : t('workshop_cost_credits').replace('{cost}', String(VARIANT_COST))}
                             </span>
                         </div>
 
@@ -319,22 +359,22 @@ export default function Workshop() {
                         {isFull && (
                             <Alert variant="destructive">
                                 <AlertCircle className="h-4 w-4" />
-                                <AlertDescription>製造ラインが満杯です。レベルを上げて上限を解放してください。 (Workshop Full)</AlertDescription>
+                                <AlertDescription>{t('workshop_error_full')}</AlertDescription>
                             </Alert>
                         )}
                         {!isFull && !canAfford && (
                             <Alert variant="destructive">
                                 <AlertCircle className="h-4 w-4" />
-                                <AlertDescription>クレジットが不足しています。 (Insufficient Credits)</AlertDescription>
+                                <AlertDescription>{t('workshop_error_insufficient_credits')}</AlertDescription>
                             </Alert>
                         )}
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
                             {/* Input A */}
                             <div className="space-y-2">
-                                <label className="text-sm font-medium">素材ユニット A</label>
+                                <label className="text-sm font-medium">{t('workshop_material_a')}</label>
                                 <Select value={robotAId} onValueChange={setRobotAId}>
-                                    <SelectTrigger><SelectValue placeholder="ロボットを選択" /></SelectTrigger>
+                                    <SelectTrigger><SelectValue placeholder={t('workshop_select_robot')} /></SelectTrigger>
                                     <SelectContent className="max-h-60">
                                         {robots.map(r => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
                                     </SelectContent>
@@ -350,14 +390,14 @@ export default function Workshop() {
                             <div className="flex flex-col justify-center items-center gap-4">
                                 <Plus className="h-8 w-8 text-muted-foreground" />
                                 <div className="w-full space-y-2">
-                                    <label className="text-xs font-medium mb-1 block text-center">合成プリセット</label>
+                                    <label className="text-xs font-medium mb-1 block text-center">{t('workshop_fusion_preset')}</label>
                                     <Select value={previewPreset} onValueChange={(v) => setPreviewPreset(v as any)}>
-                                        <SelectTrigger><SelectValue placeholder="プリセット選択" /></SelectTrigger>
+                                        <SelectTrigger><SelectValue placeholder={t('workshop_fusion_preset')} /></SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="HALF">混合 (A/B mix)</SelectItem>
-                                            <SelectItem value="ALT">交互 (Alternate)</SelectItem>
-                                            <SelectItem value="A_DOMINANT">A ベース</SelectItem>
-                                            <SelectItem value="B_DOMINANT">B ベース</SelectItem>
+                                            <SelectItem value="HALF">{t('workshop_preset_half')}</SelectItem>
+                                            <SelectItem value="ALT">{t('workshop_preset_alt')}</SelectItem>
+                                            <SelectItem value="A_DOMINANT">{t('workshop_preset_a_dominant')}</SelectItem>
+                                            <SelectItem value="B_DOMINANT">{t('workshop_preset_b_dominant')}</SelectItem>
                                         </SelectContent>
                                     </Select>
                                     {previewRobot && (
@@ -367,9 +407,9 @@ export default function Workshop() {
                                     )}
                                 </div>
                                 <div className="w-full">
-                                    <label className="text-xs font-medium mb-1 block text-center">バリアント名 (任意)</label>
+                                    <label className="text-xs font-medium mb-1 block text-center">{t('workshop_variant_name')}</label>
                                     <Input
-                                        placeholder="名称未設定..."
+                                        placeholder={t('workshop_name_placeholder')}
                                         value={variantName}
                                         onChange={(e) => setVariantName(e.target.value)}
                                         className="bg-black/20 text-center"
@@ -380,9 +420,9 @@ export default function Workshop() {
 
                             {/* Input B */}
                             <div className="space-y-2">
-                                <label className="text-sm font-medium">素材ユニット B</label>
+                                <label className="text-sm font-medium">{t('workshop_material_b')}</label>
                                 <Select value={robotBId} onValueChange={setRobotBId}>
-                                    <SelectTrigger><SelectValue placeholder="ロボットを選択" /></SelectTrigger>
+                                    <SelectTrigger><SelectValue placeholder={t('workshop_select_robot')} /></SelectTrigger>
                                     <SelectContent className="max-h-60">
                                         {robots.map(r => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
                                     </SelectContent>
@@ -402,33 +442,48 @@ export default function Workshop() {
                             onClick={handleCreate}
                         >
                             {creating ? <Loader2 className="animate-spin mr-2" /> : <RefreshCw className="mr-2" />}
-                            融合開始 ({isFreeToday === true ? "無料" : isFreeToday === null ? "…" : `${VARIANT_COST} Cr`})
+                            {t('workshop_start_fusion')} ({isFreeToday === true ? t('label_free') : isFreeToday === null ? "…" : `${VARIANT_COST} ${t('label_credits_short')}`})
                         </Button>
                         <p className="text-xs text-center text-muted-foreground">
-                            バリアントは見た目のみ変更されます。ステータスは両親の平均値となります。
+                            {t('workshop_fusion_note')}
                         </p>
                     </CardContent>
                 </Card>
 
                 {/* List Section */}
                 <div className="space-y-4">
-                    <h2 className="text-xl font-bold">所有バリアント ({variants.length})</h2>
+                    <h2 className="text-xl font-bold">{t('workshop_owned_variants').replace('{count}', String(variants.length))}</h2>
                     {variants.length === 0 ? (
                         <div className="text-center p-8 text-muted-foreground border border-dashed rounded bg-black/20">
-                            バリアントはまだありません。
+                            {t('workshop_no_variants')}
                         </div>
                     ) : (
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                             {variants.map(v => (
                                 <Interactive key={v.id} className="overflow-hidden bg-black/40 border-white/10 relative group h-auto rounded-xl">
-                                    {/* Read-only list in client. */} {/* REF: A2 */}
+                                    {/* Delete button - visible on hover */}
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDeleteVariant(v.id);
+                                        }}
+                                        disabled={deletingId === v.id}
+                                        className="absolute top-2 right-2 z-10 p-1.5 rounded-lg bg-red-500/20 border border-red-500/30 opacity-0 group-hover:opacity-100 hover:bg-red-500/40 transition-all disabled:opacity-50"
+                                        title={t('workshop_scrap_btn')}
+                                    >
+                                        {deletingId === v.id ? (
+                                            <Loader2 className="w-4 h-4 text-red-400 animate-spin" />
+                                        ) : (
+                                            <Trash2 className="w-4 h-4 text-red-400" />
+                                        )}
+                                    </button>
                                     <CardContent className="p-4 flex flex-col items-center space-y-2">
                                         {v.parts && (
                                             <RobotSVG parts={v.parts} colors={v.colors} size={140} />
                                         )}
                                         <div className="text-sm font-bold truncate w-full text-center px-1">{v.name || `Variant ${v.id?.slice(0, 4)}`}</div>
                                         <div className="flex gap-2 text-xs text-muted-foreground w-full justify-center">
-                                            <span className="bg-secondary/20 px-1 rounded">Fusion</span>
+                                            <span className="bg-secondary/20 px-1 rounded">{t('workshop_label_fusion')}</span>
                                         </div>
                                     </CardContent>
                                 </Interactive>
@@ -448,7 +503,7 @@ export default function Workshop() {
                         setShowAnimation(false);
                         setFusionResult(null);
                         // Live listeners refresh data. // REF: A4
-                        toast.success("Variant added to collection!");
+                        toast.success(t('workshop_success_variant'));
                     }}
                 />
             )}

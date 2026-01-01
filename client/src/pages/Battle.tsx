@@ -36,7 +36,7 @@ import { Zap, Shield, Heart } from "lucide-react";
 import { useRobotFx } from "@/hooks/useRobotFx";
 import { AnimatedHPBar } from "@/components/AnimatedHPBar";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { Interactive } from "@/components/ui/interactive";
+import Interactive from "@/components/ui/interactive";
 import { SystemSkeleton } from "@/components/ui/SystemSkeleton";
 import { CountUp } from "@/components/ui/CountUp";
 import { simulateBattle as simulateTrainingBattle, getTrainingBattleId, normalizeTrainingInput, toBattleRobotData } from "@/lib/battleEngine";
@@ -130,7 +130,7 @@ export default function Battle() {
   };
 
   const myRobot = robots.find(r => r.id === selectedRobotId)
-    || (variants.find(v => v.id === selectedRobotId) ? { ...variants.find(v => v.id === selectedRobotId), name: `Variant ${selectedRobotId?.slice(0, 4)}`, baseHp: 0 } as any : null)
+    || (variants.find(v => v.id === selectedRobotId) ? { ...variants.find(v => v.id === selectedRobotId), name: variants.find(v => v.id === selectedRobotId)?.name || `Variant ${selectedRobotId?.slice(0, 4)}` } as any : null)
     || battleResult?.resolvedPlayerRobot;
 
   // Use hook's resolved enemy if battling, otherwise use selection from training list or default logic

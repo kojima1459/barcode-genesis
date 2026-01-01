@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
-import { Loader2, Swords, Factory, ChevronDown, ChevronRight, ScanBarcode } from "lucide-react";
+import { collection, onSnapshot, orderBy, query, doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { Loader2, Swords, Factory, ChevronDown, ChevronRight, ScanBarcode, Star } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 import { useAuth } from "@/contexts/AuthContext";
@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toast } from "sonner";
 import RobotSVG from "@/components/RobotSVG";
 import SilhouetteCard from "@/components/SilhouetteCard";
 import CollectionSlot from "@/components/CollectionSlot";
@@ -229,7 +230,7 @@ export default function Dex() {
   const [loadingVariants, setLoadingVariants] = useState(true);
 
   // Use centralized user data
-  const { badgeIds, titleId } = useUserData();
+  const { badgeIds, titleId, activeUnitId } = useUserData();
 
   // Filters
   const [filterRole, setFilterRole] = useState<string>("ALL");
@@ -360,6 +361,20 @@ export default function Dex() {
     else sessionStorage.removeItem("workshopParentB");
 
     setLocation(`/workshop?a=${encodeURIComponent(nextA)}${nextB ? `&b=${encodeURIComponent(nextB)}` : ""}`);
+  };
+
+  const handleSetActiveUnit = async (robotId: string) => {
+    if (!user) return;
+    try {
+      await updateDoc(doc(db, "users", user.uid), {
+        activeUnitId: robotId,
+        updatedAt: serverTimestamp(),
+      });
+      toast.success(t("active_unit_updated"));
+    } catch (e) {
+      console.error("Set active unit error:", e);
+      toast.error(t("active_unit_update_failed"));
+    }
   };
 
   const statsLine = useMemo(
@@ -635,8 +650,23 @@ export default function Dex() {
                               )}
                             </div>
                           </div>
-                          <div className="text-[11px] text-muted-foreground font-mono">{statsLine(r)}</div>
                           <div className="flex flex-wrap gap-2 pt-1">
+                            <Button
+                              size="sm"
+                              variant={activeUnitId === r.id ? "default" : "outline"}
+                              className="h-8 text-[11px]"
+                              onClick={() => handleSetActiveUnit(r.id)}
+                            >
+                              {activeUnitId === r.id ? (
+                                <>
+                                  <Star className="w-3 h-3 mr-1 fill-yellow-400 text-yellow-400" />
+                                  {t("active_unit_current")}
+                                </>
+                              ) : (
+                                <Star className="w-3 h-3 mr-1" />
+                              )}
+                              {activeUnitId !== r.id && t("set_active_unit")}
+                            </Button>
                             <Button size="sm" variant="outline" className="h-8 text-[11px]" onClick={() => handleBattle(r.id)}>
                               {t('battle_with_this')}
                             </Button>

@@ -17,6 +17,7 @@ export interface UserData {
     workshopLines: number;
     createdAt?: any;
     lastLogin?: any;
+    activeUnitId?: string;
     // Arrays
     badgeIds?: string[];
     titleId?: string;
@@ -38,6 +39,7 @@ interface UserDataResult {
     isPremium: boolean;
     titleId: string | null;
     badgeIds: string[];
+    activeUnitId: string | null;
 }
 
 const UserDataContext = createContext<UserDataResult>({
@@ -53,6 +55,7 @@ const UserDataContext = createContext<UserDataResult>({
     isPremium: false,
     titleId: null,
     badgeIds: [],
+    activeUnitId: null,
 });
 
 export function UserDataProvider({ children }: { children: ReactNode }) {
@@ -91,6 +94,7 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
                         workshopLines: typeof data.workshopLines === "number" ? data.workshopLines : 1,
                         createdAt: data.createdAt,
                         lastLogin: data.lastLogin,
+                        activeUnitId: typeof data.activeUnitId === "string" ? data.activeUnitId : undefined,
                         badgeIds: Array.isArray(data.badgeIds) ? data.badgeIds : [],
                         titleId: typeof data.titleId === "string" ? data.titleId : undefined,
                         lastFreeVariantDate: typeof data.lastFreeVariantDate === "string" ? data.lastFreeVariantDate : undefined,
@@ -125,6 +129,7 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
         isPremium: !!userData?.isPremium,
         titleId: userData?.titleId ?? null,
         badgeIds: userData?.badgeIds ?? [],
+        activeUnitId: userData?.activeUnitId ?? null,
     };
 
     return (

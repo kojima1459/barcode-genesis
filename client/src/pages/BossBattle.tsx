@@ -20,7 +20,7 @@ import RobotSVG from "@/components/RobotSVG";
 import { BossData, BossType } from "@/components/BossAlertCard";
 import { RobotData, VariantData } from "@/types/shared";
 import { SystemSkeleton } from "@/components/ui/SystemSkeleton";
-import { Interactive } from "@/components/ui/interactive";
+import Interactive from "@/components/ui/interactive";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import BattleReplay from "@/components/BattleReplay";
 import SEO from "@/components/SEO";

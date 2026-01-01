@@ -12,7 +12,7 @@ interface InteractiveProps {
     disabled?: boolean;
 }
 
-export const Interactive = ({
+const Interactive = ({
     children,
     className,
     onClick,
@@ -43,3 +43,6 @@ export const Interactive = ({
         </motion.div>
     );
 };
+
+export { Interactive };
+export default Interactive;

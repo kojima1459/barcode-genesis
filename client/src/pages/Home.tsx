@@ -16,6 +16,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { useNotification } from "@/hooks/useNotification";
 import { useUserData } from "@/hooks/useUserData";
+import { selectActiveRobot } from "@/lib/selectActiveRobot";
 import ShareButton from "@/components/ShareButton";
 import TutorialModal from "@/components/TutorialModal";
 import SoundSettings from "@/components/SoundSettings";
@@ -54,7 +55,7 @@ export default function Home() {
   const [robot, setRobot] = useState<RobotData | null>(null);
 
   // Use centralized user data
-  const { credits, loginStreak, isPremium } = useUserData();
+  const { credits, loginStreak, isPremium, activeUnitId } = useUserData();
 
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isClaimingLogin, setIsClaimingLogin] = useState(false);
@@ -283,7 +284,7 @@ export default function Home() {
 
   if (loading) {
     return (
-      <div className="min-h-dvh bg-background text-foreground pb-24 md:pb-8 flex flex-col">
+      <div className="min-h-dvh bg-background text-foreground pb-8 flex flex-col" style={{ paddingBottom: "calc(var(--bottom-nav-height) + env(safe-area-inset-bottom) + 16px)" }}>
         {/* Global Header */}
         <GlobalHeader missions={missions} />
 
@@ -311,10 +312,11 @@ export default function Home() {
 
   // Get the most "active" robot (using last one in list for now, ideally sort by lastUsed)
   // Logic: last added often feels like current main
-  const mainRobot = robots.length > 0 ? robots[0] : null;
+  const mainRobot = selectActiveRobot(robots, activeUnitId);
 
   return (
-    <div className="flex-1 flex flex-col relative pb-32 md:pb-8">
+    <div className="min-h-screen bg-black text-white relative font-body pt-[env(safe-area-inset-top)]"
+      style={{ paddingBottom: "calc(var(--bottom-nav-height) + 1rem)" }}>
       {/* Background Effect */}
       <div className="fixed inset-0 bg-[url('/grid.svg')] opacity-10 pointer-events-none z-0" />
 

@@ -16,7 +16,7 @@ export default function HowTo() {
   ];
 
   return (
-    <div className="min-h-screen bg-background p-4 flex flex-col pb-[calc(6rem+env(safe-area-inset-bottom))] pt-[env(safe-area-inset-top)] relative overflow-hidden text-foreground">
+    <div className="min-h-screen bg-background p-4 flex flex-col pt-[env(safe-area-inset-top)] relative overflow-hidden text-foreground" style={{ paddingBottom: "calc(var(--bottom-nav-height) + env(safe-area-inset-bottom) + 16px)" }}>
       <SEO title={t('how_to_title')} description={t('how_to_welcome')} />
       <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-20 pointer-events-none" />
       <div className="absolute inset-0 bg-linear-to-b from-transparent to-bg/90 pointer-events-none" />

@@ -33,28 +33,8 @@ const EPITHET_PREFIXES: Record<LegacyRole, string[]> = {
   'TRICKY': ["紫電の", "幻影の", "混沌の", "深淵の", "狂気の"]
 };
 
-// 名前パーツ（小中学生向けのかっこいい名前）
-const NAME_PREFIXES = [
-  "ゴースト", "サンダー", "ブレイズ", "シャドウ", "ストーム",
-  "フレア", "アイス", "ダーク", "ライト", "メタル",
-  "ドラゴン", "ファントム", "サイバー", "ネオ", "アルファ",
-  "オメガ", "ゼロ", "プライム", "マックス", "ギガ"
-];
-const NAME_SUFFIXES = [
-  "ナイト", "マスター", "キング", "エース", "ウォリアー",
-  "ハンター", "ブレイカー", "バスター", "ライダー", "ファイター",
-  "セイバー", "ガーディアン", "ストライカー", "シューター", "ドライバー",
-  "ブレイド", "ウイング", "スター", "クロス", "ビート"
-];
-
 // バーコード特徴に基づく名前キーワード
-const NAME_KEYWORDS: Record<string, string[]> = {
-  'tank': ['装甲', '要塞', '鋼', '堅牢'],      // 0,8が多い
-  'speed': ['疾風', '影', '閃光', '迅雷'],     // 1,7が多い
-  'power': ['猛火', '轟', '烈', '豪'],         // 3,9が多い
-  'mystic': ['深淵', '冥', '幻', '魔'],        // 2,6が多い
-  'balance': ['均衡', '心', '和', '光輝'],     // 4,5が多い
-};
+
 
 // ============================================
 // Barcode Features Extraction
@@ -445,7 +425,7 @@ function calculateRareEffect(seedHash: number): 'none' | 'rare' | 'legendary' {
 
 function calculateVisuals(features: BarcodeFeatures, role: LegacyRole): RobotVisuals {
   const { manufacturerCode, productCode, seedHash } = features;
-  const rng = (seed: number) => Math.abs(seed) % 100;
+
 
   // Aura (5 types)
   const AURAS = ['none', 'burning', 'electric', 'digital', 'psycho', 'angel'] as const;
@@ -485,36 +465,8 @@ function calculateVisuals(features: BarcodeFeatures, role: LegacyRole): RobotVis
   return { aura, decal, eyeGlow, weaponIcon };
 }
 
-// 3-layer Name Generation
-function generateName(digits: number[], roleTitle: string, features: BarcodeFeatures): string {
-  // 1. Epithet (Adjective) - from product code
-  const epithetSeed = features.productCode;
-  const EPITHETS = [
-    "灼熱の", "氷結の", "疾風の", "鋼鉄の", "閃光の",
-    "深淵の", "聖なる", "禁断の", "無限の", "虚空の",
-    "紅蓮の", "蒼穹の", "雷鳴の", "絶対の", "不滅の"
-  ];
-  const epithet = EPITHETS[epithetSeed % EPITHETS.length];
-
-  // 2. Role (Class) - Use roleTitle (e.g., "突撃", "重装") or English Role?
-  // User example: "灼熱の / STRIKER / ...". 'STRIKER' is English.
-  // Existing roleTitle is "突撃" (Japanese).
-  // Let's use a hybrid or Mapping.
-  // Let's use the provided roleTitle for now to match current JP style, OR map to English if user wants "STRIKER".
-  // User example: "灼熱の / STRIKER / バーコード・ヴァルキリー"
-  // But existing names are fully Japanese-ish "突撃・フレアナイト".
-  // Let's stick to Japanese style for consistency unless I add English aliases.
-  // I'll use roleTitle ("突撃" etc) as the middle part.
-
-  // 3. Core Name (Noun) - Manufacturer code + Prefix + Suffix
-  const pIndex = (digits[0] + digits[1]) % NAME_PREFIXES.length;
-  const sIndex = (digits[2] + digits[3]) % NAME_SUFFIXES.length;
-  const coreName = `${NAME_PREFIXES[pIndex]}${NAME_SUFFIXES[sIndex]}`;
-
-  return `${epithet}${roleTitle}・${coreName}`;
-}
-
 // メイン生成関数
+
 export function generateRobotData(barcode: string, userId: string): RobotData {
   const digits = parseBarcode(barcode);
   const features = extractBarcodeFeatures(digits);

@@ -11,7 +11,7 @@ var __rest = (this && this.__rest) || function (s, e) {
     return t;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.executeBossBattle = exports.getDailyBoss = exports.resolveFighterData = exports.createVariant = exports.scanBarcodeFromImage = exports.checkMatchStatus = exports.leaveMatchmaking = exports.joinMatchmaking = exports.stripeWebhook = exports.createPortalSession = exports.createSubscriptionSession = exports.createCheckoutSession = exports.applyCosmeticItem = exports.useUpgradeItem = exports.craftItem = exports.checkAchievements = exports.updateRanking = exports.followUser = exports.claimMissionReward = exports.getDailyMissions = exports.claimLoginBonus = exports.claimDailyLogin = exports.equipItem = exports.purchaseItem = exports.inheritSkill = exports.synthesizeRobots = exports.matchBattle = exports.evolveRobot = exports.batchDisassemble = exports.awardScanToken = exports.generateRobot = exports.ping = exports.debugPing = exports.testFunctionHealth = void 0;
+exports.executeBossBattle = exports.getDailyBoss = exports.resolveFighterData = exports.deleteVariant = exports.createVariant = exports.scanBarcodeFromImage = exports.checkMatchStatus = exports.leaveMatchmaking = exports.joinMatchmaking = exports.stripeWebhook = exports.createPortalSession = exports.createSubscriptionSession = exports.createCheckoutSession = exports.applyCosmeticItem = exports.useUpgradeItem = exports.craftItem = exports.checkAchievements = exports.updateRanking = exports.followUser = exports.claimMissionReward = exports.getDailyMissions = exports.claimLoginBonus = exports.claimDailyLogin = exports.equipItem = exports.purchaseItem = exports.inheritSkill = exports.synthesizeRobots = exports.matchBattle = exports.evolveRobot = exports.batchDisassemble = exports.awardScanToken = exports.generateRobot = exports.ping = exports.debugPing = exports.testFunctionHealth = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
@@ -33,7 +33,7 @@ const dailyLogin_1 = require("./dailyLogin");
 const dailyBoss_1 = require("./dailyBoss");
 // Node.js 20 has native fetch - no need for node-fetch
 // Use a version constant to help track deployments and identify cache issues
-const VERSION = "2.1.0-fixed-cors-v3";
+const VERSION = "2.1.1-force-refresh";
 // Simple test function to verify Cloud Functions are working
 exports.testFunctionHealth = functions
     .runWith({ memory: '128MB', timeoutSeconds: 10 })
@@ -1795,7 +1795,7 @@ const STRIPE_PRICES = {
     credits_100: { priceId: 'price_1SjPcuRy3cnjpOGFNMSku9Op', credits: 100 },
     credits_500: { priceId: 'price_1SjPsxRy3cnjpOGFK5rCDh9q', credits: 500 },
     credits_1200: { priceId: 'price_1SjPqhRy3cnjpOGF1EIsZba4', credits: 1200 },
-    premium_monthly: { priceId: 'price_1SjPgiRy3cnjpOGFbq8hgztq' },
+    premium_monthly: { priceId: 'price_1SkiWvRy3cnjpOGFW3lhDJSZ' },
 };
 const isCreditPackId = (id) => {
     return id === 'credits_100' || id === 'credits_500' || id === 'credits_1200';
@@ -2343,6 +2343,33 @@ exports.createVariant = functions.https.onCall(async (data, context) => {
             remainingLines: limit - (vSnap.size + 1)
         };
     });
+});
+/**
+ * Delete a variant from user's collection
+ * Frees up workshop capacity
+ */
+exports.deleteVariant = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
+    }
+    const { variantId } = data;
+    if (!variantId || typeof variantId !== 'string') {
+        throw new functions.https.HttpsError('invalid-argument', 'variantId is required');
+    }
+    const uid = context.auth.uid;
+    const db = admin.firestore();
+    const variantRef = db.collection('users').doc(uid).collection('variants').doc(variantId);
+    const variantDoc = await variantRef.get();
+    if (!variantDoc.exists) {
+        throw new functions.https.HttpsError('not-found', 'Variant not found');
+    }
+    // Delete the variant
+    await variantRef.delete();
+    console.log(`[deleteVariant] User ${uid} deleted variant ${variantId}`);
+    return {
+        success: true,
+        deletedVariantId: variantId
+    };
 });
 async function resolveFighterData(uid, ref, transaction) {
     var _a;

@@ -8,6 +8,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { useRobotFx } from "@/hooks/useRobotFx";
 import { CountUp } from "@/components/ui/CountUp";
 import { Button } from "@/components/ui/button";
+import Interactive from "@/components/ui/interactive";
 import ShareButton from "@/components/ShareButton";
 import { Zap, Volume2, VolumeX } from "lucide-react";
 import { playGenerated, setMuted as setGlobalMuted, getMuted } from "@/lib/sound";

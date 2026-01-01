@@ -3,10 +3,10 @@ import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { RobotData } from "@/types/shared";
 import RobotCard from "./RobotCard";
-import { toBlob } from 'html-to-image';
 import { Share2, Download, Loader2 } from "lucide-react";
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { generateImageFromElement, shareImage, downloadBlob } from '@/utils/share';
 
 // SVG Icons for social platforms
 const XIcon = () => (
@@ -36,6 +36,7 @@ export default function ShareCardModal({ robot, trigger }: ShareCardModalProps) 
     const { user } = useAuth();
     const [isOpen, setIsOpen] = useState(false);
     const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+    const [generatedBlob, setGeneratedBlob] = useState<Blob | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
     const cardRef = useRef<HTMLDivElement>(null);
 
@@ -43,23 +44,37 @@ export default function ShareCardModal({ robot, trigger }: ShareCardModalProps) 
     const shareUrl = "https://barcodegame-42858.web.app";
 
     const generateImage = async () => {
-        if (!cardRef.current) return;
+        if (!cardRef.current) {
+            console.error('[ShareCardModal] Card ref is null');
+            return;
+        }
 
         setIsGenerating(true);
         try {
-            const blob = await toBlob(cardRef.current, {
+            console.log('[ShareCardModal] Starting image generation for robot:', robot.name);
+
+            const blob = await generateImageFromElement(cardRef.current, {
                 width: 600,
                 height: 800,
-                style: { transform: 'none' }
+                retries: 2
             });
 
             if (blob) {
                 const url = URL.createObjectURL(blob);
                 setGeneratedImage(url);
+                setGeneratedBlob(blob);
+                console.log('[ShareCardModal] Image generated successfully');
+            } else {
+                console.error('[ShareCardModal] Image generation returned null');
+                toast.error('画像生成に失敗しました', {
+                    description: 'カードの読み込みに時間がかかっている可能性があります。もう一度お試しください。'
+                });
             }
         } catch (error) {
-            console.error("Failed to generate card image:", error);
-            toast.error("画像生成に失敗しました");
+            console.error('[ShareCardModal] Image generation error:', error);
+            toast.error('画像生成に失敗しました', {
+                description: error instanceof Error ? error.message : '不明なエラー'
+            });
         } finally {
             setIsGenerating(false);
         }
@@ -74,14 +89,18 @@ export default function ShareCardModal({ robot, trigger }: ShareCardModalProps) 
 
     // Download image
     const handleDownload = () => {
-        if (!generatedImage) return;
-        const link = document.createElement('a');
-        link.href = generatedImage;
-        link.download = `robot_${robot.id}.png`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        toast.success("画像をダウンロードしました！");
+        if (!generatedBlob) {
+            console.error('[ShareCardModal] No blob available for download');
+            toast.error('画像が生成されていません');
+            return;
+        }
+
+        const filename = `robot_${robot.id}_${robot.name}.png`;
+        const success = downloadBlob(generatedBlob, filename);
+
+        if (!success) {
+            toast.error('ダウンロードに失敗しました');
+        }
     };
 
     // Share to X (Twitter)
@@ -106,29 +125,28 @@ export default function ShareCardModal({ robot, trigger }: ShareCardModalProps) 
         toast("画像を保存しました。Instagramアプリで投稿してください！", { icon: "📸", duration: 5000 });
     };
 
-    // Native share (fallback/additional option)
+    // Native share with comprehensive fallbacks
     const handleNativeShare = async () => {
-        if (!generatedImage) return;
-
-        try {
-            const response = await fetch(generatedImage);
-            const blob = await response.blob();
-            const file = new File([blob], `robot_${robot.id}.png`, { type: 'image/png' });
-
-            if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-                await navigator.share({
-                    title: `${robot.name} - Barcode Genesis`,
-                    text: shareText,
-                    files: [file]
-                });
-                toast.success("シェアしました！");
-            } else {
-                handleDownload();
-            }
-        } catch (error) {
-            console.error("Share failed:", error);
-            toast.error("シェアに失敗しました");
+        if (!generatedBlob) {
+            console.error('[ShareCardModal] No blob available for sharing');
+            toast.error('画像が生成されていません');
+            return;
         }
+
+        console.log('[ShareCardModal] Initiating share for robot:', robot.name);
+
+        const filename = `robot_${robot.id}_${robot.name}.png`;
+        const result = await shareImage(
+            generatedBlob,
+            filename,
+            {
+                title: `${robot.name} - Barcode Genesis`,
+                text: shareText,
+                url: shareUrl
+            }
+        );
+
+        console.log('[ShareCardModal] Share result:', result);
     };
 
     return (

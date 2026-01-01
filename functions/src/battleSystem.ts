@@ -3,16 +3,16 @@
  * Integrates Stance, Overdrive, and Part Passives
  */
 
-import { RobotData, Skill, BattleResult, BattleLog, OverdriveState, PassiveTrigger, RobotRole, SpecialMoveType, SpecialMoveInput } from "./types";
+import { RobotData, Skill, BattleResult, BattleLog, OverdriveState, PassiveTrigger, SpecialMoveInput } from "./types";
 import { getSkillById } from "./skills";
 import { SeededRandom } from "./seededRandom";
 import { getStanceWeights, pickStance, resolveStance, getStanceMultiplier } from "./battleStance";
 import { createOverdriveState, addOverdrive, tickOverdrive, getOverdriveSkillMultiplier, getOverdriveTriggerBonus } from "./battleOverdrive";
 import { checkPassive, getPassiveEffect } from "./battlePassives";
-import { calculateEffectiveStats, calculateEffectiveStatsWithRole } from "./levelSystem";
+import { calculateEffectiveStatsWithRole } from "./levelSystem";
 import { BossTraits } from "./dailyBoss";
 import { shouldTriggerSpecial, applySpecialEffect, getSpecialMove } from "./lib/phaseBSpecialMoves";
-import { getTerrainFromBarcode, applyTerrainModifiers, getTerrainCritBonus, getTerrainSpeedModifier, getTerrainDefenseModifier } from "./battleTerrain";
+import { getTerrainFromBarcode, applyTerrainModifiers, getTerrainSpeedModifier, getTerrainDefenseModifier } from "./battleTerrain";
 
 const resolveSkills = (skills: RobotData["skills"]): Skill[] => {
   if (!Array.isArray(skills)) return [];
