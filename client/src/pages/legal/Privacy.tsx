@@ -29,7 +29,7 @@ export default function Privacy() {
                     <p className="mt-2">UNSEVED:LAB<br />E-mail: mk19830920@gmail.com</p>
                 </div>
                 <div className="pt-8 text-center">
-                    <Link href="/lp">
+                    <Link href="/">
                         <Button variant="outline">トップへ戻る</Button>
                     </Link>
                 </div>

@@ -12,6 +12,7 @@ const battleOverdrive_1 = require("./battleOverdrive");
 const battlePassives_1 = require("./battlePassives");
 const levelSystem_1 = require("./levelSystem");
 const phaseBSpecialMoves_1 = require("./lib/phaseBSpecialMoves");
+const battleTerrain_1 = require("./battleTerrain");
 const resolveSkills = (skills) => {
     if (!Array.isArray(skills))
         return [];
@@ -83,13 +84,20 @@ const getElementMultiplier = (attacker, defender) => {
 const simulateBattle = (robot1, robot2, battleId, robot1Items = [], cheer, battleItems, specialInput, bossTraits // NEW: Boss traits for PvE boss battles
 ) => {
     var _a, _b, _c, _d;
+    // Terrain System: Deterministic terrain selection from barcodes
+    const terrain = (0, battleTerrain_1.getTerrainFromBarcode)(robot1.sourceBarcode || robot2.sourceBarcode || '');
     // Phase B: Level-based stat scaling with role awareness
-    const effectiveStats1 = (0, levelSystem_1.calculateEffectiveStatsWithRole)({
+    let effectiveStats1 = (0, levelSystem_1.calculateEffectiveStatsWithRole)({
         hp: robot1.baseHp, attack: robot1.baseAttack, defense: robot1.baseDefense, speed: robot1.baseSpeed
     }, (_a = robot1.level) !== null && _a !== void 0 ? _a : 1, robot1.role);
-    const effectiveStats2 = (0, levelSystem_1.calculateEffectiveStatsWithRole)({
+    let effectiveStats2 = (0, levelSystem_1.calculateEffectiveStatsWithRole)({
         hp: robot2.baseHp, attack: robot2.baseAttack, defense: robot2.baseDefense, speed: robot2.baseSpeed
     }, (_b = robot2.level) !== null && _b !== void 0 ? _b : 1, robot2.role);
+    // Apply terrain stat modifiers
+    const speedMod = (0, battleTerrain_1.getTerrainSpeedModifier)(terrain);
+    const defMod = (0, battleTerrain_1.getTerrainDefenseModifier)(terrain);
+    effectiveStats1 = Object.assign(Object.assign({}, effectiveStats1), { speed: Math.floor(effectiveStats1.speed * speedMod), defense: Math.floor(effectiveStats1.defense * defMod) });
+    effectiveStats2 = Object.assign(Object.assign({}, effectiveStats2), { speed: Math.floor(effectiveStats2.speed * speedMod), defense: Math.floor(effectiveStats2.defense * defMod) });
     // Max HP with level scaling
     const maxHp1 = effectiveStats1.hp;
     const maxHp2 = effectiveStats2.hp;
@@ -368,7 +376,9 @@ const simulateBattle = (robot1, robot2, battleId, robot1Items = [], cheer, battl
             }
         }
         const { effectiveAtk, effectiveDef } = normalizeStats(atk, def);
-        const coreDamage = computeCoreDamage(effectiveAtk, effectiveDef);
+        let coreDamage = computeCoreDamage(effectiveAtk, effectiveDef);
+        // Apply terrain damage modifiers
+        coreDamage = (0, battleTerrain_1.applyTerrainModifiers)(coreDamage, terrain);
         // スキル発動判定 (with Overdrive bonus)
         let skill = null;
         const overdriveActive = odResult.newState.isActive;
@@ -957,6 +967,7 @@ const simulateBattle = (robot1, robot2, battleId, robot1Items = [], cheer, battl
         totalDamageP1,
         totalDamageP2,
         turnCount: turn - 1,
+        terrain, // Include terrain in battle result
     };
 };
 exports.simulateBattle = simulateBattle;

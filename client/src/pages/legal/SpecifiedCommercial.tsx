@@ -53,7 +53,7 @@ export default function SpecifiedCommercial() {
                 </div>
 
                 <div className="pt-8 text-center">
-                    <Link href="/lp">
+                    <Link href="/">
                         <Button variant="outline">トップへ戻る</Button>
                     </Link>
                 </div>
