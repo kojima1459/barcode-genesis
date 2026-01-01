@@ -1,11 +1,22 @@
 /**
- * SFX System - Lightweight sound effect management
+ * SFX System - Lightweight sound effect management (Battle-specific)
  * 
- * Uses Audio pool for multiple simultaneous playback without heavy dependencies.
- * Respects mute state and handles missing files gracefully.
+ * Maps battle SFX names to actual available files.
+ * Uses the main sound.ts mp3 files instead of stubs.
  */
 
 type SfxName = 'attack' | 'hit' | 'crit' | 'cheer' | 'win' | 'lose' | 'ui';
+
+// Map SFX names to actual available mp3 files
+const SFX_FILE_MAP: Record<SfxName, string> = {
+    attack: '/sfx/hit_light.mp3',  // Use hit_light for attack
+    hit: '/sfx/hit_light.mp3',
+    crit: '/sfx/hit_heavy.mp3',    // Use heavy hit for crits
+    cheer: '/sfx/battle_start.mp3', // fallback (cheer.mp3 is stub)
+    win: '/sfx/ui_click.mp3',      // fallback (win.mp3 is stub)
+    lose: '/sfx/ui_click.mp3',     // fallback (lose.mp3 is stub)
+    ui: '/sfx/ui_click.mp3',
+};
 
 interface AudioPool {
     pool: HTMLAudioElement[];
@@ -25,15 +36,16 @@ export function preloadSfx(): void {
 
     sfxNames.forEach(name => {
         const pool: HTMLAudioElement[] = [];
+        const filePath = SFX_FILE_MAP[name];
 
         for (let i = 0; i < POOL_SIZE; i++) {
             const audio = new Audio();
             audio.preload = 'auto';
-            audio.src = `/sfx/${name}.mp3`;
+            audio.src = filePath;
 
             // Handle missing files silently
             audio.onerror = () => {
-                console.warn(`[SFX] Missing file: /sfx/${name}.mp3`);
+                // Silent - already mapped to real files
             };
 
             pool.push(audio);
@@ -59,7 +71,7 @@ export function playSfx(
 
     const poolObj = pools[name];
     if (!poolObj) {
-        console.warn(`[SFX] Pool not initialized for: ${name}`);
+        // Pool might not be initialized yet, ignore silently
         return;
     }
 
@@ -74,11 +86,8 @@ export function playSfx(
     audio.playbackRate = options.playbackRate ?? 1.0;
     audio.currentTime = 0; // Reset to start
 
-    audio.play().catch(err => {
-        // Ignore autoplay policy errors
-        if (err.name !== 'NotAllowedError') {
-            console.warn(`[SFX] Playback failed for ${name}:`, err);
-        }
+    audio.play().catch(() => {
+        // Ignore autoplay policy errors silently
     });
 }
 

@@ -61,6 +61,11 @@ function RobotSVGComponent({
   rarityEffect,
   role
 }: RobotSVGProps) {
+  // Defensive check: If parts is invalid, render nothing
+  if (!parts || typeof parts !== 'object') {
+    return null;
+  }
+
   const isLite = simplified || size < 100;
 
 
