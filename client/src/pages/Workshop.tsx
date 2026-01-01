@@ -249,6 +249,22 @@ export default function Workshop() {
         return { parts, colors };
     }, [previewPreset, robotAId, robotBId, robots]);
 
+    // Self-healing: detect ghost capacity issues
+    // If variants array is empty but we're showing FULL, something is wrong
+    useEffect(() => {
+        if (!loading && variants.length === 0 && userLimit > 0) {
+            // Clear any sessionStorage workshop-related keys that might cause issues
+            const keysToCheck = ['workshopParentA', 'workshopParentB'];
+            keysToCheck.forEach(key => {
+                const val = sessionStorage.getItem(key);
+                if (val && !robots.some(r => r.id === val)) {
+                    sessionStorage.removeItem(key);
+                    console.log(`[Workshop] Cleared orphan session key: ${key}`);
+                }
+            });
+        }
+    }, [loading, variants.length, userLimit, robots]);
+
     // Derived State
     const VARIANT_COST = 5;
     const nowJST = new Date().toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
@@ -257,7 +273,9 @@ export default function Workshop() {
     const userCredits = typeof userProfile?.credits === "number" ? userProfile.credits : null;
     // Fix: Allow creation when loading (isFreeToday === null) if user has credits
     const canAfford = isFreeToday === true || (isFreeToday === null && (userCredits == null || userCredits >= VARIANT_COST)) || (isFreeToday === false && userCredits != null && userCredits >= VARIANT_COST);
-    const isFull = userLimit > 0 ? variants.length >= userLimit : false;
+    // FIXED: Only consider FULL when loading is complete AND variants actually exist
+    // If variants.length is 0, never show as FULL (prevents ghost capacity bug)
+    const isFull = !loading && userLimit > 0 && variants.length > 0 && variants.length >= userLimit;
 
     // Calculate next capacity level threshold
     const getNextCapacityLevel = (currentLimit: number): number | null => {

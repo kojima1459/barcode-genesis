@@ -154,7 +154,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
           {children}
 
           {/* Footer - inside main for proper spacing */}
-          <footer className="border-t border-border/50 bg-surface/50 backdrop-blur-sm mt-8 mb-4" style={{ marginBottom: "calc(var(--bottom-nav-h, 84px) + env(safe-area-inset-bottom) + 24px)" }}>
+          <footer className="border-t border-border/50 bg-surface/50 backdrop-blur-sm mt-8 mb-4" style={{ marginBottom: "calc(var(--bottom-nav-height, 88px) + env(safe-area-inset-bottom) + 24px)" }}>
             <div className="mx-auto max-w-6xl px-4 py-6">
               <div className="flex flex-col items-center gap-4 text-sm">
                 {/* Footer links - single row with Premium larger */}
