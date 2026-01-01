@@ -61,7 +61,7 @@ export default function Workshop() {
     useEffect(() => {
         if (!user) return;
 
-        setLoadingUser(true);
+
         setLoadingRobots(true);
         setLoadingVariants(true);
 
