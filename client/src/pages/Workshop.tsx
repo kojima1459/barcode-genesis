@@ -252,7 +252,8 @@ export default function Workshop() {
     const dailyFreeKnown = !!userProfile && userProfile.lastFreeVariantDate != null;
     const isFreeToday = dailyFreeKnown ? userProfile.lastFreeVariantDate !== nowJST : null;
     const userCredits = typeof userProfile?.credits === "number" ? userProfile.credits : null;
-    const canAfford = isFreeToday === true || userCredits == null || userCredits >= VARIANT_COST;
+    // Fix: Allow creation when loading (isFreeToday === null) if user has credits
+    const canAfford = isFreeToday === true || (isFreeToday === null && (userCredits == null || userCredits >= VARIANT_COST)) || (isFreeToday === false && userCredits != null && userCredits >= VARIANT_COST);
     const isFull = userLimit > 0 ? variants.length >= userLimit : false;
 
     if (loading) {
