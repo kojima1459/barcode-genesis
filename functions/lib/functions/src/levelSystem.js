@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getLevelMultiplier = exports.applyRobotXp = exports.calculateEffectiveStats = exports.STAT_MULTIPLIER_CAP = exports.applyUserXp = exports.getWorkshopLines = exports.calculateNextLevelXp = exports.LEVEL_CAP = void 0;
+exports.getLevelMultiplier = exports.applyRobotXp = exports.calculateEffectiveStatsWithRole = exports.calculateEffectiveStats = exports.STAT_MULTIPLIER_CAP = exports.applyUserXp = exports.getWorkshopLines = exports.calculateNextLevelXp = exports.LEVEL_CAP = void 0;
+const robotRoles_1 = require("./lib/robotRoles");
 exports.LEVEL_CAP = 30;
 const calculateNextLevelXp = (level) => {
     if (level >= exports.LEVEL_CAP)
@@ -78,6 +79,33 @@ const calculateEffectiveStats = (baseStats, level = 1) => {
     };
 };
 exports.calculateEffectiveStats = calculateEffectiveStats;
+/**
+ * Phase B: Role-aware effective stats calculation
+ * Uses Phase B level bonus system if role is provided
+ */
+const calculateEffectiveStatsWithRole = (baseStats, level = 1, role // Accept both Phase B and legacy roles
+) => {
+    const safeLevel = Math.max(1, level);
+    // If Phase B role is provided, use role-aware bonus
+    if (role && typeof role === 'string' &&
+        ['striker', 'tank', 'speed', 'support', 'balanced'].includes(role)) {
+        const bonus = (0, robotRoles_1.getLevelBonus)(safeLevel, role);
+        return {
+            hp: baseStats.hp + bonus.hp,
+            attack: baseStats.attack + bonus.atk,
+            defense: baseStats.defense + bonus.def,
+            speed: baseStats.speed, // Speed not affected by Phase B yet
+        };
+    }
+    // Fallback to legacy system
+    return {
+        hp: baseStats.hp + Math.floor(safeLevel * 1.0),
+        attack: baseStats.attack + Math.floor(safeLevel * 0.3),
+        defense: baseStats.defense + Math.floor(safeLevel * 0.3),
+        speed: baseStats.speed + Math.floor(safeLevel * 0.3),
+    };
+};
+exports.calculateEffectiveStatsWithRole = calculateEffectiveStatsWithRole;
 // Re-use existing level curve for robots but with separate function for clarity
 const applyRobotXp = (currentLevel, currentXp, xpToAdd) => {
     // Currently same logic as user XP, but explicitly separated for future tuning

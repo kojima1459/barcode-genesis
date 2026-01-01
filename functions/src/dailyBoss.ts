@@ -223,7 +223,7 @@ export function bossToRobotData(boss: BossData): RobotData {
         level: 10,  // Fixed boss level
         parts: boss.parts,
         colors: boss.colors,
-        role: boss.role,
+        role: boss.role as any,  // Boss uses legacy role type
         roleName: getBossRoleName(boss.type),
         evolutionLevel: 0,
         totalBattles: 0,

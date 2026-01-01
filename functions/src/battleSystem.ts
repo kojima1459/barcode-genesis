@@ -9,8 +9,10 @@ import { SeededRandom } from "./seededRandom";
 import { getStanceWeights, pickStance, resolveStance, getStanceMultiplier } from "./battleStance";
 import { createOverdriveState, addOverdrive, tickOverdrive, getOverdriveSkillMultiplier, getOverdriveTriggerBonus } from "./battleOverdrive";
 import { checkPassive, getPassiveEffect } from "./battlePassives";
-import { calculateEffectiveStats } from "./levelSystem";
+import { calculateEffectiveStats, calculateEffectiveStatsWithRole } from "./levelSystem";
 import { BossTraits } from "./dailyBoss";
+import { shouldTriggerSpecial, applySpecialEffect, getSpecialMove } from "./lib/phaseBSpecialMoves";
+import { getTerrainFromBarcode, applyTerrainModifiers, getTerrainCritBonus, getTerrainSpeedModifier, getTerrainDefenseModifier } from "./battleTerrain";
 
 const resolveSkills = (skills: RobotData["skills"]): Skill[] => {
   if (!Array.isArray(skills)) return [];
@@ -89,92 +91,8 @@ export interface CheerInput {
   p2: boolean;  // P2 (robot2) has cheer reserved
 }
 
+
 import { BattleItemType, BattleItemInput } from "./types";
-
-// ============================================
-// Special Move System (必殺技)
-// ============================================
-
-interface SpecialMoveDefinition {
-  type: SpecialMoveType;
-  name: string;
-  roleJa: string;
-  damageMultiplier: number;
-  defPenetration: number;  // 0-1, reduces defender's DEF
-  healRatio: number;       // 0-1, heals attacker by ratio of max HP
-  damageReduction: number; // 0-1, reduces incoming damage this turn
-  hitCount: number;        // For multi-hit (each hit = damage * damageMultiplier / hitCount)
-  stunChance: number;      // 0-1
-  guaranteedCrit: boolean;
-}
-
-const SPECIAL_MOVES: Record<RobotRole, SpecialMoveDefinition> = {
-  ATTACKER: {
-    type: 'PIERCING_ASSAULT',
-    name: '貫通強襲',
-    roleJa: 'アタッカー',
-    damageMultiplier: 1.8,
-    defPenetration: 0.3,
-    healRatio: 0,
-    damageReduction: 0,
-    hitCount: 1,
-    stunChance: 0,
-    guaranteedCrit: false,
-  },
-  TANK: {
-    type: 'IRON_FORTRESS',
-    name: '鉄壁の盾',
-    roleJa: 'タンク',
-    damageMultiplier: 0.8,
-    defPenetration: 0,
-    healRatio: 0.15,
-    damageReduction: 0.5,
-    hitCount: 1,
-    stunChance: 0,
-    guaranteedCrit: false,
-  },
-  SPEED: {
-    type: 'RAPID_COMBO',
-    name: '連撃乱舞',
-    roleJa: 'スピード',
-    damageMultiplier: 1.5,  // Total (3 hits × 0.5)
-    defPenetration: 0,
-    healRatio: 0,
-    damageReduction: 0,
-    hitCount: 3,
-    stunChance: 0,
-    guaranteedCrit: false,
-  },
-  BALANCE: {
-    type: 'ADAPTIVE_STRIKE',
-    name: '適応一撃',
-    roleJa: 'バランス',
-    damageMultiplier: 1.4,
-    defPenetration: 0,
-    healRatio: 0,
-    damageReduction: 0,
-    hitCount: 1,
-    stunChance: 0,
-    guaranteedCrit: true,
-  },
-  TRICKY: {
-    type: 'CHAOS_DISRUPT',
-    name: '混沌撹乱',
-    roleJa: 'トリッキー',
-    damageMultiplier: 1.6,
-    defPenetration: 0,
-    healRatio: 0,
-    damageReduction: 0,
-    hitCount: 1,
-    stunChance: 0.5,
-    guaranteedCrit: false,
-  },
-};
-
-const getSpecialMove = (role?: RobotRole): SpecialMoveDefinition | null => {
-  if (!role) return null;
-  return SPECIAL_MOVES[role] ?? null;
-};
 
 export const simulateBattle = (
   robot1: RobotData,
@@ -186,13 +104,30 @@ export const simulateBattle = (
   specialInput?: SpecialMoveInput,
   bossTraits?: BossTraits  // NEW: Boss traits for PvE boss battles
 ): BattleResult => {
-  // Level-based stat scaling
-  const effectiveStats1 = calculateEffectiveStats({
-    hp: robot1.baseHp, attack: robot1.baseAttack, defense: robot1.baseDefense, speed: robot1.baseSpeed, isPlayer: true
-  }, robot1.level ?? 1);
-  const effectiveStats2 = calculateEffectiveStats({
-    hp: robot2.baseHp, attack: robot2.baseAttack, defense: robot2.baseDefense, speed: robot2.baseSpeed, isPlayer: false
-  }, robot2.level ?? 1);
+  // Terrain System: Deterministic terrain selection from barcodes
+  const terrain = getTerrainFromBarcode(robot1.sourceBarcode || robot2.sourceBarcode || '');
+
+  // Phase B: Level-based stat scaling with role awareness
+  let effectiveStats1 = calculateEffectiveStatsWithRole({
+    hp: robot1.baseHp, attack: robot1.baseAttack, defense: robot1.baseDefense, speed: robot1.baseSpeed
+  }, robot1.level ?? 1, robot1.role);
+  let effectiveStats2 = calculateEffectiveStatsWithRole({
+    hp: robot2.baseHp, attack: robot2.baseAttack, defense: robot2.baseDefense, speed: robot2.baseSpeed
+  }, robot2.level ?? 1, robot2.role);
+
+  // Apply terrain stat modifiers
+  const speedMod = getTerrainSpeedModifier(terrain);
+  const defMod = getTerrainDefenseModifier(terrain);
+  effectiveStats1 = {
+    ...effectiveStats1,
+    speed: Math.floor(effectiveStats1.speed * speedMod),
+    defense: Math.floor(effectiveStats1.defense * defMod)
+  };
+  effectiveStats2 = {
+    ...effectiveStats2,
+    speed: Math.floor(effectiveStats2.speed * speedMod),
+    defense: Math.floor(effectiveStats2.defense * defMod)
+  };
 
   // Max HP with level scaling
   const maxHp1 = effectiveStats1.hp;
@@ -238,11 +173,15 @@ export const simulateBattle = (
   let p1Stunned = false;
   let p2Stunned = false;
 
-  // Special Move System: Initialize state (once per battle)
+  // Special Move System (Phase B): Initialize state
   let p1SpecialUsed = false;
   let p2SpecialUsed = false;
-  const p1SpecialRequested = !!specialInput?.p1Used;
-  const p2SpecialRequested = !!specialInput?.p2Used;
+
+  // Phase B: Track special move effects that persist
+  let p1FocusRemaining = 0;  // Focus: +30% ATK for 3 turns
+  let p2FocusRemaining = 0;
+  let p1GuardActive = false; // Guard: 50% damage reduction this turn
+  let p2GuardActive = false;
 
   // Track total damage for tiebreaker
   let totalDamageP1 = 0;
@@ -256,7 +195,7 @@ export const simulateBattle = (
   let bossShieldHp = bossTraits?.type === 'SHIELD' && bossTraits.shieldHp ? bossTraits.shieldHp : 0;
   const hasBossShield = bossShieldHp > 0;
 
-  // ステータス補正関数 (includes level multiplier)
+  // ステータス補正関数 (includes level multiplier and Focus boost)
   const getStat = (robot: RobotData, stat: 'baseAttack' | 'baseDefense') => {
     const isP1 = robot.id === robot1.id;
     const effStats = isP1 ? effectiveStats1 : effectiveStats2;
@@ -266,6 +205,12 @@ export const simulateBattle = (
     if (isP1) {
       if (stat === 'baseAttack' && robot1Items.includes('attack_boost')) val *= 1.2;
       if (stat === 'baseDefense' && robot1Items.includes('defense_boost')) val *= 1.2;
+
+      // Phase B: Focus special move boost (+30% ATK for 3 turns)
+      if (stat === 'baseAttack' && p1FocusRemaining > 0) val *= 1.3;
+    } else {
+      // P2 Focus boost
+      if (stat === 'baseAttack' && p2FocusRemaining > 0) val *= 1.3;
     }
     return Math.floor(val);
   };
@@ -425,63 +370,70 @@ export const simulateBattle = (
     }
 
     // ============================================
-    // Special Move System (必殺技)
+    // Phase B Special Move System (HP-based, once per battle)
     // ============================================
     let specialTriggered = false;
-    let specialName: string | undefined;
-    let specialRoleName: string | undefined;
-    let specialImpact: string | undefined;
-    let specialHits = 1;
+    let specialMessage: string | undefined;
     let specialDamageMultiplier = 1.0;
-    let specialGuaranteedCrit = false;
-    let specialStunChance = 0;
-    let specialHealAmount = 0;
 
-    // Check if attacker should use special (first opportunity, once per battle)
+    // Check if attacker should trigger special (HP <= 40%, not used yet)
     const isP1Attacker = attacker.id === robot1.id;
-    const shouldUseSpecial = isP1Attacker
-      ? (p1SpecialRequested && !p1SpecialUsed)
-      : (p2SpecialRequested && !p2SpecialUsed);
+    const attackerMaxHp = isP1Attacker ? maxHp1 : maxHp2;
+    const attackerUsedSpecial = isP1Attacker ? p1SpecialUsed : p2SpecialUsed;
 
-    if (shouldUseSpecial) {
-      const specialMove = getSpecialMove(attacker.role);
-      if (specialMove) {
-        // Mark as used
-        if (isP1Attacker) p1SpecialUsed = true;
-        else p2SpecialUsed = true;
+    if (shouldTriggerSpecial(attackerHp, attackerMaxHp, attackerUsedSpecial, attacker.role)) {
+      // Mark as used
+      if (isP1Attacker) p1SpecialUsed = true;
+      else p2SpecialUsed = true;
+
+      // Get and apply special effect
+      const special = getSpecialMove(attacker.role);
+      if (special && special.type) {
+        const effect = applySpecialEffect(special.type as any, attackerMaxHp, getStat(attacker, 'baseAttack'));
 
         specialTriggered = true;
-        specialName = specialMove.name;
-        specialRoleName = specialMove.roleJa;
-        specialDamageMultiplier = specialMove.damageMultiplier;
-        specialHits = specialMove.hitCount;
-        specialGuaranteedCrit = specialMove.guaranteedCrit;
-        specialStunChance = specialMove.stunChance;
+        specialMessage = effect.message;
 
-        // Apply special effects
-        if (specialMove.defPenetration > 0) {
-          def = Math.floor(def * (1 - specialMove.defPenetration));
-          specialImpact = `DEF貫通×${specialMove.damageMultiplier}`;
-        } else if (specialMove.healRatio > 0) {
-          const maxHp = isP1Attacker ? maxHp1 : maxHp2;
-          specialHealAmount = Math.floor(maxHp * specialMove.healRatio);
-          specialImpact = `回復${Math.floor(specialMove.healRatio * 100)}%`;
-        } else if (specialMove.hitCount > 1) {
-          specialImpact = `${specialMove.hitCount}連撃`;
-        } else if (specialMove.guaranteedCrit) {
-          specialImpact = `確定クリティカル×${specialMove.damageMultiplier}`;
-        } else if (specialMove.stunChance > 0) {
-          specialImpact = `スタン${Math.floor(specialMove.stunChance * 100)}%`;
-        } else {
-          specialImpact = `×${specialMove.damageMultiplier}`;
+        // Apply immediate effects
+        if (effect.damageMultiplier) {
+          // Burst: Next attack 1.35x
+          specialDamageMultiplier = effect.damageMultiplier;
         }
 
-        reasonTags.push(`必殺技:${specialMove.name}`);
+        if (effect.defenseMultiplier) {
+          // Guard: 50% damage reduction this turn
+          if (isP1Attacker) p1GuardActive = true;
+          else p2GuardActive = true;
+        }
+
+        if (effect.healAmount) {
+          // Heal: Recover 15% max HP
+          if (isP1Attacker) {
+            hp1 = Math.min(maxHp1, hp1 + effect.healAmount);
+            attackerHp = hp1;
+          } else {
+            hp2 = Math.min(maxHp2, hp2 + effect.healAmount);
+            attackerHp = hp2;
+          }
+        }
+
+        // Note: Accel (extra attack) implementation would require more complex loop logic
+        // Placeholder for future enhancement
+
+        if (effect.temporaryAtkBoost) {
+          // Focus: +30% ATK for 3 turns
+          if (isP1Attacker) p1FocusRemaining = 3;
+          else p2FocusRemaining = 3;
+        }
+
+        reasonTags.push(`【必殺技】`);
       }
     }
 
     const { effectiveAtk, effectiveDef } = normalizeStats(atk, def);
-    const coreDamage = computeCoreDamage(effectiveAtk, effectiveDef);
+    let coreDamage = computeCoreDamage(effectiveAtk, effectiveDef);
+    // Apply terrain damage modifiers
+    coreDamage = applyTerrainModifiers(coreDamage, terrain);
 
     // スキル発動判定 (with Overdrive bonus)
     let skill: Skill | null = null;
@@ -555,11 +507,6 @@ export const simulateBattle = (
 
       isCritical = rng.next() < critChance;
 
-      // Special Move: Guaranteed critical
-      if (specialGuaranteedCrit) {
-        isCritical = true;
-      }
-
       // ============================================
       // JAMMER Item: Nullify critical (post-RNG, deterministic)
       // ============================================
@@ -601,15 +548,7 @@ export const simulateBattle = (
         damage = toDamage(damage * specialDamageMultiplier);
       }
 
-      // Handle multi-hit specials (RAPID_COMBO)
-      if (specialTriggered && specialHits > 1) {
-        // Damage is already the total, but we'll log the hit count
-        // Each hit is damage / hitCount, total = damage
-      }
-
-      message = specialTriggered
-        ? `🔥 ${attacker.name} ${specialName}！ ${damage}ダメージ！`
-        : `${attacker.name} attacks ${defender.name} for ${damage} damage!`;
+      message = `${attacker.name} attacks ${defender.name} for ${damage} damage!`;
     }
 
     // ============================================
@@ -620,6 +559,20 @@ export const simulateBattle = (
       damage = toDamage(damage * GUARD_MULTIPLIER);
       guardApplied = true;
       reasonTags.push("ガードで軽減");
+    }
+
+    // ============================================
+    // Phase B: Guard Special Move (50% damage reduction)
+    // ============================================
+    const isP1Defender = defender.id === robot1.id;
+    const defenderHasGuard = isP1Defender ? p1GuardActive : p2GuardActive;
+
+    if (damage > 0 && defenderHasGuard) {
+      damage = toDamage(damage * 0.5);
+      reasonTags.push("【必殺技:Guard】");
+      // Clear guard after use
+      if (isP1Defender) p1GuardActive = false;
+      else p2GuardActive = false;
     }
 
     // ============================================
@@ -861,35 +814,11 @@ export const simulateBattle = (
       }
     }
 
-    // ============================================
-    // Special Move: Heal Effect (TANK - Iron Fortress)
-    // ============================================
-    if (specialTriggered && specialHealAmount > 0) {
-      if (attacker.id === robot1.id) {
-        hp1 = Math.min(maxHp1, hp1 + specialHealAmount);
-        attackerHp = hp1;
-      } else {
-        hp2 = Math.min(maxHp2, hp2 + specialHealAmount);
-        attackerHp = hp2;
-      }
-      message += ` HP${specialHealAmount}回復！`;
-    }
+
 
     const totalHitDamage = damage + followUpDamage;
 
-    // ============================================
-    // Special Move: Stun Effect (TRICKY - Chaos Disrupt)
-    // ============================================
-    if (specialTriggered && specialStunChance > 0 && damage > 0 && defenderHp > 0) {
-      // Use RNG for deterministic stun chance
-      if (rng.next() < specialStunChance) {
-        stunApplied = true;
-        if (defender.id === robot1.id) p1Stunned = true;
-        else p2Stunned = true;
-        reasonTags.push("必殺スタン");
-        message += ` スタン発動！`;
-      }
-    }
+
 
     // Speed-based stun (separate from special stun)
     if (!stunApplied && damage > 0 && defenderHp > 0 && speedDiff >= STUN_SPEED_THRESHOLD) {
@@ -927,6 +856,26 @@ export const simulateBattle = (
 
     const reasonNote = reasonTags.length ? `（${reasonTags.join("・")}）` : "";
     const messageWithReasons = reasonNote ? `${message} ${reasonNote}` : message;
+
+    // Phase B: Log special move activation BEFORE battle log
+    if (specialTriggered && specialMessage) {
+      logs.push({
+        turn,
+        attackerId: attacker.id!,
+        defenderId: defender.id!,
+        action: 'special',
+        damage: 0,
+        isCritical: false,
+        attackerHp: Math.max(0, attackerHp),
+        defenderHp: Math.max(0, defenderHp),
+        message: specialMessage,
+        stanceAttacker: attackerStance,
+        stanceDefender: defenderStance,
+        stanceOutcome,
+        attackerOverdriveGauge: Math.floor(getOverdrive(attacker.id).gauge),
+        defenderOverdriveGauge: Math.floor(getOverdrive(defender.id).gauge),
+      });
+    }
 
     if (overdriveTriggered) {
       message = `🔥 OVERDRIVE! ` + messageWithReasons;
@@ -972,12 +921,6 @@ export const simulateBattle = (
       itemEffect: itemEffect,
       itemEvent: itemEvent,
       itemMessage: itemMessage,
-      // Special Move System
-      specialTriggered: specialTriggered || undefined,
-      specialName: specialName,
-      specialRoleName: specialRoleName,
-      specialImpact: specialImpact,
-      specialHits: specialHits > 1 ? specialHits : undefined,
       // Boss Shield System
       bossShieldDamage: bossShieldDamageThisTurn || undefined,
       bossShieldRemaining: hasBossShield ? bossShieldHp : undefined,
@@ -1044,6 +987,10 @@ export const simulateBattle = (
 
     if (hp1 <= 0 || hp2 <= 0) break;
 
+    // Phase B: Countdown Focus duration at end of turn
+    if (p1FocusRemaining > 0) p1FocusRemaining--;
+    if (p2FocusRemaining > 0) p2FocusRemaining--;
+
     // 攻守交代
     const tempRobot = attacker;
     attacker = defender;
@@ -1109,5 +1056,6 @@ export const simulateBattle = (
     totalDamageP1,
     totalDamageP2,
     turnCount: turn - 1,
+    terrain,  // Include terrain in battle result
   };
 };

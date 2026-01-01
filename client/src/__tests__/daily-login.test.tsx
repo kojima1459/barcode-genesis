@@ -44,8 +44,8 @@ describe("daily login display + toast", () => {
       firestore.emitDoc(`users/${uid}`, { credits: 10, loginStreak: 3, titleId: "streak_3" });
     });
 
-    expect(screen.getByText("🔥連続3日")).toBeInTheDocument();
-    expect(screen.getByText("連続3日")).toBeInTheDocument();
+    expect(screen.getByText("🔥")).toBeInTheDocument();
+    expect(screen.getByText("3")).toBeInTheDocument();
     expect(toastFn.success).toHaveBeenCalled();
   });
 });

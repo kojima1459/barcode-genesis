@@ -16,6 +16,7 @@ export interface BattleEvent {
     isCritical?: boolean;
     isMiss?: boolean;
     isGuard?: boolean;
+    cheerApplied?: boolean;
     currentHp?: Record<string, number>;
     message?: string;
     delay?: number; // Duration to wait AFTER this event
@@ -29,14 +30,14 @@ export function generateBattleEvents(logs: BattleLog[], p1Id: string, p2Id: stri
         events.push({
             type: 'LOG_MESSAGE',
             message: log.message, // e.g., "Robot used Attack!"
-            delay: 400
+            delay: 100
         });
 
         // 2. Attack Animation Start (Attacker lunges)
         events.push({
             type: 'ATTACK_PREPARE',
             attackerId: log.attackerId,
-            delay: 200
+            delay: 100
         });
 
         // 3. Impact (Flash/Shake)
@@ -45,9 +46,9 @@ export function generateBattleEvents(logs: BattleLog[], p1Id: string, p2Id: stri
             attackerId: log.attackerId,
             defenderId: log.defenderId,
             isCritical: log.isCritical,
-            isMiss: log.action === 'miss', // Assume action 'miss' or check damage logic
-            isGuard: log.guarded, // From expanded types
-            delay: 100 // Short delay for shake impact
+            isMiss: log.action === 'miss',
+            isGuard: log.guarded,
+            delay: 50
         });
 
         // 4. Damage Popup & Text update
@@ -59,7 +60,8 @@ export function generateBattleEvents(logs: BattleLog[], p1Id: string, p2Id: stri
                 isCritical: log.isCritical,
                 isMiss: log.action === 'miss',
                 isGuard: log.guarded,
-                delay: 600 // Let popup float a bit
+                cheerApplied: log.cheerApplied,
+                delay: 100
             });
         }
 
@@ -70,13 +72,13 @@ export function generateBattleEvents(logs: BattleLog[], p1Id: string, p2Id: stri
                 [log.attackerId]: log.attackerHp,
                 [log.defenderId]: log.defenderHp
             },
-            delay: 400
+            delay: 150 // Total: 100+100+50+100+150 = 500ms
         });
 
         // 6. Post-turn buffer
         events.push({
             type: 'PHASE_START',
-            delay: 300
+            delay: 0
         });
     });
 

@@ -2,20 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { useUserData } from '@/hooks/useUserData';
 
 export default function AdBanner() {
   const { user } = useAuth();
   const bannerRef = useRef<HTMLDivElement>(null);
-  const [isPremium, setIsPremium] = useState(false);
-
-  useEffect(() => {
-    if (!user) return;
-    const unsub = onSnapshot(doc(db, "users", user.uid), (doc) => {
-      setIsPremium(!!doc.data()?.isPremium);
-    });
-    return () => unsub();
-  }, [user]);
+  const { isPremium } = useUserData();
 
   useEffect(() => {
     if (isPremium) return; // Don't load ad script if premium

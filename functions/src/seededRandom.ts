@@ -12,7 +12,8 @@ export class SeededRandom {
       hash = ((hash << 5) - hash) + char;
       hash = hash & hash;
     }
-    return Math.abs(hash);
+    // Use uint32 conversion with fallback to avoid 0 or negative seeds
+    return (hash >>> 0) || 0x9e3779b9;
   }
 
   next(): number {

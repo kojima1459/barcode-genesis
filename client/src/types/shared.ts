@@ -85,8 +85,11 @@ export interface RobotData {
     epithet?: string;          // 二つ名
     variantKey?: number;       // Visual variant seed (0-99)
 
-    // ロール情報
-    role?: 'ATTACKER' | 'TANK' | 'SPEED' | 'BALANCE' | 'TRICKY';
+    // ロール情報 (Phase B - refined)
+    role?: RobotRole; // New Phase B role system
+    rarityTier?: RobotRarity; // New Phase B rarity (renamed to avoid conflict with legacy)
+
+    // Legacy role fields (deprecated, keep for backward compat)
     roleName?: string;
     roleTitle?: string;
 
@@ -98,6 +101,48 @@ export interface RobotData {
     // Added for cosmetic items
     cosmetics?: string[];
 }
+
+// ============================================
+// Phase B: Role & Rarity System
+// ============================================
+
+/**
+ * Robot Role - Determines stat tendencies and special move
+ * Derived deterministically from barcode seed
+ */
+export type RobotRole = 'striker' | 'tank' | 'speed' | 'support' | 'balanced';
+
+/**
+ * Robot Rarity - Affects visual style and epithet
+ * 1% legendary, 9% rare, 90% common
+ */
+export type RobotRarity = 'common' | 'rare' | 'legendary';
+
+/**
+ * Special Move Type - One per battle when HP drops below 40%
+ * (Phase B - renamed to avoid conflict with legacy special moves)
+ */
+export type PhaseBSpecialType = 'burst' | 'guard' | 'heal' | 'accel' | 'focus';
+
+/**
+ * Role display labels (Japanese)
+ */
+export const ROLE_LABELS: Record<RobotRole, string> = {
+    striker: 'ストライカー',
+    tank: 'タンク',
+    speed: 'スピード',
+    support: 'サポート',
+    balanced: 'バランス型'
+};
+
+/**
+ * Rarity display labels (Japanese)
+ */
+export const RARITY_LABELS: Record<RobotRarity, string> = {
+    common: 'コモン',
+    rare: 'レア',
+    legendary: '伝説'
+};
 
 export interface BattleLog {
     turn: number;
@@ -130,6 +175,19 @@ export interface BattleLog {
     stunApplied?: boolean;
     stunTargetId?: string;
     stunned?: boolean;
+
+    // Phase B: Special Moves
+    specialApplied?: boolean;
+    specialType?: PhaseBSpecialType;
+    specialMessage?: string;
+
+    // Phase B: Level Bonus (for transparency)
+    levelBonus?: {
+        attackerLevel?: number;
+        defenderLevel?: number;
+        attackerBonus?: { hp: number; atk: number; def: number };
+        defenderBonus?: { hp: number; atk: number; def: number };
+    };
 }
 
 export type BattleItemType = 'BOOST' | 'SHIELD' | 'JAMMER' | 'DRONE' | 'DISRUPT' | 'CANCEL_CRIT';
@@ -240,6 +298,8 @@ export interface VariantData {
     colors: RobotColors;
     createdAt?: any;
     updatedAt?: any;
+    role?: RobotRole;
+    rarityTier?: RobotRarity;
 }
 
 export type FighterRef =

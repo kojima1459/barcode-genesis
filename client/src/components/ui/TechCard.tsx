@@ -1,66 +1,38 @@
-import React from "react";
+import { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
-interface TechCardProps extends React.HTMLAttributes<HTMLDivElement> {
-    children: React.ReactNode;
-    variant?: "default" | "glow" | "outline";
-    intensity?: "low" | "medium" | "high";
+interface TechCardProps {
+    children: ReactNode;
     className?: string;
-    cornerSize?: number;
+    header?: ReactNode;
+    footer?: ReactNode;
 }
 
-export function TechCard({
-    children,
-    variant = "default",
-    intensity = "medium",
-    className,
-    cornerSize = 12,
-    ...props
-}: TechCardProps) {
-    // Intensity map for background opacity
-    const intensityMap = {
-        low: "bg-surface/40 backdrop-blur-sm",
-        medium: "bg-surface/60 backdrop-blur-md",
-        high: "bg-surface/80 backdrop-blur-lg",
-    };
-
+export function TechCard({ children, className, header, footer }: TechCardProps) {
     return (
-        <div
-            className={cn(
-                "relative rounded-lg border border-white/10 overflow-hidden transition-all duration-300",
-                intensityMap[intensity],
-                // Inner Glow Logic
-                variant === "glow" && "shadow-[inset_0_0_20px_rgba(var(--accent),0.1)] border-accent/30",
-                variant === "outline" && "bg-transparent border-white/20 hover:border-accent/50",
-                // Hover effect for all
-                "hover:shadow-[0_0_15px_rgba(0,0,0,0.3)] hover:border-white/20",
-                className
+        <div className={cn(
+            "glass-panel border-white/10 overflow-hidden relative group transition-all duration-300",
+            "hover:border-white/20 hover:shadow-[0_0_20px_rgba(255,255,255,0.05)]",
+            className
+        )}>
+            {/* Scanning Line Effect */}
+            <div className="absolute top-0 left-0 w-full h-px bg-linear-to-r from-transparent via-primary/20 to-transparent transform -translate-y-full group-hover:translate-y-[400px] transition-transform duration-1000 ease-in-out pointer-events-none" />
+
+            {header && (
+                <div className="px-5 py-3 border-b border-white/10 bg-white/5 font-orbitron text-sm font-bold tracking-wider">
+                    {header}
+                </div>
             )}
-            {...props}
-        >
-            {/* Tech Corners (Top Left) */}
-            <svg
-                className="absolute top-0 left-0 w-8 h-8 pointer-events-none opacity-50 text-accent"
-                viewBox="0 0 32 32"
-                fill="none"
-            >
-                <path d="M1 12V1H12" stroke="currentColor" strokeWidth="2" />
-            </svg>
 
-            {/* Tech Corners (Bottom Right) */}
-            <svg
-                className="absolute bottom-0 right-0 w-8 h-8 pointer-events-none opacity-50 text-accent"
-                viewBox="0 0 32 32"
-                fill="none"
-            >
-                <path d="M31 20V31H20" stroke="currentColor" strokeWidth="2" />
-            </svg>
+            <div className="p-5 relative z-10">
+                {children}
+            </div>
 
-            {/* Scanline overlay (optional subtle texture) */}
-            <div className="absolute inset-0 bg-[url('/scanline.png')] opacity-[0.02] pointer-events-none mix-blend-overlay" />
-
-            {/* Content */}
-            <div className="relative z-10">{children}</div>
+            {footer && (
+                <div className="px-5 py-3 border-t border-white/10 bg-white/5 mt-auto">
+                    {footer}
+                </div>
+            )}
         </div>
     );
 }

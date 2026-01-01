@@ -23,7 +23,7 @@ describe("Dex -> Workshop wiring", () => {
     await userEvent.click(robotsTab);
 
     await screen.findByText("Alpha");
-    const button = screen.getByRole("button", { name: /Use in workshop/i });
+    const button = await screen.findByRole("button", { name: /工房で使用|Use in workshop/i });
     await userEvent.click(button);
 
     expect(screen.getByTestId("location")).toHaveTextContent("/workshop?a=robot-alpha");
@@ -47,7 +47,7 @@ describe("Dex -> Workshop wiring", () => {
     await userEvent.click(tab);
 
     await screen.findByText("Fusion X");
-    const button = await screen.findByRole("button", { name: /Use in workshop/i });
+    const button = await screen.findByRole("button", { name: /工房で使用|Use in workshop/i });
     await userEvent.click(button);
 
     expect(screen.getByTestId("location")).toHaveTextContent("/workshop?a=robot-a&b=robot-b");
@@ -71,7 +71,7 @@ describe("Dex -> Workshop wiring", () => {
     await userEvent.click(tab);
 
     await screen.findByText("Broken Variant");
-    const button = screen.getByRole("button", { name: /Use in workshop/i });
+    const button = await screen.findByRole("button", { name: /工房で使用/i });
     expect(button).toBeDisabled();
     expect(button).toHaveAttribute("title", "親ロボットが未登録です");
   });

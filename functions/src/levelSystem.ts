@@ -1,4 +1,4 @@
-
+import { RobotRole, getLevelBonus as getPhaseBLevelBonus } from './lib/robotRoles';
 export const LEVEL_CAP = 30;
 
 export const calculateNextLevelXp = (level: number): number => {
@@ -73,6 +73,38 @@ export const calculateEffectiveStats = (baseStats: { hp: number; isPlayer: boole
     // Ensure level is at least 1
     const safeLevel = Math.max(1, level);
 
+    return {
+        hp: baseStats.hp + Math.floor(safeLevel * 1.0),
+        attack: baseStats.attack + Math.floor(safeLevel * 0.3),
+        defense: baseStats.defense + Math.floor(safeLevel * 0.3),
+        speed: baseStats.speed + Math.floor(safeLevel * 0.3),
+    };
+};
+
+/**
+ * Phase B: Role-aware effective stats calculation
+ * Uses Phase B level bonus system if role is provided
+ */
+export const calculateEffectiveStatsWithRole = (
+    baseStats: { hp: number; attack: number; defense: number; speed: number },
+    level: number = 1,
+    role?: RobotRole | any  // Accept both Phase B and legacy roles
+): { hp: number; attack: number; defense: number; speed: number } => {
+    const safeLevel = Math.max(1, level);
+
+    // If Phase B role is provided, use role-aware bonus
+    if (role && typeof role === 'string' &&
+        ['striker', 'tank', 'speed', 'support', 'balanced'].includes(role)) {
+        const bonus = getPhaseBLevelBonus(safeLevel, role as RobotRole);
+        return {
+            hp: baseStats.hp + bonus.hp,
+            attack: baseStats.attack + bonus.atk,
+            defense: baseStats.defense + bonus.def,
+            speed: baseStats.speed,  // Speed not affected by Phase B yet
+        };
+    }
+
+    // Fallback to legacy system
     return {
         hp: baseStats.hp + Math.floor(safeLevel * 1.0),
         attack: baseStats.attack + Math.floor(safeLevel * 0.3),

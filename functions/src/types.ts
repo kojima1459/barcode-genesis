@@ -1,3 +1,8 @@
+import { RobotRole as NewRobotRole, RobotRarity } from './lib/robotRoles';
+
+// Terrain System
+export type Terrain = 'ICE' | 'VOLCANO' | 'LIBRARY';
+
 // ロボットのパーツ構成
 export interface RobotParts {
   head: number;      // 1-10
@@ -87,8 +92,11 @@ export interface RobotData {
   epithet?: string; // 二つ名 (e.g., "《紅蓮の》")
   variantKey?: number; // Visual variant seed (0-99)
 
-  // ロール（アーキタイプ）
-  role?: RobotRole;          // ATTACKER | TANK | SPEED | BALANCE | TRICKY
+  // Phase B: New Role & Rarity System
+  role?: NewRobotRole;       // New: striker | tank | speed | support | balanced
+  rarityTier?: RobotRarity;  // New: common | rare | legendary (renamed to avoid conflict with legacy rarity: number)
+
+  // Legacy role fields (keep for backward compat)
   roleName?: string;         // 日本語ロール名 (e.g., "アタッカー")
   roleTitle?: string;        // ロール称号 (e.g., "突撃")
 
@@ -247,6 +255,7 @@ export interface BattleResult {
   totalDamageP1?: number;
   totalDamageP2?: number;
   turnCount?: number;
+  terrain?: Terrain;  // Terrain type for this battle
 }
 
 export interface BattleRewardData {
@@ -285,6 +294,8 @@ export interface VariantData {
   colors: RobotColors;
   createdAt?: any;
   updatedAt?: any;
+  role?: NewRobotRole;
+  rarityTier?: RobotRarity;
 }
 
 export type FighterRef =

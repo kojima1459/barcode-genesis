@@ -14,6 +14,7 @@ import SEO from "@/components/SEO";
 import { Interactive } from "@/components/ui/interactive";
 import { ScrambleText } from "@/components/ui/ScrambleText";
 import { SystemSkeleton } from "@/components/ui/SystemSkeleton";
+import LazyRender from "@/components/LazyRender";
 
 // Constants for 図鑑
 const FAMILY_NAMES = ["DRINK", "SNACK", "DAILY", "BEAUTY", "OTHER"];
@@ -236,49 +237,49 @@ export default function Collection() {
       <main className="flex-1 max-w-6xl mx-auto w-full">
         <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-2">
           {displaySlots.map((slotInfo, idx) => (
-            <Interactive
-              key={`${slotInfo.familyIndex}-${slotInfo.rarityIndex}-${slotInfo.slot}-${idx}`}
-              className={`overflow-hidden transition-all h-auto ${slotInfo.robot
-                ? 'cursor-pointer hover:border-primary'
-                : 'opacity-50'
-                }`}
-              disabled={!slotInfo.robot}
-            >
-              <CardContent className="p-2">
-                {slotInfo.robot ? (
-                  <Link href={`/robots/${slotInfo.robot.id}`}>
-                    <div className="aspect-square bg-secondary/20 rounded flex items-center justify-center mb-1">
-                      <RobotSVG
-                        parts={slotInfo.robot.parts}
-                        colors={slotInfo.robot.colors}
-                        size={60}
-                        animate={false}
-                      />
+            <LazyRender key={`${slotInfo.familyIndex}-${slotInfo.rarityIndex}-${slotInfo.slot}-${idx}`} minHeight="100px">
+              <Interactive
+                className={`overflow-hidden transition-all h-auto ${slotInfo.robot
+                  ? 'cursor-pointer hover:border-neon-cyan/50 bg-black/30 border-white/10'
+                  : 'opacity-40 bg-black/10 border-white/5'
+                  }`}
+                disabled={!slotInfo.robot}
+              >
+                <CardContent className="p-2">
+                  {slotInfo.robot ? (
+                    <Link href={`/robots/${slotInfo.robot.id}`}>
+                      <div className="aspect-square bg-black/40 rounded flex items-center justify-center mb-1 border border-white/5">
+                        <RobotSVG
+                          parts={slotInfo.robot.parts}
+                          colors={slotInfo.robot.colors}
+                          size={64}
+                          animate={false}
+                          simplified={true}
+                        />
+                      </div>
+                      <div className="text-[10px] truncate text-center font-bold text-white/90">
+                        {slotInfo.robot.name}
+                      </div>
+                      <div className="text-[8px] text-neon-cyan/70 text-center font-bold font-mono">
+                        {RARITY_NAMES[slotInfo.rarityIndex]}
+                      </div>
+                    </Link>
+                  ) : (
+                    <div className="flex flex-col items-center">
+                      <div className="aspect-square w-full bg-black/20 rounded flex items-center justify-center mb-1 border border-white/5 border-dashed">
+                        <span className="text-xl text-white/10">?</span>
+                      </div>
+                      <div className="text-[10px] text-white/20 text-center font-mono">
+                        ???
+                      </div>
+                      <div className="text-[8px] text-white/10 text-center font-mono">
+                        {RARITY_NAMES[slotInfo.rarityIndex]}
+                      </div>
                     </div>
-                    <div className="text-[10px] truncate text-center font-medium">
-                      <ScrambleText text={slotInfo.robot.name} duration={600} />
-                    </div>
-                    <div className="text-[8px] text-muted-foreground text-center">
-                      {RARITY_NAMES[slotInfo.rarityIndex]}
-                    </div>
-                  </Link>
-                ) : (
-                  <div className="aspect-square bg-secondary/10 rounded flex items-center justify-center mb-1">
-                    <span className="text-2xl text-muted-foreground/30">?</span>
-                  </div>
-                )}
-                {!slotInfo.robot && (
-                  <>
-                    <div className="text-[10px] text-muted-foreground/50 text-center">
-                      ???
-                    </div>
-                    <div className="text-[8px] text-muted-foreground/30 text-center">
-                      {RARITY_NAMES[slotInfo.rarityIndex]}
-                    </div>
-                  </>
-                )}
-              </CardContent>
-            </Interactive>
+                  )}
+                </CardContent>
+              </Interactive>
+            </LazyRender>
           ))}
         </div>
       </main>

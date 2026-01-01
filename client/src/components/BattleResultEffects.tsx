@@ -41,42 +41,73 @@ export function VictoryEffect({ onComplete }: VictoryEffectProps) {
 
     return (
         <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
+            {/* Background Flash */}
+            <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: [0, 0.4, 0] }}
+                transition={{ duration: 1 }}
+                className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-64 bg-yellow-400/20 blur-[100px]"
+            />
+
             {/* Victory banner */}
             <motion.div
-                className="absolute top-1/3 left-1/2 transform -translate-x-1/2 -translate-y-1/2"
-                initial={{ scale: 0, rotate: -180, opacity: 0 }}
-                animate={{ scale: 1, rotate: 0, opacity: 1 }}
-                transition={{ type: "spring", stiffness: 200, damping: 15 }}
+                className="absolute top-[40%] left-1/2 -translate-x-1/2 -translate-y-1/2"
+                initial={{ scale: 0.5, opacity: 0, y: -50 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                transition={{ type: "spring", stiffness: 300, damping: 20 }}
             >
-                <div className="flex flex-col items-center gap-4">
+                <div className="flex flex-col items-center gap-6">
                     <motion.div
                         animate={{
-                            rotate: [0, 10, -10, 10, 0],
-                            scale: [1, 1.1, 1, 1.1, 1]
+                            rotate: [0, 15, -15, 15, 0],
+                            scale: [1, 1.2, 1, 1.2, 1],
+                            filter: ["drop-shadow(0 0 10px rgba(250,204,21,0.5))", "drop-shadow(0 0 30px rgba(250,204,21,0.8))", "drop-shadow(0 0 10px rgba(250,204,21,0.5))"]
                         }}
                         transition={{
-                            duration: 0.5,
+                            duration: 0.6,
                             repeat: Infinity,
-                            repeatDelay: 1
+                            repeatDelay: 0.5
                         }}
+                        className="relative"
                     >
-                        <Trophy className="w-24 h-24 text-yellow-400 drop-shadow-[0_0_20px_rgba(250,204,21,0.8)]" />
+                        <Trophy className="w-28 h-28 text-yellow-400" />
+                        <motion.div
+                            className="absolute inset-0 bg-yellow-400 blur-2xl opacity-20"
+                            animate={{ opacity: [0.2, 0.5, 0.2] }}
+                            transition={{ duration: 1, repeat: Infinity }}
+                        />
                     </motion.div>
 
+                    <div className="relative">
+                        <motion.div
+                            initial={{ scaleX: 0 }}
+                            animate={{ scaleX: 1 }}
+                            transition={{ duration: 0.8, delay: 0.2 }}
+                            className="absolute -inset-x-12 top-1/2 h-px bg-linear-to-r from-transparent via-yellow-400 to-transparent"
+                        />
+                        <motion.div
+                            className="text-7xl font-black italic tracking-tighter text-white font-orbitron"
+                            animate={{
+                                scale: [1, 1.02, 1],
+                                textShadow: [
+                                    "0 0 10px rgba(250, 204, 21, 0.5)",
+                                    "0 0 30px rgba(250, 204, 21, 0.8)",
+                                    "0 0 10px rgba(250, 204, 21, 0.5)"
+                                ]
+                            }}
+                            transition={{ duration: 0.5, repeat: Infinity }}
+                        >
+                            VICTORY
+                        </motion.div>
+                    </div>
+
                     <motion.div
-                        className="text-6xl font-bold bg-linear-to-r from-yellow-400 via-yellow-300 to-yellow-400 bg-clip-text text-transparent"
-                        style={{
-                            textShadow: "0 0 30px rgba(250, 204, 21, 0.5)"
-                        }}
-                        animate={{
-                            scale: [1, 1.05, 1],
-                        }}
-                        transition={{
-                            duration: 1,
-                            repeat: Infinity
-                        }}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 1 }}
+                        className="text-[10px] font-black italic tracking-[0.4em] text-yellow-400/60 uppercase"
                     >
-                        VICTORY
+                        Objective_Complete
                     </motion.div>
                 </div>
             </motion.div>
@@ -94,24 +125,24 @@ export function VictoryEffect({ onComplete }: VictoryEffectProps) {
                     animate={{
                         y: window.innerHeight + 20,
                         opacity: [1, 1, 0],
-                        rotate: Math.random() * 720 - 360
+                        rotate: Math.random() * 1080 - 540
                     }}
                     transition={{
-                        duration: 2 + Math.random(),
+                        duration: 1.5 + Math.random(),
                         delay: particle.delay,
-                        ease: "linear"
+                        ease: [0.22, 1, 0.36, 1]
                     }}
                 >
                     <div
-                        className="w-3 h-3 rounded-sm"
+                        className="w-2.5 h-2.5 rounded-[1px] shadow-sm"
                         style={{
                             backgroundColor: [
-                                "#FFD700",
-                                "#FF6B6B",
-                                "#4ECDC4",
-                                "#45B7D1",
-                                "#F7DC6F",
-                                "#BB8FCE"
+                                "#FFD700", // Gold
+                                "#FFFFFF", // White
+                                "#00F3FF", // Cyan
+                                "#FF0055", // Pink
+                                "#F7DC6F", // Yellow
+                                "#BB8FCE"  // Purple
                             ][Math.floor(Math.random() * 6)]
                         }}
                     />
@@ -119,27 +150,27 @@ export function VictoryEffect({ onComplete }: VictoryEffectProps) {
             ))}
 
             {/* Sparkle effects */}
-            {[...Array(20)].map((_, i) => (
+            {[...Array(24)].map((_, i) => (
                 <motion.div
                     key={`sparkle-${i}`}
                     className="absolute"
                     style={{
-                        left: `${10 + Math.random() * 80}%`,
-                        top: `${20 + Math.random() * 60}%`
+                        left: `${Math.random() * 100}%`,
+                        top: `${Math.random() * 100}%`
                     }}
                     initial={{ scale: 0, opacity: 0 }}
                     animate={{
-                        scale: [0, 1, 0],
+                        scale: [0, 1.5, 0],
                         opacity: [0, 1, 0]
                     }}
                     transition={{
-                        duration: 1.5,
-                        delay: i * 0.1,
+                        duration: 1,
+                        delay: Math.random() * 2,
                         repeat: Infinity,
-                        repeatDelay: 1
+                        repeatDelay: Math.random() * 1
                     }}
                 >
-                    <Sparkles className="w-4 h-4 text-yellow-300" />
+                    <Sparkles className="w-4 h-4 text-yellow-200" />
                 </motion.div>
             ))}
         </div>
@@ -173,51 +204,86 @@ export function DefeatEffect({ onComplete }: DefeatEffectProps) {
 
     return (
         <motion.div
-            className="fixed inset-0 pointer-events-none z-50"
+            className="fixed inset-0 pointer-events-none z-50 overflow-hidden"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
         >
             {/* Dark overlay with vignette */}
             <motion.div
-                className="absolute inset-0 bg-black"
+                className="absolute inset-0 bg-black/80"
                 initial={{ opacity: 0 }}
-                animate={{ opacity: 0.7 }}
-                transition={{ duration: 0.5 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 1 }}
                 style={{
-                    boxShadow: "inset 0 0 200px 100px rgba(0,0,0,0.9)"
+                    boxShadow: "inset 0 0 200px 100px rgba(0,0,0,1)"
                 }}
+            />
+
+            {/* Error Scanline */}
+            <motion.div
+                className="absolute inset-0 bg-red-500/5 mix-blend-overlay"
+                animate={{ opacity: [0, 0.1, 0] }}
+                transition={{ duration: 0.1, repeat: Infinity }}
             />
 
             {/* Defeat text */}
             <motion.div
-                className="absolute top-1/3 left-1/2 transform -translate-x-1/2 -translate-y-1/2"
-                initial={{ opacity: 0, y: 50 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3, type: "spring", stiffness: 100 }}
+                className="absolute top-[40%] left-1/2 -translate-x-1/2 -translate-y-1/2"
+                initial={{ opacity: 0, scale: 2 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.3, type: "spring", stiffness: 200 }}
             >
-                <div className="text-6xl font-bold text-red-400 text-center drop-shadow-[0_0_30px_rgba(248,113,113,0.8)]">
-                    DEFEAT
+                <div className="flex flex-col items-center gap-4">
+                    <div className="relative">
+                        <motion.div
+                            className="text-7xl font-black italic tracking-tighter text-red-500 font-orbitron"
+                            animate={{
+                                x: [0, -4, 4, -2, 2, 0],
+                                textShadow: [
+                                    "2px 0 #00ffff, -2px 0 #ff00ff",
+                                    "-2px 0 #00ffff, 2px 0 #ff00ff",
+                                    "0px 0 #00ffff, 0px 0 #ff00ff"
+                                ]
+                            }}
+                            transition={{ duration: 0.2, repeat: Infinity }}
+                        >
+                            DEFEAT
+                        </motion.div>
+                        <motion.div
+                            className="absolute inset-0 text-7xl font-black italic tracking-tighter text-red-500 font-orbitron opacity-50 blur-sm"
+                            animate={{ scale: [1, 1.1, 1], opacity: [0.5, 0.2, 0.5] }}
+                            transition={{ duration: 0.1, repeat: Infinity }}
+                        >
+                            DEFEAT
+                        </motion.div>
+                    </div>
+
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.5 }}
+                        className="text-[10px] font-black italic tracking-[0.4em] text-red-500/40 uppercase"
+                    >
+                        System_Failure_Critical
+                    </motion.div>
                 </div>
             </motion.div>
 
             {/* Glitch effect lines */}
-            {[...Array(5)].map((_, i) => (
+            {[...Array(12)].map((_, i) => (
                 <motion.div
                     key={i}
-                    className="absolute h-px bg-red-500/50"
-                    style={{
-                        width: "100%",
-                        top: `${20 * i + 10}%`
-                    }}
+                    className="absolute h-[1px] bg-red-500/20 w-full"
+                    style={{ top: `${Math.random() * 100}%` }}
                     animate={{
                         x: ["-100%", "100%"],
-                        opacity: [0, 0.5, 0]
+                        opacity: [0, 0.3, 0]
                     }}
                     transition={{
-                        duration: 0.8,
-                        delay: i * 0.1,
-                        repeat: 1
+                        duration: 0.2 + Math.random() * 0.5,
+                        delay: Math.random() * 2,
+                        repeat: Infinity
                     }}
                 />
             ))}

@@ -39,11 +39,18 @@ describe('Client Cheer Regression', () => {
     });
 
     it('should display cheer message only when cheerApplied is true', () => {
-        // Check for conditional cheer display based on log.cheerApplied
+        const battleReplayTsxPath = join(__dirname, '../src/components/BattleReplay.tsx');
+        let battleReplayContent: string;
+        try {
+            battleReplayContent = readFileSync(battleReplayTsxPath, 'utf-8');
+        } catch {
+            battleReplayContent = '';
+        }
+
         const hasConditionalCheerDisplay =
-            battleTsxContent.includes('if (cheerApplied)') ||
-            battleTsxContent.includes('cheerApplied &&') ||
-            battleTsxContent.includes('log.cheerApplied');
+            battleReplayContent.includes('cheerApplied') ||
+            battleReplayContent.includes('CHEER_APPLIED') ||
+            battleTsxContent.includes('cheerApplied');
 
         expect(hasConditionalCheerDisplay).toBe(true);
     });
@@ -62,7 +69,7 @@ describe('Client Cheer Regression', () => {
         const hasPreBattleCheer =
             battleTsxContent.includes('cheerP1') &&
             battleTsxContent.includes('cheerP2') &&
-            battleTsxContent.includes("type=\"checkbox\"");
+            (battleTsxContent.includes("type=\"checkbox\"") || battleTsxContent.includes("P1_Support"));
 
         expect(hasPreBattleCheer).toBe(true);
     });

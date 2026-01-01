@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo, memo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { BattleResult, RobotData } from "@/types/shared";
 import { BattleEvent, generateBattleEvents } from "@/lib/battleReplay";
@@ -15,30 +15,58 @@ import { AnimatedHPBar } from "@/components/AnimatedHPBar";
 import { VictoryEffect, DefeatEffect } from "@/components/BattleResultEffects";
 import { useScreenShake } from "@/hooks/useScreenShake";
 import { EnhancedDamageNumber } from "@/components/EnhancedDamageNumber";
+import { playSfx, setMuted as setSfxMuted, getMuted as getSfxMuted } from "@/lib/sfx";
+import { PLAY_STEP_MS, IMPORTANT_EVENT_BONUS_MS, getImpactIntensity, isImportantLog } from "@/lib/battleFx";
 
-// Confetti Component
-const Confetti = () => (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none z-40">
-        {Array.from({ length: 50 }).map((_, i) => (
-            <div
-                key={i}
-                className="absolute w-2 h-2 rounded-full animate-pulse"
-                style={{
-                    left: `${Math.random() * 100}%`,
-                    top: `-10px`,
-                    animation: `fall ${2 + Math.random() * 3}s linear infinite`,
-                    animationDelay: `${Math.random() * 2}s`,
-                    backgroundColor: ['#00f3ff', '#ff0055', '#ffff00'][Math.floor(Math.random() * 3)]
-                }}
-            />
-        ))}
-        <style>{`
-            @keyframes fall {
-                to { transform: translateY(100vh) rotate(360deg); }
-            }
-        `}</style>
-    </div>
-);
+// Deterministic PRNG based on LCG (Linear Congruential Generator)
+const createPRNG = (seed: string) => {
+    let hash = 0;
+    for (let i = 0; i < seed.length; i++) {
+        hash = ((hash << 5) - hash) + seed.charCodeAt(i);
+        hash |= 0;
+    }
+    let state = hash || 123456789;
+    return () => {
+        state = (state * 1664525 + 1013904223) | 0;
+        return (state >>> 0) / 4294967296;
+    };
+};
+
+// Memoized Confetti for performance and determinism
+const Confetti = memo(({ seed }: { seed: string }) => {
+    const prng = useMemo(() => createPRNG(seed), [seed]);
+    const particles = useMemo(() => Array.from({ length: 50 }).map((_, i) => ({
+        id: i,
+        left: `${prng() * 100}%`,
+        duration: 2 + prng() * 3,
+        delay: prng() * 2,
+        color: ['#00f3ff', '#ff0055', '#ffff00'][Math.floor(prng() * 3)]
+    })), [prng]);
+
+    return (
+        <div className="absolute inset-0 overflow-hidden pointer-events-none z-40">
+            {particles.map((p) => (
+                <div
+                    key={p.id}
+                    className="absolute w-2 h-2 rounded-full animate-pulse"
+                    style={{
+                        left: p.left,
+                        top: `-10px`,
+                        animation: `fall ${p.duration}s linear infinite`,
+                        animationDelay: `${p.delay}s`,
+                        backgroundColor: p.color
+                    }}
+                />
+            ))}
+            <style>{`
+                @keyframes fall {
+                    to { transform: translateY(100vh) rotate(360deg); }
+                }
+            `}</style>
+        </div>
+    );
+});
+Confetti.displayName = 'Confetti';
 
 interface BattleReplayProps {
     p1: RobotData;
@@ -53,8 +81,8 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
     const { fx } = useRobotFx();
     const { shake, shakeStyle } = useScreenShake();
 
-    // Sound
-    const [isMuted, setIsMuted] = useState(() => getMuted());
+    // Sound - sync with both old and new systems
+    const [isMuted, setIsMuted] = useState(() => getMuted() || getSfxMuted());
 
     const [events, setEvents] = useState<BattleEvent[]>([]);
     const [currentEventIndex, setCurrentEventIndex] = useState(0);
@@ -103,7 +131,8 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
         const next = !isMuted;
         setIsMuted(next);
         setGlobalMuted(next);
-        playGenerated('ui_click');
+        setSfxMuted(next);
+        if (!next) playSfx('ui');
     };
 
     // Cleanup
@@ -151,6 +180,8 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
                         setLungeId(event.attackerId);
                         setCurrentAttackerId(event.attackerId);
                         setTimeout(() => setLungeId(null), 200 / speed);
+                        // Play attack SE
+                        playSfx('attack', { volume: 0.4 });
                     }
                     break;
                 case 'ATTACK_IMPACT':
@@ -166,31 +197,36 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
                             shake({ intensity: 'light', duration: 200 });
                         }
 
-                        // Sound
+                        // Sound - use new SFX system
                         if (event.isMiss) {
-                            playGenerated('miss'); // Whoosh sound for miss
+                            playGenerated('miss'); // Keep existing miss sound
                         } else if (event.isCritical) {
-                            playGenerated('hit_heavy'); // Code-generated crit sound
+                            playSfx('crit', { volume: 0.7 });
                         } else {
-                            playGenerated('hit_light'); // Code-generated hit sound
+                            playSfx('hit', { volume: 0.5 });
+                        }
+
+                        // Cheer SE if applied
+                        if (event.cheerApplied) {
+                            setTimeout(() => playSfx('cheer', { volume: 0.6 }), 100);
                         }
                     }
                     break;
                 case 'DAMAGE_POPUP':
                     if (event.defenderId) {
-                        const popupId = Math.random().toString();
+                        const popupId = `popup-${currentEventIndex}-${Date.now()}`;
                         const value = event.damage || 0;
                         const isCritical = Boolean(event.isCritical);
                         const isDodge = Boolean(event.isMiss);
 
-                        setPopups(prev => [...prev, {
+                        setPopups(prev => [...prev.slice(-4), {
                             id: popupId,
                             value,
                             isCritical,
                             isDodge,
                             cheerApplied: event.cheerApplied,
-                            x: 50, // center
-                            y: 50, // center
+                            x: 40 + ((currentEventIndex * 17) % 20), // deterministic spread
+                            y: 30 + ((currentEventIndex * 13) % 20), // deterministic spread
                             targetId: event.defenderId!
                         }]);
                         setTimeout(() => {
@@ -231,10 +267,11 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
         hasEndedRef.current = true;
 
         const isWin = result.winnerId === p1.id;
+        // Play victory/defeat SFX
         if (isWin) {
-            playGenerated('win');
+            playSfx('win', { volume: 0.8 });
         } else {
-            playGenerated('lose');
+            playSfx('lose', { volume: 0.7 });
         }
         setIsFinished(true);
     };
@@ -286,29 +323,43 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
         <div className={`space-y-8 relative py-8 w-full transition-all duration-200 ${isCriticalMoment ? 'grayscale-[0.5] scale-[1.02]' : ''}`} style={shakeStyle}>
             {/* Visual Overlays */}
             {isFinished && result.winnerId === p1.id && <VictoryEffect />}
+            {isFinished && result.winnerId === p1.id && <Confetti seed={result.battleId || 'victory'} />}
             {isFinished && result.winnerId !== p1.id && <DefeatEffect />}
 
             {/* NEW: Fixed Battle HUD */}
             {!isFinished && (
-                <div className="fixed top-0 left-0 right-0 bg-black/95 backdrop-blur-sm z-50 border-b border-white/10">
-                    <div className="max-w-4xl mx-auto px-3 sm:px-4 py-2 sm:py-3 relative">
+                <div className="fixed top-0 left-0 right-0 z-50">
+                    {/* Glass Overlay */}
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-xl border-b border-white/5" />
+                    <div className="absolute bottom-0 left-0 right-0 h-px bg-linear-to-r from-transparent via-neon-cyan/30 to-transparent" />
+
+                    <div className="max-w-4xl mx-auto px-4 py-3 relative">
                         {/* Mute Toggle */}
-                        <button
-                            onClick={handleMuteToggle}
-                            className="absolute right-4 top-1/2 -translate-y-1/2 text-white/50 hover:text-white transition-colors p-2"
-                        >
-                            {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-                        </button>
-                        {/* Turn & Phase */}
-                        <div className="text-center mb-2 text-xs sm:text-sm">
-                            <span className="text-neon-cyan font-bold font-orbitron">TURN {Math.floor(currentTurn / 6)}</span>
-                            <span className="ml-2 sm:ml-4 text-[10px] sm:text-xs text-gray-400">
-                                {currentAttackerId === p1.id ? "P1 ATTACKING" : currentAttackerId === p2.id ? "P2 ATTACKING" : "STANDBY"}
-                            </span>
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                            <Interactive
+                                onClick={handleMuteToggle}
+                                className="text-white/40 hover:text-neon-cyan transition-colors p-2 rounded-lg border border-white/5 bg-black/20"
+                            >
+                                {isMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+                            </Interactive>
                         </div>
 
-                        {/* HP Bars */}
-                        <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 items-stretch sm:items-center">
+                        {/* Turn & Phase Indicator */}
+                        <div className="flex items-center justify-center gap-6 mb-3">
+                            <div className="bg-black/40 border border-white/5 px-4 py-0.5 rounded-full flex items-center gap-3">
+                                <div className="text-[10px] font-black italic text-neon-cyan tracking-widest font-orbitron uppercase">
+                                    Turn_{Math.floor(currentTurn / 6)}
+                                </div>
+                                <div className="w-px h-2 bg-white/20" />
+                                <div className="text-[9px] font-mono text-muted-foreground uppercase flex items-center gap-2">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-primary/40 animate-pulse" />
+                                    {currentAttackerId === p1.id ? "P1_STRIKING" : currentAttackerId === p2.id ? "P2_STRIKING" : "SYSTEM_WAIT"}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* HP Bars - Premium Layout */}
+                        <div className="flex gap-4 items-center">
                             {/* P1 HP */}
                             <div className="flex-1">
                                 <AnimatedHPBar
@@ -317,20 +368,25 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
                                     label={p1.name}
                                     showNumbers={true}
                                     onCriticalDamage={() => shake({ intensity: 'medium', duration: 300 })}
+                                    className="h-8"
                                 />
                             </div>
 
-                            {/* VS Divider */}
-                            <div className="hidden sm:block text-base sm:text-xl font-bold text-white/30 px-1">VS</div>
+                            {/* VS Badge */}
+                            <div className="relative">
+                                <div className="text-xs font-black italic text-white/20 font-orbitron">VS</div>
+                                <div className="absolute inset-0 blur-sm text-xs font-black italic text-white/10 font-orbitron">VS</div>
+                            </div>
 
                             {/* P2 HP */}
-                            <div className="flex-1">
+                            <div className="flex-1 text-right">
                                 <AnimatedHPBar
                                     current={hp[p2.id] ?? p2.baseHp}
                                     max={p2.baseHp}
                                     label={p2.name}
                                     showNumbers={true}
                                     onCriticalDamage={() => shake({ intensity: 'medium', duration: 300 })}
+                                    className="h-8"
                                 />
                             </div>
                         </div>
@@ -342,50 +398,37 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
             {!isFinished && <div className="h-20 sm:h-24" />}
 
             {/* NEW: Improved Pacing Controls */}
+            {/* NEW: Improved Pacing Controls */}
             {!isFinished && (
-                <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-40 flex flex-wrap gap-1 sm:gap-2 px-3 py-2 rounded-full glass-panel border border-white/10 shadow-lg">
-                    {/* Speed Control */}
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => { setSpeed(1); playGenerated('ui_click'); }}
-                        className={`text-[10px] sm:text-xs font-bold h-7 sm:h-8 px-2 sm:px-3 ${speed === 1 ? "text-neon-cyan bg-neon-cyan/10" : "text-white/70 hover:text-white"}`}
-                    >
-                        1x
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => { setSpeed(2); playGenerated('ui_click'); }}
-                        className={`text-[10px] sm:text-xs font-bold h-7 sm:h-8 px-2 sm:px-3 ${speed === 2 ? "text-neon-cyan bg-neon-cyan/10" : "text-white/70 hover:text-white"}`}
-                    >
-                        2x
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => { setSpeed(3); playGenerated('ui_click'); }}
-                        className={`text-[10px] sm:text-xs font-bold h-7 sm:h-8 px-2 sm:px-3 ${speed === 3 ? "text-neon-cyan bg-neon-cyan/10" : "text-white/70 hover:text-white"}`}
-                    >
-                        3x
-                    </Button>
-                    <div className="w-px h-6 bg-white/20 self-center hidden sm:block" />
-                    <Button
-                        variant="ghost"
-                        size="sm"
+                <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1.5 px-4 py-2 rounded-2xl glass-panel border border-white/10 shadow-2xl">
+                    <div className="flex gap-1 bg-black/40 p-1 rounded-xl border border-white/5">
+                        {([1, 2, 3] as const).map(s => (
+                            <Interactive
+                                key={s}
+                                onClick={() => { setSpeed(s); playGenerated('ui_click'); }}
+                                className={`text-[10px] font-black italic h-8 px-3 rounded-lg transition-all ${speed === s ? "bg-primary text-black shadow-[0_0_10px_rgba(0,243,255,0.3)]" : "text-white/40 hover:text-white"
+                                    }`}
+                            >
+                                {s}x
+                            </Interactive>
+                        ))}
+                    </div>
+
+                    <div className="w-px h-6 bg-white/10 mx-1" />
+
+                    <Interactive
                         onClick={handleSkip}
-                        className="text-[10px] sm:text-xs font-bold h-7 sm:h-8 px-2 sm:px-3 text-yellow-400 hover:text-yellow-300"
+                        className="text-[10px] font-black italic h-10 px-4 rounded-xl bg-orange-500/10 border border-orange-500/30 text-orange-400 hover:bg-orange-500 hover:text-black transition-all"
                     >
-                        SKIP ⏭
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="sm"
+                        FAST_FORWARD
+                    </Interactive>
+
+                    <Interactive
                         onClick={handleResultsOnly}
-                        className="text-[10px] sm:text-xs font-bold h-7 sm:h-8 px-2 sm:px-3 text-white/70 hover:text-white"
+                        className="text-[10px] font-black italic h-10 px-4 rounded-xl bg-white/5 border border-white/5 text-white/60 hover:text-white hover:bg-white/10 transition-all font-mono"
                     >
-                        結果だけ見る
-                    </Button>
+                        SKIP_TO_RESULT
+                    </Interactive>
                 </div>
             )}
 
@@ -400,7 +443,7 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
                         isLunging={lungeId === p1.id}
                         isPlayer={true}
                         fx={fx}
-                        popups={popups.filter(p => p.targetId === p1.id)}
+                        popups={useMemo(() => popups.filter(p => p.targetId === p1.id), [popups, p1.id])}
                     />
                 </div>
 
@@ -419,7 +462,7 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
                         isLunging={lungeId === p2.id}
                         isPlayer={false}
                         fx={fx}
-                        popups={popups.filter(p => p.targetId === p2.id)}
+                        popups={useMemo(() => popups.filter(p => p.targetId === p2.id), [popups, p2.id])}
                     />
                 </div>
             </div>
@@ -509,7 +552,7 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
     );
 }
 
-function RobotCard({ robot, hpPercent, currentHp, isShaking, isLunging, isPlayer, fx, popups }: any) {
+const RobotCard = memo(({ robot, hpPercent, currentHp, isShaking, isLunging, isPlayer, fx, popups }: any) => {
     const { t } = useLanguage();
     // Determine visuals
     const borderColor = isShaking ? 'border-red-500' : (isPlayer ? 'border-neon-cyan' : 'border-neon-pink');
@@ -530,7 +573,14 @@ function RobotCard({ robot, hpPercent, currentHp, isShaking, isLunging, isPlayer
             </div>
 
             <div className="flex justify-center my-4">
-                <RobotSVG parts={robot.parts} colors={robot.colors} size={160} fx={fx} />
+                <RobotSVG
+                    parts={robot.parts}
+                    colors={robot.colors}
+                    size={160}
+                    fx={fx}
+                    role={typeof robot.role === 'string' ? robot.role : undefined}
+                    rarityEffect={robot.rarityTier === 'legendary' ? 'legendary' : (robot.rarityTier === 'rare' ? 'rare' : undefined)}
+                />
             </div>
 
             <div className="mt-2 text-center font-semibold text-lg text-white">{robot.name}</div>
@@ -543,13 +593,13 @@ function RobotCard({ robot, hpPercent, currentHp, isShaking, isLunging, isPlayer
                     transition={{ type: "spring", stiffness: 100, damping: 20 }}
                 />
             </div>
-            <div className={`text-right text-xs font-mono mt-1 font-semibold ${isPlayer ? 'text-neon-cyan' : 'text-neon-pink'}`}>
+            <div className={`text-right text-xs font-mono mt-1 font-semibold ${isPlayer ? 'text-neon-cyan' : 'text-neon-pink'} tabular-nums`}>
                 HP: <span className="text-white text-lg font-orbitron">{Math.floor(currentHp ?? 0)}</span> / {robot.baseHp}
             </div>
 
             {/* Enhanced Damage Numbers */}
             <AnimatePresence>
-                {popups.map((p) => (
+                {popups.map((p: any) => (
                     <EnhancedDamageNumber
                         key={p.id}
                         value={p.value}
@@ -558,10 +608,12 @@ function RobotCard({ robot, hpPercent, currentHp, isShaking, isLunging, isPlayer
                         cheerApplied={p.cheerApplied}
                         x={p.x}
                         y={p.y}
-                        onComplete={() => setPopups(prev => prev.filter(popup => popup.id !== p.id))}
+                        onComplete={() => { }}
                     />
                 ))}
             </AnimatePresence>
         </motion.div>
     );
-}
+});
+RobotCard.displayName = 'RobotCard';
+

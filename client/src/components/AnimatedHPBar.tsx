@@ -91,26 +91,29 @@ export function AnimatedHPBar({
             )}
 
             <motion.div
-                className="relative h-6 bg-black/40 rounded-full overflow-hidden border border-white/10"
+                className="relative h-6 bg-black/60 rounded border border-white/5 overflow-hidden group"
                 animate={isShaking && !prefersReducedMotion ? {
-                    x: [-2, 2, -2, 2, 0],
+                    x: [-3, 3, -3, 3, 0],
                     transition: { duration: 0.3 }
                 } : {}}
             >
-                {/* Background glow for low HP */}
+                {/* Background Scanlines */}
+                <div className="absolute inset-0 bg-[url('/scanline.png')] opacity-[0.03] pointer-events-none" />
+
+                {/* Energy Glow for Low HP */}
                 {hpPercent <= 30 && (
                     <motion.div
-                        className="absolute inset-0 bg-red-500/20"
+                        className="absolute inset-0 bg-red-500/10 pointer-events-none"
                         animate={!prefersReducedMotion ? {
-                            opacity: [0.2, 0.4, 0.2],
-                            transition: { duration: 1.5, repeat: Infinity }
-                        } : { opacity: 0.2 }}
+                            opacity: [0.1, 0.3, 0.1],
+                            transition: { duration: 1, repeat: Infinity }
+                        } : { opacity: 0.1 }}
                     />
                 )}
 
                 {/* Main HP bar */}
                 <motion.div
-                    className={`absolute inset-y-0 left-0 bg-linear-to-r ${getHPColor(hpPercent)} rounded-full`}
+                    className={`absolute inset-y-0 left-0 bg-linear-to-r ${getHPColor(hpPercent)} shadow-[0_0_15px_rgba(0,0,0,0.5)] transition-all duration-300`}
                     style={{
                         width: `${hpPercent}%`,
                     }}
@@ -119,29 +122,28 @@ export function AnimatedHPBar({
                         ...getPulseAnimation(hpPercent)
                     }}
                 >
-                    {/* Shine effect */}
+                    {/* Holographic Shine Effect */}
                     <motion.div
-                        className="absolute inset-0 bg-linear-to-r from-transparent via-white/30 to-transparent"
+                        className="absolute inset-0 bg-linear-to-r from-transparent via-white/40 to-transparent skew-x-[-20deg]"
                         animate={!prefersReducedMotion ? {
-                            x: ["-100%", "200%"],
+                            left: ["-100%", "200%"],
                             transition: {
-                                duration: 2,
+                                duration: 1.5,
                                 repeat: Infinity,
                                 ease: "linear",
-                                repeatDelay: 1
+                                repeatDelay: 0.5
                             }
                         } : {}}
                     />
+
+                    {/* Inner Shadow */}
+                    <div className="absolute inset-0 shadow-[inset_0_1px_2px_rgba(255,255,255,0.2)]" />
                 </motion.div>
 
-                {/* Tick marks */}
-                <div className="absolute inset-0 flex items-center">
-                    {[25, 50, 75].map((tick) => (
-                        <div
-                            key={tick}
-                            className="absolute h-full w-px bg-white/20"
-                            style={{ left: `${tick}%` }}
-                        />
+                {/* Tactical Grid Overlay */}
+                <div className="absolute inset-0 flex items-center justify-between px-2 pointer-events-none opacity-20">
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => (
+                        <div key={i} className="h-full w-px bg-black/40" />
                     ))}
                 </div>
             </motion.div>

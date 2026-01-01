@@ -7,7 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { db, functions } from "@/lib/firebase";
 import { callGenerateRobot } from "@/lib/functions";
 import { httpsCallable } from "firebase/functions";
-import { collection, doc, getDocs, onSnapshot } from "firebase/firestore";
+import { collection, getDocs } from "firebase/firestore";
 import { Factory, Loader2, Trophy, Zap, ScanBarcode, Swords, ShoppingCart, Activity, Users } from "lucide-react";
 import RobotSVG from "@/components/RobotSVG";
 import { toast } from "sonner";
@@ -15,6 +15,7 @@ import { Link } from "wouter";
 import { useLanguage } from "@/contexts/LanguageContext";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { useNotification } from "@/hooks/useNotification";
+import { useUserData } from "@/hooks/useUserData";
 import ShareButton from "@/components/ShareButton";
 import TutorialModal from "@/components/TutorialModal";
 import SoundSettings from "@/components/SoundSettings";
@@ -51,8 +52,10 @@ export default function Home() {
   const [mode, setMode] = useState<'menu' | 'scan' | 'result'>('menu');
   const [isGenerating, setIsGenerating] = useState(false);
   const [robot, setRobot] = useState<RobotData | null>(null);
-  const [credits, setCredits] = useState(0);
-  const [loginStreak, setLoginStreak] = useState<number | null>(null);
+
+  // Use centralized user data
+  const { credits, loginStreak, isPremium } = useUserData();
+
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isClaimingLogin, setIsClaimingLogin] = useState(false);
   const [missions, setMissions] = useState<Mission[]>([]);
@@ -78,17 +81,20 @@ export default function Home() {
   const [, setLocation] = useLocation();
 
   useEffect(() => {
-    // playBGM('bgm_menu'); // ユーザー要望により起動時の英語アナウンス（BGMに含まれる）を停止
-  }, [playBGM]);
+    if (!user) return;
+
+    // Play welcome BGM (bgm_menu contains the voice) only once per session
+    const hasPlayedWelcome = sessionStorage.getItem(`welcome_played_${user.uid}`);
+    if (!hasPlayedWelcome) {
+      playBGM('bgm_menu', false); // Play without loop to avoid repeating voice
+      sessionStorage.setItem(`welcome_played_${user.uid}`, 'true');
+    }
+  }, [user, playBGM]);
 
   useEffect(() => {
     if (!user) return;
-    const unsubUser = onSnapshot(doc(db, "users", user.uid), (snap) => {
-      if (!snap.exists()) return;
-      const data = snap.data();
-      setCredits(typeof data.credits === "number" ? data.credits : 0);
-      setLoginStreak(typeof data.loginStreak === "number" ? data.loginStreak : null);
-    });
+    // Removed local onSnapshot for user data - now handled by useUserData
+
 
     const loadMissions = async () => {
       setMissionsLoading(true);
@@ -154,10 +160,6 @@ export default function Home() {
       }
     };
     loadBoss();
-
-    return () => {
-      unsubUser();
-    };
   }, [user]);
 
   const handleScan = async (barcode: string) => {
@@ -281,7 +283,7 @@ export default function Home() {
 
   if (loading) {
     return (
-      <div className="min-h-dvh bg-bg text-text pb-24 md:pb-8 flex flex-col">
+      <div className="min-h-dvh bg-background text-foreground pb-24 md:pb-8 flex flex-col">
         {/* Global Header */}
         <GlobalHeader missions={missions} />
 
@@ -312,25 +314,26 @@ export default function Home() {
   const mainRobot = robots.length > 0 ? robots[0] : null;
 
   return (
-    <div className="min-h-dvh flex flex-col text-text relative pb-24 md:pb-8">
+    <div className="flex-1 flex flex-col relative pb-32 md:pb-8">
       {/* Background Effect */}
       <div className="fixed inset-0 bg-[url('/grid.svg')] opacity-10 pointer-events-none z-0" />
 
-      {/* Mobile: Constrained width, Desktop: Expanded width */}
-      <div className="flex-1 w-full max-w-md md:max-w-5xl mx-auto flex flex-col">
-        {/* Global Header */}
-        <GlobalHeader missions={missions} className="mb-4" />
+      {/* Global Header now acts as the primary status bar on mobile */}
+      <GlobalHeader missions={missions} />
 
-        <main className="flex-1 w-full px-4 space-y-5 relative z-10">
+      {/* Mobile: Constrained width, Desktop: Expanded width */}
+      <div className="flex-1 w-full max-w-md md:max-w-5xl mx-auto flex flex-col relative z-10">
+
+        <main className="flex-1 w-full px-4 space-y-6 pt-4">
 
           {/* 1. System Ticker */}
           <div className="w-full bg-black/40 border-y border-white/5 py-1 overflow-hidden">
             <div className="whitespace-nowrap animate-marquee text-[10px] font-mono text-muted-foreground/80 flex gap-8">
-              <span>SYSTEM ONLINE...</span>
-              <span>CONNECTION STABLE</span>
-              <span>GRID ACCESS: AUTHORIZED</span>
-              <span>WELCOME BACK, OPERATOR {user?.uid.slice(0, 6)}...</span>
-              <span className="text-neon-cyan">NEW ORDERS AVAILABLE</span>
+              <span>{t('ticker_online')}</span>
+              <span>{t('ticker_stable')}</span>
+              <span>{t('ticker_access')}</span>
+              <span>{t('ticker_welcome').replace('{id}', user?.uid.slice(0, 6) || '???')}</span>
+              <span className="text-neon-cyan">{t('ticker_new_orders')}</span>
             </div>
           </div>
 
@@ -363,12 +366,12 @@ export default function Home() {
                         <BookOpen className="w-5 h-5 text-blue-400" />
                       </div>
                       <div>
-                        <div className="text-sm font-bold text-blue-100">初めての方へ</div>
-                        <div className="text-[10px] text-blue-300">ゲームの遊び方（約30秒）</div>
+                        <div className="text-sm font-bold text-blue-100">{t('guide_card_title')}</div>
+                        <div className="text-[10px] text-blue-300">{t('guide_card_desc')}</div>
                       </div>
                     </div>
                     <div className="text-xs text-blue-400 font-mono border border-blue-500/30 px-2 py-1 rounded">
-                      GUIDE
+                      {t('guide_badge')}
                     </div>
                   </div>
                 </Link>
@@ -385,34 +388,64 @@ export default function Home() {
                     <Button
                       id="tutorial-generate-btn"
                       onClick={() => completeStep('HOME_GENERATE')}
-                      className="h-28 md:h-32 w-full flex flex-col items-center justify-center gap-2 glass-panel border border-neon-cyan/30 hover:bg-neon-cyan/10 hover:border-neon-cyan transition-all group shadow-[0_0_15px_rgba(0,0,0,0.3)] bg-surface1/80"
+                      className="h-28 md:h-32 w-full flex flex-col items-center justify-center gap-2 glass-panel border border-neon-cyan/30 hover:bg-neon-cyan/10 hover:border-neon-cyan transition-all group shadow-[0_0_15px_rgba(0,0,0,0.3)] bg-surface1/80 active:scale-95 duration-200"
                     >
                       <div className="p-3 rounded-full bg-surface2 group-hover:bg-neon-cyan/20 transition-colors">
                         <ScanBarcode className="w-6 h-6 text-neon-cyan" />
                       </div>
-                      <span className="font-bold text-xs text-white tracking-wider group-hover:text-neon-cyan">SCAN</span>
+                      <span className="font-bold text-xs text-white tracking-wider group-hover:text-neon-cyan">{t('menu_scan')}</span>
                     </Button>
                   </Link>
 
                   <Link href="/battle">
-                    <Button className="h-28 md:h-32 w-full flex flex-col items-center justify-center gap-2 glass-panel border border-neon-pink/30 hover:bg-neon-pink/10 hover:border-neon-pink transition-all group shadow-[0_0_15px_rgba(0,0,0,0.3)] bg-surface1/80">
+                    <Button className="h-28 md:h-32 w-full flex flex-col items-center justify-center gap-2 glass-panel border border-neon-pink/30 hover:bg-neon-pink/10 hover:border-neon-pink transition-all group shadow-[0_0_15px_rgba(0,0,0,0.3)] bg-surface1/80 active:scale-95 duration-200">
                       <div className="p-3 rounded-full bg-surface2 group-hover:bg-neon-pink/20 transition-colors">
                         <Swords className="w-6 h-6 text-neon-pink" />
                       </div>
-                      <span className="font-bold text-xs text-white tracking-wider group-hover:text-neon-pink">BATTLE</span>
+                      <span className="font-bold text-xs text-white tracking-wider group-hover:text-neon-pink">{t('menu_battle')}</span>
                     </Button>
                   </Link>
 
                   <Link href="/workshop">
-                    <Button className="h-28 md:h-32 w-full flex flex-col items-center justify-center gap-2 glass-panel border border-orange-500/30 hover:bg-orange-500/10 hover:border-orange-500 transition-all group shadow-[0_0_15px_rgba(0,0,0,0.3)] bg-surface1/80">
+                    <Button className="h-28 md:h-32 w-full flex flex-col items-center justify-center gap-2 glass-panel border border-orange-500/30 hover:bg-orange-500/10 hover:border-orange-500 transition-all group shadow-[0_0_15px_rgba(0,0,0,0.3)] bg-surface1/80 active:scale-95 duration-200">
                       <div className="p-3 rounded-full bg-surface2 group-hover:bg-orange-500/20 transition-colors">
                         <Factory className="w-6 h-6 text-orange-500" />
                       </div>
-                      <span className="font-bold text-xs text-white tracking-wider group-hover:text-orange-500">CRAFT</span>
+                      <span className="font-bold text-xs text-white tracking-wider group-hover:text-orange-500">{t('menu_craft')}</span>
                     </Button>
                   </Link>
                 </div>
               </section>
+
+              {/* NEW: Recent Robots Horizontal Scroll */}
+              <section className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xs font-bold text-muted-foreground tracking-widest flex items-center gap-2">
+                    <Users className="w-3 h-3" />
+                    RECENT UNITS
+                  </h2>
+                  <Link href="/dex">
+                    <Button variant="link" size="sm" className="h-auto p-0 text-[10px] text-neon-cyan">
+                      VIEW ALL
+                    </Button>
+                  </Link>
+                </div>
+                <div className="flex overflow-x-auto gap-3 pb-2 -mx-4 px-4 scrollbar-hide snap-x">
+                  {robots.slice(0, 5).map(r => (
+                    <div key={r.id} className="snap-start shrink-0 w-32">
+                      <Link href={`/robots/${r.id}`}>
+                        <div className="aspect-square rounded-lg bg-surface1 border border-white/10 overflow-hidden relative">
+                          <RobotSVG robot={r} className="w-full h-full p-2" />
+                          <div className="absolute bottom-0 w-full bg-black/60 backdrop-blur-sm p-1 text-[9px] text-center truncate font-mono">
+                            {r.name}
+                          </div>
+                        </div>
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
             </div>
 
             {/* Side Column (Mission / Status) */}
@@ -485,8 +518,8 @@ export default function Home() {
                       <ShoppingCart className="w-4 h-4" />
                     </div>
                     <div>
-                      <div className="text-xs font-bold text-white">SHOP</div>
-                      <div className="text-[10px] text-muted-foreground">SUPPLIES</div>
+                      <div className="text-xs font-bold text-white">{t('menu_shop')}</div>
+                      <div className="text-[10px] text-muted-foreground">{t('menu_supplies')}</div>
                     </div>
                   </TechCard>
                 </Link>
@@ -496,8 +529,8 @@ export default function Home() {
                       <Users className="w-4 h-4" />
                     </div>
                     <div>
-                      <div className="text-xs font-bold text-white">UNITS</div>
-                      <div className="text-[10px] text-muted-foreground">DATABASE</div>
+                      <div className="text-xs font-bold text-white">{t('menu_units')}</div>
+                      <div className="text-[10px] text-muted-foreground">{t('menu_database')}</div>
                     </div>
                   </TechCard>
                 </Link>
@@ -528,22 +561,20 @@ export default function Home() {
               <DialogHeader>
                 <DialogTitle className="text-neon-cyan flex items-center gap-2">
                   <Zap className="h-5 w-5" />
-                  製造上限に達しました
+                  {t('limit_dialog_title')}
                 </DialogTitle>
                 <DialogDescription className="text-muted-foreground pt-4">
-                  {limitMessage}
-                  <br /><br />
-                  アップグレードして制限を解除しませんか？
+                  {limitMessage || t('limit_dialog_desc')}
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter className="flex-col gap-2 sm:flex-row">
                 <Link href="/premium">
                   <Button className="w-full sm:w-auto bg-neon-yellow text-black hover:bg-neon-yellow/80 font-bold" onClick={() => setShowLimitModal(false)}>
-                    プレミアムプランを見る
+                    {t('limit_dialog_premium')}
                   </Button>
                 </Link>
                 <Button variant="ghost" className="w-full sm:w-auto" onClick={() => setShowLimitModal(false)}>
-                  閉じる
+                  {t('limit_dialog_close')}
                 </Button>
               </DialogFooter>
             </DialogContent>

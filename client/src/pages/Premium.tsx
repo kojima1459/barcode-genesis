@@ -8,9 +8,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { functions } from "@/lib/firebase";
 import { toast } from "sonner";
-import { doc, onSnapshot } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { Interactive } from "@/components/ui/interactive";
+import { useUserData } from "@/hooks/useUserData";
+import { BenefitCard } from "@/components/BenefitCard";
 import SEO from "@/components/SEO";
 
 const CREDIT_PACKS = [
@@ -19,27 +19,21 @@ const CREDIT_PACKS = [
     { id: "credits_1200", credits: 1200, price: 980, popular: false },
 ];
 
+import { TechCard } from "@/components/ui/TechCard";
+
 export default function Premium() {
     const { user } = useAuth();
     const { t } = useLanguage();
+    const { userData, loading: userDataLoading } = useUserData();
     const [loadingPackId, setLoadingPackId] = useState<string | null>(null);
     const [loadingSubscription, setLoadingSubscription] = useState(false);
     const [loadingPortal, setLoadingPortal] = useState(false);
-    const [isPremium, setIsPremium] = useState(false);
 
-    // ユーザー情報の監視（プレミアム状態の確認）
-    useEffect(() => {
-        if (!user) return;
-        const unsub = onSnapshot(doc(db, "users", user.uid), (doc) => {
-            const data = doc.data();
-            setIsPremium(!!data?.isPremium);
-        });
-        return () => unsub();
-    }, [user]);
+    const isPremium = !!userData?.isPremium;
 
     const handleBuyCredits = async (packId: string) => {
         if (!user) {
-            toast.error("ログインが必要です");
+            toast.error(t('error'));
             return;
         }
 
@@ -57,11 +51,11 @@ export default function Premium() {
             if (data.url) {
                 window.location.href = data.url;
             } else {
-                toast.error("決済ページの作成に失敗しました");
+                toast.error(t('error'));
             }
         } catch (error) {
             console.error("Checkout error:", error);
-            toast.error("エラーが発生しました");
+            toast.error(t('error'));
         } finally {
             setLoadingPackId(null);
         }
@@ -69,7 +63,7 @@ export default function Premium() {
 
     const handleSubscribe = async () => {
         if (!user) {
-            toast.error("ログインが必要です");
+            toast.error(t('error'));
             return;
         }
 
@@ -86,15 +80,14 @@ export default function Premium() {
             if (data.url) {
                 window.location.href = data.url;
             } else {
-                toast.error("決済ページの作成に失敗しました");
+                toast.error(t('error'));
             }
         } catch (error) {
             console.error("Subscription error:", error);
-            toast.error("エラーが発生しました");
+            toast.error(t('error'));
         } finally {
             setLoadingSubscription(false);
         }
-        setLoadingSubscription(false);
     };
 
     const handlePortal = async () => {
@@ -109,22 +102,22 @@ export default function Premium() {
             if (data.url) {
                 window.location.href = data.url;
             } else {
-                toast.error("ポータルへの遷移に失敗しました");
+                toast.error(t('error'));
             }
         } catch (error) {
             console.error("Portal error:", error);
-            toast.error("エラーが発生しました");
+            toast.error(t('error'));
         } finally {
             setLoadingPortal(false);
         }
     };
 
     return (
-        <div className="min-h-screen bg-bg pb-32 text-text">
-            <SEO title={t('premium')} description="Upgrade your base system." />
+        <div className="flex-1 flex flex-col relative pb-32 md:pb-8 bg-background text-foreground pt-[env(safe-area-inset-top)]">
+            <SEO title={t('premium')} description={t('premium_desc')} />
 
             {/* Header / Hero */}
-            <div className="relative pt-6 pb-8 px-4 border-b border-border/40 bg-black/20">
+            <div className="relative pt-6 pb-8 px-4 border-b border-white/5 bg-black/20">
                 <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-[0.05] pointer-events-none" />
                 <div className="max-w-4xl mx-auto">
                     <Link href="/">
@@ -178,17 +171,14 @@ export default function Premium() {
                 </section>
 
                 {/* Free vs Premium Comparison */}
-                <section className="glass-panel rounded-xl overflow-hidden border-white/10">
-                    <div className="p-4 border-b border-white/10 bg-white/5 font-orbitron font-bold text-center">
-                        ACCESS LEVEL COMPARISON
+                <TechCard header={t('access_comparison')}>
+                    <div className="space-y-4 text-sm">
+                        <CompareRow label={t('scanning_limit')} free={`5 / ${t('day')}`} premium={t('unlimited')} highlight />
+                        <CompareRow label={t('ads_display')} free={t('present')} premium={t('none')} />
+                        <CompareRow label={t('login_bonus')} free={t('standard')} premium="x2" />
+                        <CompareRow label={t('battle_xp')} free="100%" premium="150%" />
                     </div>
-                    <div className="p-4 space-y-4 text-sm">
-                        <CompareRow label="Scanning" free="5 / day" premium="100 / day" highlight />
-                        <CompareRow label="Ads" free="Yes" premium="None" />
-                        <CompareRow label="Login Bonus" free="Standard" premium="x2" />
-                        <CompareRow label="Battle XP" free="100%" premium="150%" />
-                    </div>
-                </section>
+                </TechCard>
 
                 {/* Resource Supply (Credits) */}
                 <section className="pb-8">
@@ -200,23 +190,23 @@ export default function Premium() {
                         {CREDIT_PACKS.map((pack) => (
                             <Interactive
                                 key={pack.id}
-                                className={`rounded-lg border p-4 bg-black/40 flex flex-col items-center text-center transition-colors ${pack.popular ? 'border-neon-cyan/50 bg-neon-cyan/5' : 'border-white/10 hover:border-white/20'}`}
+                                className={`rounded-xl border p-4 bg-white/5 flex flex-col items-center text-center transition-colors ${pack.popular ? 'border-neon-cyan/50 bg-neon-cyan/5 shadow-[0_0_15px_rgba(0,243,255,0.1)]' : 'border-white/10 hover:border-white/20'}`}
                                 onClick={() => handleBuyCredits(pack.id)}
                             >
-                                <div className="text-xl font-bold mb-1">{pack.credits} Cr</div>
-                                <div className="text-sm text-muted-foreground mb-3">¥{pack.price.toLocaleString()}</div>
-                                <Button size="sm" variant={pack.popular ? "default" : "secondary"} className="w-full h-8 text-xs" disabled={loadingPackId === pack.id}>
-                                    {loadingPackId === pack.id && <Loader2 className="h-3 w-3 animate-spin" />}
-                                    {!loadingPackId && "PURCHASE"}
+                                <div className="text-xl font-bold mb-1 text-white">{pack.credits} <span className="text-xs text-muted-foreground uppercase">{t('credits')}</span></div>
+                                <div className="text-sm text-neon-cyan mb-3 font-mono">¥{pack.price.toLocaleString()}</div>
+                                <Button size="sm" variant={pack.popular ? "default" : "secondary"} className="w-full h-8 text-xs font-bold" disabled={loadingPackId === pack.id}>
+                                    {loadingPackId === pack.id && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
+                                    {t('purchase')}
                                 </Button>
                             </Interactive>
                         ))}
                     </div>
                 </section>
 
-                {/* Pricing & CTA Section (Summary for Desktop / Info for Mobile) */}
-                <section className={`rounded-xl p-1 ${isPremium ? 'bg-linear-to-br from-yellow-500/20 to-orange-500/10 border border-yellow-500/30' : 'bg-linear-to-br from-neon-cyan/20 to-blue-600/10 border border-neon-cyan/30'}`}>
-                    <div className="bg-black/80 backdrop-blur rounded p-6 text-center space-y-4">
+                {/* Pricing & CTA Section */}
+                <TechCard className={isPremium ? 'border-yellow-500/30' : 'border-neon-cyan/30'}>
+                    <div className="text-center space-y-4">
                         <h3 className="font-orbitron text-lg text-muted-foreground">{t('maintenance_cost')}</h3>
 
                         <div className="flex items-end justify-center gap-1">
@@ -225,7 +215,7 @@ export default function Premium() {
                         </div>
 
                         {/* FAQ Simple */}
-                        <div className="pt-4 border-t border-white/10 text-left space-y-4 text-xs text-muted-foreground">
+                        <div className="pt-6 border-t border-white/10 text-left space-y-4 text-[11px] text-muted-foreground leading-relaxed">
                             <div>
                                 <strong className="text-white block mb-1">{t('faq_cancel_title')}</strong>
                                 {t('faq_cancel_desc')}
@@ -236,13 +226,13 @@ export default function Premium() {
                             </div>
                         </div>
                     </div>
-                </section>
+                </TechCard>
 
-                <div className="h-24"></div> {/* Spacer for fixed footer */}
+                <div className="h-24"></div>
             </main>
 
             {/* Fixed Bottom CTA */}
-            <div className="fixed bottom-0 left-0 right-0 bg-black/80 backdrop-blur-md border-t border-white/10 p-4 z-50 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+            <div className="fixed bottom-0 left-0 right-0 bg-black/80 backdrop-blur-md border-t border-white/5 p-4 z-50 pb-[calc(1rem+env(safe-area-inset-bottom))]">
                 <div className="max-w-4xl mx-auto flex items-center gap-4 justify-between">
                     <div className="hidden sm:block">
                         <div className="text-xs text-muted-foreground">{t('maintenance_cost')}</div>
@@ -257,7 +247,7 @@ export default function Premium() {
                             <Button
                                 variant="outline"
                                 onClick={handlePortal}
-                                className="w-full border-yellow-500/30 text-yellow-500 hover:bg-yellow-500/10"
+                                className="w-full border-yellow-500/30 text-yellow-500 hover:bg-yellow-500/10 h-12 font-bold"
                                 disabled={loadingPortal}
                             >
                                 {loadingPortal && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -266,7 +256,7 @@ export default function Premium() {
                         ) : (
                             <Button
                                 size="lg"
-                                className="w-full bg-neon-cyan text-black hover:bg-cyan-400 font-bold text-lg h-12 relative overflow-hidden group shadow-[0_0_20px_rgba(0,243,255,0.3)] animate-pulse hover:animate-none"
+                                className="w-full bg-neon-cyan text-black hover:bg-cyan-400 font-bold text-lg h-12 relative overflow-hidden group shadow-[0_0_20px_rgba(0,243,255,0.3)]"
                                 onClick={handleSubscribe}
                                 disabled={loadingSubscription}
                             >
@@ -288,21 +278,7 @@ export default function Premium() {
     );
 }
 
-function BenefitCard({ icon: Icon, color, title, desc }: { icon: any, color: string, title: string, desc: string }) {
-    return (
-        <Card className="bg-black/40 border-white/10 hover:border-white/20 transition-colors">
-            <CardContent className="p-4 flex gap-4 items-start">
-                <div className={`p-2 rounded bg-white/5 border border-white/5 ${color}`}>
-                    <Icon className="w-5 h-5" />
-                </div>
-                <div>
-                    <h3 className={`font-bold text-sm mb-1 ${color}`}>{title}</h3>
-                    <p className="text-xs text-muted-foreground leading-relaxed">{desc}</p>
-                </div>
-            </CardContent>
-        </Card>
-    );
-}
+
 
 function CompareRow({ label, free, premium, highlight }: { label: string, free: string, premium: string, highlight?: boolean }) {
     return (

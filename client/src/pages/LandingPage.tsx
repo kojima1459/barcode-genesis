@@ -45,7 +45,7 @@ const Hero = () => {
                     <div className="inline-block mb-4 px-3 py-1 border border-border/60 rounded-full bg-panel/60 backdrop-blur-sm text-xs tracking-[0.14em] text-accent font-orbitron">
                         次世代バーコードバトラー
                     </div>
-                    <h1 className="text-5xl md:text-7xl font-semibold tracking-tight mb-6 bg-clip-text text-transparent bg-gradient-to-b from-white via-white to-white/70 drop-shadow-[0_0_12px_rgba(255,255,255,0.25)] font-orbitron">
+                    <h1 className="text-5xl md:text-7xl font-semibold tracking-tight mb-6 bg-clip-text text-transparent bg-linear-to-b from-white via-white to-white/70 drop-shadow-[0_0_12px_rgba(255,255,255,0.25)] font-orbitron">
                         BARCODE<br />GENESIS
                     </h1>
                     <p className="text-lg md:text-xl text-muted mb-8 max-w-2xl mx-auto leading-relaxed">
@@ -55,7 +55,7 @@ const Hero = () => {
 
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                         <Link href="/auth">
-                            <Button size="lg" className="h-14 px-8 text-lg rounded-full bg-accent text-bg hover:bg-accent/90 transition-all hover:scale-[1.02] shadow-[0_0_20px_rgba(62,208,240,0.3)]">
+                            <Button size="lg" className="h-14 px-8 text-lg rounded-full bg-accent text-background hover:bg-accent/90 transition-all hover:scale-[1.02] shadow-[0_0_20px_rgba(62,208,240,0.3)]">
                                 ゲームスタート <ArrowRight className="ml-2 w-5 h-5" />
                             </Button>
                         </Link>
@@ -63,7 +63,7 @@ const Hero = () => {
                             variant="outline"
                             size="lg"
                             onClick={scrollToFeatures}
-                            className="h-14 px-8 text-lg rounded-full border-border/70 text-text hover:bg-panel/60 hover:border-border transition-all"
+                            className="h-14 px-8 text-lg rounded-full border-border/70 text-foreground hover:bg-panel/60 hover:border-border transition-all"
                         >
                             詳しく見る
                         </Button>
@@ -110,7 +110,7 @@ const FeatureCard = ({ icon: Icon, title, desc, delay }: any) => {
 
 const Features = () => {
     return (
-        <section id="features" className="py-24 bg-bg relative">
+        <section id="features" className="py-24 bg-background relative">
             <div className="container max-w-6xl mx-auto px-4">
                 <div className="text-center mb-16">
                     <h2 className="text-3xl md:text-5xl font-semibold mb-6 font-orbitron">ゲームシステム</h2>
@@ -176,7 +176,7 @@ const World = () => {
                         あなたは「スキャナー」として世界を探索し、隠されたデータを解読。デジタル覇権をかけた戦いに身を投じる。
                     </p>
                     <Link href="/auth">
-                        <Button className="rounded-full px-8 bg-accent2 hover:bg-accent2/90 text-bg border-none">
+                        <Button className="rounded-full px-8 bg-accent2 hover:bg-accent2/90 text-background border-none">
                             ジェネシスレイヤーへ
                         </Button>
                     </Link>
@@ -217,7 +217,7 @@ const Footer = () => {
 
 export default function LandingPage() {
     return (
-        <div className="min-h-screen bg-bg text-text selection:bg-accent selection:text-bg font-sans">
+        <div className="min-h-screen bg-background text-foreground selection:bg-accent selection:text-background font-sans">
             <Hero />
             <Features />
             <World />

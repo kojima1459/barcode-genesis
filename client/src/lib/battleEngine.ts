@@ -134,6 +134,8 @@ export interface SpecialMoveInput {
     p2Used: boolean;
 }
 
+export type Terrain = 'ICE' | 'VOLCANO' | 'LIBRARY';
+
 export interface BattleResult {
     winnerId: string;
     loserId: string;
@@ -147,6 +149,7 @@ export interface BattleResult {
     totalDamageP1?: number;
     totalDamageP2?: number;
     turnCount?: number;
+    terrain?: Terrain;  // Terrain type for this battle
 }
 
 export interface CheerInput {

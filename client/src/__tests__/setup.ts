@@ -1,6 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import { afterEach, vi } from "vitest";
 import { cleanup } from "@testing-library/react";
+import { translations } from "@/lib/translations";
 
 type MockDoc = { id: string; data: Record<string, unknown> };
 
@@ -47,6 +48,25 @@ if (typeof window !== "undefined") {
       } as MediaQueryList;
     };
   }
+
+  // IntersectionObserver Mock
+  window.IntersectionObserver = vi.fn((callback) => ({
+    observe: vi.fn((element) => {
+      callback([
+        {
+          isIntersecting: true,
+          target: element,
+          intersectionRatio: 1,
+          boundingClientRect: element.getBoundingClientRect(),
+          intersectionRect: element.getBoundingClientRect(),
+          rootBounds: null,
+          time: Date.now(),
+        },
+      ]);
+    }),
+    unobserve: vi.fn(),
+    disconnect: vi.fn(),
+  })) as any;
 }
 
 const listeners = new Map<string, Set<Listener>>();
@@ -137,11 +157,18 @@ vi.mock("@/contexts/AuthContext", () => ({
 }));
 
 vi.mock("@/contexts/LanguageContext", () => ({
-  useLanguage: () => ({ t: (key: string) => key }),
+  useLanguage: () => ({
+    language: 'ja',
+    t: (key: string) => (translations.ja as any)[key] || key
+  }),
 }));
 
 vi.mock("@/contexts/SoundContext", () => ({
   useSound: () => ({ playBGM: vi.fn(), playSE: vi.fn() }),
+}));
+
+vi.mock("@/contexts/HapticContext", () => ({
+  useHaptic: () => ({ triggerHaptic: vi.fn() }),
 }));
 
 vi.mock("@/hooks/useRobotFx", () => ({

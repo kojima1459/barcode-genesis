@@ -24,25 +24,41 @@ interface RobotCardProps {
 }
 
 const RobotCard = React.forwardRef<HTMLDivElement, RobotCardProps>(({ robot, userName = "COMMANDER", originalItemName, staticMode = false }, ref) => {
-    // Rarity color mapping
-    const rarityColors: Record<number, string> = {
-        1: '#a0a0a0', // Common (Gray)
-        2: '#00ccff', // Rare (Cyan)
-        3: '#cc00ff', // Epic (Purple)
-        4: '#ffd700', // Legendary (Gold)
-        5: '#ff0055', // Mythic (Red/Pink)
+    // Rarity color mapping (Legacy + Phase B)
+    const getRarityColor = () => {
+        if (robot.rarityTier === 'legendary') return '#ffd700'; // Gold
+        if (robot.rarityTier === 'rare') return '#00ccff'; // Cyan
+        if (robot.rarityTier === 'common') return '#a0a0a0'; // Gray
+
+        // Legacy fallbacks
+        const colors: Record<number, string> = {
+            1: '#a0a0a0', 2: '#00ccff', 3: '#cc00ff', 4: '#ffd700', 5: '#ff0055'
+        };
+        return colors[robot.rarity || 1] || '#00ccff';
     };
-    const mainColor = rarityColors[robot.rarity || 1] || '#00ccff';
+    const mainColor = getRarityColor();
 
     const getRoleIcon = () => {
         const iconClasses = "w-5 h-5";
-        switch (robot.role) {
-            case 'ATTACKER': return <RoleIconAttacker className={iconClasses} color={mainColor} />;
-            case 'TANK': return <RoleIconTank className={iconClasses} color={mainColor} />;
-            case 'SPEED': return <RoleIconSpeed className={iconClasses} color={mainColor} />;
-            case 'TRICKY': return <RoleIconTricky className={iconClasses} color={mainColor} />;
-            case 'BALANCE': return <RoleIconBalance className={iconClasses} color={mainColor} />;
-            default: return <RoleIconBalance className={iconClasses} color={mainColor} />;
+        const roleStr = String(robot.role || '').toUpperCase();
+
+        switch (roleStr) {
+            case 'ATTACKER': // Legacy
+            case 'STRIKER':  // Phase B
+                return <RoleIconAttacker className={iconClasses} color={mainColor} />;
+            case 'TANK':
+                return <RoleIconTank className={iconClasses} color={mainColor} />;
+            case 'SPEED':
+                return <RoleIconSpeed className={iconClasses} color={mainColor} />;
+            case 'TRICKY':   // Legacy
+                return <RoleIconTricky className={iconClasses} color={mainColor} />;
+            case 'SUPPORT':  // Phase B (Map to Tricky visually for now, or Balance)
+                return <RoleIconTricky className={iconClasses} color={mainColor} />;
+            case 'BALANCE':  // Legacy
+            case 'BALANCED': // Phase B
+                return <RoleIconBalance className={iconClasses} color={mainColor} />;
+            default:
+                return <RoleIconBalance className={iconClasses} color={mainColor} />;
         }
     };
 
@@ -57,16 +73,18 @@ const RobotCard = React.forwardRef<HTMLDivElement, RobotCardProps>(({ robot, use
                 style={{ width: '600px', height: '800px' }}
                 className="bg-black relative overflow-hidden flex flex-col items-center justify-between p-0 font-sans"
             >
-                {/* Background Layer */}
-                <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-10 bg-[size:50px_50px]" />
-                <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-transparent to-black" />
+                {/* Background Layer with Depth */}
+                <div className="absolute inset-0 bg-background" />
+                <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-[0.08] [mask-image:radial-gradient(ellipse_at_center,black,transparent_80%)]" />
+                <div className="absolute inset-0 bg-noise opacity-[0.03] mix-blend-overlay" />
+                <div className="absolute inset-x-0 top-0 h-64 bg-linear-to-b from-primary/10 to-transparent" />
 
                 {/* Decorative Side Lines */}
-                <div className="absolute left-4 top-20 bottom-20 w-px bg-gradient-to-b from-transparent via-white/20 to-transparent" />
-                <div className="absolute right-4 top-20 bottom-20 w-px bg-gradient-to-b from-transparent via-white/20 to-transparent" />
+                <div className="absolute left-4 top-20 bottom-20 w-px bg-linear-to-b from-transparent via-white/20 to-transparent" />
+                <div className="absolute right-4 top-20 bottom-20 w-px bg-linear-to-b from-transparent via-white/20 to-transparent" />
 
                 {/* Header Section */}
-                <div className="w-full p-8 pb-4 relative z-20 bg-gradient-to-b from-black to-transparent">
+                <div className="w-full p-8 pb-4 relative z-20 bg-linear-to-b from-black to-transparent">
                     <div className="flex justify-between items-start">
                         {/* Name & Role */}
                         <div className="flex flex-col">
@@ -99,6 +117,21 @@ const RobotCard = React.forwardRef<HTMLDivElement, RobotCardProps>(({ robot, use
                                     </span>
                                 </div>
                             )}
+
+                            {/* Phase B Badges */}
+                            <div className="flex gap-2 mt-2 pl-1">
+                                {robot.rarityTier && (
+                                    <span className="px-1.5 py-0.5 border rounded text-[10px] uppercase font-orbitron tracking-wider bg-black/60 backdrop-blur-sm shadow-[0_0_8px_rgba(0,0,0,0.5)]"
+                                        style={{ borderColor: `${mainColor}60`, color: mainColor, textShadow: `0 0 5px ${mainColor}80` }}>
+                                        {robot.rarityTier}
+                                    </span>
+                                )}
+                                {robot.role && ['striker', 'tank', 'speed', 'support', 'balanced'].includes(String(robot.role).toLowerCase()) && (
+                                    <span className="px-1.5 py-0.5 border rounded text-[10px] uppercase font-orbitron tracking-wider bg-black/60 backdrop-blur-sm border-white/30 text-white/80 shadow-sm">
+                                        {String(robot.role).toUpperCase()}
+                                    </span>
+                                )}
+                            </div>
                         </div>
 
                         {/* Rarity Indicator */}
@@ -115,8 +148,8 @@ const RobotCard = React.forwardRef<HTMLDivElement, RobotCardProps>(({ robot, use
                                     <div
                                         key={i}
                                         className={`w-2 h-4 transform -skew-x-12 ${i < (robot.rarity || 1)
-                                                ? 'bg-gradient-to-b from-white to-transparent opacity-100'
-                                                : 'bg-white/10'
+                                            ? 'bg-linear-to-b from-white to-transparent opacity-100'
+                                            : 'bg-white/10'
                                             }`}
                                         style={i < (robot.rarity || 1) ? { backgroundColor: mainColor } : {}}
                                     />
@@ -129,57 +162,75 @@ const RobotCard = React.forwardRef<HTMLDivElement, RobotCardProps>(({ robot, use
                 {/* Main Visual Area */}
                 <div className="flex-1 w-full flex items-center justify-center relative z-10 -mt-10">
                     {/* Tech Ring Background */}
-                    <div className="absolute w-[500px] h-[500px] border border-white/5 rounded-full animate-[spin_60s_linear_infinite]"
-                        style={{ borderStyle: 'dashed' }} />
-                    <div className="absolute w-[400px] h-[400px] border border-white/10 rounded-full opacity-30" />
+                    {/* Rarity Aura */}
+                    <div className="absolute w-[350px] h-[350px] rounded-full blur-[100px] transition-all duration-1000"
+                        style={{
+                            backgroundColor: `${mainColor}20`,
+                            animation: `pulse-slow 4s ease-in-out infinite`
+                        }} />
 
-                    {/* Glow behind robot */}
-                    <div className="absolute w-[300px] h-[300px] rounded-full blur-[100px] opacity-20"
-                        style={{ backgroundColor: mainColor }} />
+                    {/* Visual Frame */}
+                    <div className="absolute inset-16 border border-white/5 tech-border pointer-events-none opacity-40" />
 
-                    <div className="transform scale-[1.6] drop-shadow-[0_20px_40px_rgba(0,0,0,0.6)]">
+                    <div className="transform scale-[1.7] drop-shadow-[0_20px_50px_rgba(0,0,0,0.8)] relative z-10">
                         <RobotSVG
                             parts={robot.parts}
                             colors={robot.colors}
                             size={300}
                             variantKey={robot.variantKey}
-                            isRareVariant={(robot.rarity || 1) >= 3}
+                            isRareVariant={(robot.rarityTier === 'legendary' || robot.rarityTier === 'rare' || (robot.rarity || 1) >= 3)}
                             animate={!staticMode}
+                            role={typeof robot.role === 'string' ? robot.role : undefined}
+                            rarityEffect={robot.rarityTier === 'legendary' ? 'legendary' : (robot.rarityTier === 'rare' ? 'rare' : undefined)}
                         />
+                    </div>
+
+                    {/* Rarity Floating Badge */}
+                    <div
+                        className="absolute right-12 top-1/2 -translate-y-1/2 flex flex-col items-center gap-1 z-20"
+                        style={{
+                            textShadow: `0 0 10px ${mainColor}`,
+                            animation: 'float 6s ease-in-out infinite'
+                        }}
+                    >
+                        <div className="w-px h-12 bg-linear-to-b from-transparent to-white/40" />
+                        <div className="p-2 rounded-full border border-white/20 glass flex items-center justify-center">
+                            <span className="text-sm font-orbitron font-bold" style={{ color: mainColor }}>
+                                {RARITY_NAMES[robot.rarity || 1] || 'N'}
+                            </span>
+                        </div>
                     </div>
                 </div>
 
                 {/* Stats & Footer */}
                 <div className="w-full relative z-20">
                     {/* Stats Grid */}
+                    {/* Stats Grid - Premium Glass */}
                     <div className="px-8 pb-4">
-                        <div className="grid grid-cols-3 gap-px bg-linear-to-r from-transparent via-white/20 to-transparent p-px">
+                        <div className="grid grid-cols-3 gap-3">
                             {/* HP */}
-                            <div className="bg-black/80 backdrop-blur-md p-4 flex flex-col items-center group relative overflow-hidden">
-                                <div className="absolute top-0 inset-x-0 h-px bg-linear-to-r from-transparent via-green-500/50 to-transparent opacity-50" />
-                                <StatIconHP className="w-8 h-8 text-green-400 mb-2 drop-shadow-[0_0_8px_rgba(74,222,128,0.5)]" />
-                                <span className="text-[10px] text-gray-500 font-orbitron tracking-widest mb-1">DURABILITY</span>
-                                <span className="text-2xl font-bold text-white font-orbitron">
+                            <div className="glass-panel rounded-xl p-4 flex flex-col items-center group relative overflow-hidden transition-all hover:scale-105">
+                                <StatIconHP className="w-8 h-8 text-green-400/80 mb-2 drop-shadow-[0_0_8px_rgba(74,222,128,0.3)]" />
+                                <span className="text-[9px] text-white/40 font-orbitron tracking-widest mb-1">DURABILITY</span>
+                                <span className="text-2xl font-bold text-white font-orbitron tabular-nums">
                                     <ScrambleText text={String(robot.baseHp)} delay={800} instant={staticMode} />
                                 </span>
                             </div>
 
                             {/* ATK */}
-                            <div className="bg-black/80 backdrop-blur-md p-4 flex flex-col items-center group relative overflow-hidden">
-                                <div className="absolute top-0 inset-x-0 h-px bg-linear-to-r from-transparent via-red-500/50 to-transparent opacity-50" />
-                                <StatIconATK className="w-8 h-8 text-red-400 mb-2 drop-shadow-[0_0_8px_rgba(248,113,113,0.5)]" />
-                                <span className="text-[10px] text-gray-500 font-orbitron tracking-widest mb-1">OFFENSE</span>
-                                <span className="text-2xl font-bold text-white font-orbitron">
+                            <div className="glass-panel rounded-xl p-4 flex flex-col items-center group relative overflow-hidden transition-all hover:scale-105">
+                                <StatIconATK className="w-8 h-8 text-red-400/80 mb-2 drop-shadow-[0_0_8px_rgba(248,113,113,0.3)]" />
+                                <span className="text-[9px] text-white/40 font-orbitron tracking-widest mb-1">OFFENSE</span>
+                                <span className="text-2xl font-bold text-white font-orbitron tabular-nums">
                                     <ScrambleText text={String(robot.baseAttack)} delay={900} instant={staticMode} />
                                 </span>
                             </div>
 
                             {/* DEF */}
-                            <div className="bg-black/80 backdrop-blur-md p-4 flex flex-col items-center group relative overflow-hidden">
-                                <div className="absolute top-0 inset-x-0 h-px bg-linear-to-r from-transparent via-blue-500/50 to-transparent opacity-50" />
-                                <StatIconDEF className="w-8 h-8 text-blue-400 mb-2 drop-shadow-[0_0_8px_rgba(96,165,250,0.5)]" />
-                                <span className="text-[10px] text-gray-500 font-orbitron tracking-widest mb-1">DEFENSE</span>
-                                <span className="text-2xl font-bold text-white font-orbitron">
+                            <div className="glass-panel rounded-xl p-4 flex flex-col items-center group relative overflow-hidden transition-all hover:scale-105">
+                                <StatIconDEF className="w-8 h-8 text-blue-400/80 mb-2 drop-shadow-[0_0_8px_rgba(96,165,250,0.3)]" />
+                                <span className="text-[10px] text-white/40 font-orbitron tracking-widest mb-1">DEFENSE</span>
+                                <span className="text-2xl font-bold text-white font-orbitron tabular-nums">
                                     <ScrambleText text={String(robot.baseDefense)} delay={1000} instant={staticMode} />
                                 </span>
                             </div>

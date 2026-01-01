@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
 import { db, functions } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
-import { collection, doc, onSnapshot, orderBy, query } from "firebase/firestore";
+import { collection, orderBy, query, onSnapshot } from "firebase/firestore";
 import { ArrowLeft, Loader2, Plus, RefreshCw, AlertCircle } from "lucide-react";
 import RobotSVG from "@/components/RobotSVG";
 import { Link } from "wouter";
@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { RobotData, VariantData } from "@/types/shared";
 import SEO from "@/components/SEO";
+import { useUserData } from "@/hooks/useUserData";
 import { Interactive } from "@/components/ui/interactive";
 import {
     Select,
@@ -31,7 +32,9 @@ export default function Workshop() {
     const [robots, setRobots] = useState<RobotData[]>([]);
     const [variants, setVariants] = useState<VariantData[]>([]);
     const [loading, setLoading] = useState(true);
-    const [userProfile, setUserProfile] = useState<any>(null);
+
+    // Centralized User Data
+    const { userData: userProfile, workshopLines: userLimit, loading: loadingUser } = useUserData();
 
     // Create Mode
     const [robotAId, setRobotAId] = useState("");
@@ -39,7 +42,7 @@ export default function Workshop() {
     const [creating, setCreating] = useState(false);
 
     // Limits
-    const [userLimit, setUserLimit] = useState(1);
+    // const [userLimit, setUserLimit] = useState(1); // Now from hook
 
     // Animation
     const [fusionResult, setFusionResult] = useState<VariantData | null>(null);
@@ -51,7 +54,7 @@ export default function Workshop() {
     // Preview preset (client-side only)
     const [previewPreset, setPreviewPreset] = useState<"A_DOMINANT" | "B_DOMINANT" | "HALF" | "ALT">("HALF");
 
-    const [loadingUser, setLoadingUser] = useState(true);
+    // const [loadingUser, setLoadingUser] = useState(true); // Now from hook
     const [loadingRobots, setLoadingRobots] = useState(true);
     const [loadingVariants, setLoadingVariants] = useState(true);
 
@@ -62,22 +65,7 @@ export default function Workshop() {
         setLoadingRobots(true);
         setLoadingVariants(true);
 
-        const unsubUser = onSnapshot(
-            doc(db, "users", user.uid),
-            (snapshot) => {
-                if (snapshot.exists()) {
-                    const data = snapshot.data();
-                    setUserProfile(data);
-                    setUserLimit(data.workshopLines || 0);
-                }
-                setLoadingUser(false);
-            },
-            (error) => {
-                console.error(error);
-                toast.error("Failed to load workshop data");
-                setLoadingUser(false);
-            }
-        );
+        // User data subscription removed - handled by useUserData
 
         const robotsQuery = query(collection(db, "users", user.uid, "robots"), orderBy("createdAt", "desc"));
         const unsubRobots = onSnapshot(
@@ -110,7 +98,7 @@ export default function Workshop() {
         );
 
         return () => {
-            unsubUser();
+            // unsubUser();
             unsubRobots();
             unsubVariants();
         };

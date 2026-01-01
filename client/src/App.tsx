@@ -9,6 +9,7 @@ import { LanguageProvider } from "./contexts/LanguageContext";
 import { HapticProvider } from "@/contexts/HapticContext";
 import { TutorialProvider } from "@/contexts/TutorialContext";
 import TutorialOverlay from "@/components/TutorialOverlay";
+import { UserDataProvider } from "@/hooks/useUserData";
 import { SoundProvider, useSound } from "@/contexts/SoundContext";
 import { useEffect, lazy, Suspense, type ComponentType, useRef } from "react";
 import { AnimatePresence } from "framer-motion";
@@ -163,14 +164,16 @@ function App() {
               <HapticProvider>
                 <TooltipProvider delayDuration={0}>
                   <AuthProvider>
-                    <TutorialProvider>
-                      <div className="min-h-screen bg-bg text-text font-sans selection:bg-neon-cyan/30">
-                        <OfflineBanner />
-                        <TutorialOverlay />
-                        <Toaster />
-                        <Router />
-                      </div>
-                    </TutorialProvider>
+                    <UserDataProvider>
+                      <TutorialProvider>
+                        <div className="min-h-screen bg-background text-foreground font-sans selection:bg-neon-cyan/30">
+                          <OfflineBanner />
+                          <TutorialOverlay />
+                          <Toaster />
+                          <Router />
+                        </div>
+                      </TutorialProvider>
+                    </UserDataProvider>
                   </AuthProvider>
                 </TooltipProvider>
               </HapticProvider>

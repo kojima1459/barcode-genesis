@@ -35,6 +35,7 @@ interface RobotSVGProps {
   visuals?: RobotVisuals;
   rarityEffect?: 'none' | 'rare' | 'legendary';
   simplified?: boolean;
+  role?: string; // Phase B: Role for visual diversity
 }
 
 const pickFromPalette = (palette: string[], seed: number, salt = 0) => {
@@ -42,10 +43,10 @@ const pickFromPalette = (palette: string[], seed: number, salt = 0) => {
   return palette[(Math.abs(safeSeed) + salt) % palette.length];
 };
 
-function RobotSVG({
+function RobotSVGComponent({
   parts,
   colors,
-  size = 200,
+  size = 160,
   className,
   animate = true,
   decals = [],
@@ -57,7 +58,8 @@ function RobotSVG({
   isRareVariant = false,
   simplified = false,
   visuals,
-  rarityEffect
+  rarityEffect,
+  role
 }: RobotSVGProps) {
   const isLite = simplified || size < 100;
 
@@ -100,15 +102,52 @@ function RobotSVG({
       : pickFromPalette(massAccentPalette, seed, 23);
     const sensorColor = pickFromPalette(sensorPalette, seed, 11);
     const highlightColor = "#F5D24B";
-    return { mainColor, subColor, accentColor, sensorColor, highlightColor };
-  }, [seed, tier, colors, isRareVariant]);
+    return {
+      mainColor,
+      subColor,
+      accentColor,
+      sensorColor: accentColor,
+      highlightColor: accentColor,
+    };
+  }, [colors, seed, tier, isRareVariant]);
 
-  const { mainColor, subColor, accentColor, sensorColor, highlightColor } = colorTokens;
+  const activeGlow = colorTokens.sensorColor;
+  const accentColor = colorTokens.accentColor; // For decals
+  const { mainColor, subColor, highlightColor } = colorTokens;
 
-  // Use sensor glow for all glow effects to unify the MS sensor feel
-  // Use sensor glow for all glow effects to unify the MS sensor feel
-  const activeGlow = sensorColor;
-  const { aura = 'none', decal = 'none', eyeGlow = 'normal', weaponIcon = 'none' } = visuals || {};
+  // Phase B: Role-based Visual Diversity
+  // Scale and proportions based on role
+  const roleTransform = useMemo(() => {
+    if (!role) return '';
+    const r = role.toLowerCase();
+
+    if (r === 'tank') {
+      // Wider, shorter, heavier
+      return 'translate(100, 100) scale(1.15, 0.95) translate(-100, -100)';
+    }
+    if (r === 'speed') {
+      // Thinner, taller, streamlined
+      return 'translate(100, 100) scale(0.9, 1.05) translate(-100, -100)';
+    }
+    if (r === 'striker') {
+      // Slightly larger/aggressive
+      return 'translate(100, 100) scale(1.05) translate(-100, -100)';
+    }
+    if (r === 'support') {
+      // Compact
+      return 'translate(100, 100) scale(0.95) translate(-100, -100)';
+    }
+    return '';
+  }, [role]);
+
+  // Phase B: Legendary Aura logic
+  // If rarityEffect is 'legendary', use a golden/rainbow aura
+  const effectiveAura = useMemo(() => {
+    if (rarityEffect === 'legendary') return 'legendary';
+    if (rarityEffect === 'rare') return 'rare';
+    return 'none';
+  }, [rarityEffect]);
+  const { aura = 'none', decal = 'none', eyeGlow = 'normal' } = visuals || {};
 
 
   // --- Constants (User Requirements) ---
@@ -161,73 +200,59 @@ function RobotSVG({
 
 
       {/* Heavy filters - skipped in lite mode */}
-      {
-        !isLite && (
-          <>
-            <filter id={`${instanceId}-glow`} width="250%" height="250%" x="-75%" y="-75%">
-              <feGaussianBlur stdDeviation="2.5" result="coloredBlur" />
-              <feMerge>
-                <feMergeNode in="coloredBlur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
+      {!isLite && (
+        <>
+          <filter id={`${instanceId}-glow`} width="200%" height="200%" x="-50%" y="-50%">
+            <feGaussianBlur stdDeviation="3" result="coloredBlur" />
+            <feMerge>
+              <feMergeNode in="coloredBlur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
 
-            {/* Silhouette filter: converts all colors to dark silhouette with noise */}
-            <filter id={`${instanceId}-silhouette`} x="0" y="0" width="100%" height="100%">
-              {/* Convert to grayscale then darken to near-black */}
-              <feColorMatrix
-                type="matrix"
-                values="0 0 0 0 0.12
-                      0 0 0 0 0.12
-                      0 0 0 0 0.15
-                      0 0 0 1 0"
-                result="darkened"
-              />
-              {/* Add subtle noise for mystery effect */}
-              <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" result="noise" />
-              <feBlend in="darkened" in2="noise" mode="overlay" result="noisy" />
-              {/* Reduce noise intensity */}
-              <feComponentTransfer in="noisy">
-                <feFuncR type="linear" slope="0.85" intercept="0.05" />
-                <feFuncG type="linear" slope="0.85" intercept="0.05" />
-                <feFuncB type="linear" slope="0.85" intercept="0.08" />
-              </feComponentTransfer>
-            </filter>
+          <filter id={`${instanceId}-silhouette`} x="0" y="0" width="100%" height="100%">
+            <feColorMatrix
+              type="matrix"
+              values="0 0 0 0 0.1 0 0 0 0 0.1 0 0 0 0 0.15 0 0 0 1 0"
+            />
+          </filter>
 
-            {/* Aura Gradients */}
-            <radialGradient id={`${instanceId}-aura-burning`} cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="#FF5500" stopOpacity="0" />
-              <stop offset="60%" stopColor="#FF5500" stopOpacity="0.1" />
-              <stop offset="90%" stopColor="#FF0000" stopOpacity="0.4" />
-              <stop offset="100%" stopColor="#FF0000" stopOpacity="0" />
+          {/* Aura Gradients */}
+          {(!isLite) && (
+            <>
+              <radialGradient id={`${instanceId}-aura-legendary`} cx="50%" cy="50%" r="60%">
+                <stop offset="40%" stopColor="#FFD700" stopOpacity="0.05" />
+                <stop offset="70%" stopColor="#FFA500" stopOpacity="0.2" />
+                <stop offset="100%" stopColor="transparent" stopOpacity="0" />
+              </radialGradient>
+              <radialGradient id={`${instanceId}-aura-rare`} cx="50%" cy="50%" r="60%">
+                <stop offset="50%" stopColor="#00FFFF" stopOpacity="0.05" />
+                <stop offset="80%" stopColor="#00CCFF" stopOpacity="0.2" />
+                <stop offset="100%" stopColor="transparent" stopOpacity="0" />
+              </radialGradient>
+            </>
+          )}
+
+          {aura !== 'none' && (
+            <radialGradient id={`${instanceId}-aura-${aura}`} cx="50%" cy="50%" r="50%">
+              {aura === 'burning' && (
+                <>
+                  <stop offset="60%" stopColor="#FF5500" stopOpacity="0.1" />
+                  <stop offset="90%" stopColor="#FF0000" stopOpacity="0.4" />
+                </>
+              )}
+              {aura === 'electric' && (
+                <>
+                  <stop offset="60%" stopColor="#00FFFF" stopOpacity="0.1" />
+                  <stop offset="90%" stopColor="#00FFFF" stopOpacity="0.4" />
+                </>
+              )}
+              {/* Other aura types could be added back if needed, but keeping it minimal for performance */}
             </radialGradient>
-            <radialGradient id={`${instanceId}-aura-electric`} cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="#FFFF00" stopOpacity="0" />
-              <stop offset="60%" stopColor="#00FFFF" stopOpacity="0.1" />
-              <stop offset="90%" stopColor="#00FFFF" stopOpacity="0.4" />
-              <stop offset="100%" stopColor="#00FFFF" stopOpacity="0" />
-            </radialGradient>
-            <radialGradient id={`${instanceId}-aura-digital`} cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="#00FF00" stopOpacity="0" />
-              <stop offset="80%" stopColor="#00FF00" stopOpacity="0.1" />
-              <stop offset="100%" stopColor="#00FF00" stopOpacity="0" />
-            </radialGradient>
-            <radialGradient id={`${instanceId}-aura-psycho`} cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="#FF00FF" stopOpacity="0" />
-              <stop offset="60%" stopColor="#FF00FF" stopOpacity="0.1" />
-              <stop offset="90%" stopColor="#8800FF" stopOpacity="0.4" />
-              <stop offset="100%" stopColor="#8800FF" stopOpacity="0" />
-            </radialGradient>
-            <radialGradient id={`${instanceId}-aura-angel`} cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0" />
-              <stop offset="60%" stopColor="#FFFFFF" stopOpacity="0.2" />
-              <stop offset="90%" stopColor="#FFFFDD" stopOpacity="0.5" />
-              <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
-            </radialGradient>
-          </>
-        )
-      }
-    </defs >
+          )}
+        </>
+      )}
+    </defs>
   );
 
 
@@ -418,9 +443,23 @@ function RobotSVG({
   // --- Visual Variant Components ---
 
   const Aura = () => {
-    if (isLite || aura === 'none') return null;
+    // Phase B: Use effectiveAura (legendary/rare) logic or fallback to legacy aura from visuals
+    const active = effectiveAura !== 'none' ? effectiveAura : aura;
+    if (isLite || active === 'none') return null;
+
+    if (active === 'legendary') {
+      return (
+        <circle cx="100" cy="100" r="140" fill={`url(#${instanceId}-aura-legendary)`} style={{ mixBlendMode: 'screen', filter: 'drop-shadow(0 0 8px rgba(255, 215, 0, 0.5))' }} />
+      );
+    }
+    if (active === 'rare') {
+      return (
+        <circle cx="100" cy="100" r="130" fill={`url(#${instanceId}-aura-rare)`} style={{ mixBlendMode: 'screen', filter: 'drop-shadow(0 0 5px rgba(0, 255, 255, 0.3))' }} />
+      );
+    }
+
     return (
-      <circle cx="100" cy="100" r="140" fill={`url(#${instanceId}-aura-${aura})`} opacity="0.6" style={{ mixBlendMode: 'screen' }} />
+      <circle cx="100" cy="100" r="140" fill={`url(#${instanceId}-aura-${active})`} opacity="0.6" style={{ mixBlendMode: 'screen' }} />
     );
   };
 
@@ -741,7 +780,7 @@ function RobotSVG({
 
           {/* Ace Commander Antenna (Vertical) */}
           {tier === "B_ACE" && (
-            <path d="M0 -2 L0 -28 L-3 -22 L-3 -2 Z" fill={subColor} stroke={COLOR_OUTLINE} strokeWidth={0.5} />
+            <path id="ms-ace-extra" d="M0 -2 L0 -28 L-3 -22 L-3 -2 Z" fill={subColor} stroke={COLOR_OUTLINE} strokeWidth={0.5} />
           )}
         </g>
       )}
@@ -795,7 +834,7 @@ function RobotSVG({
               strokeWidth={STROKE_PANEL}
             />
             {tier === "B_ACE" && (
-              <path d="M44 68 L56 62 L58 70 Z" fill={accentColor} opacity="0.8" />
+              <path id="ms-ace-extra-zaku" d="M44 68 L56 62 L58 70 Z" fill={accentColor} opacity="0.8" />
             )}
           </g>
         </g>
@@ -934,13 +973,18 @@ function RobotSVG({
       {showGlow && !silhouette && <circle cx="100" cy="100" r="90" fill={`url(#${instanceId}-bg-glow)`} />}
 
       {/* Main robot rendering - wrapped in silhouette filter when locked */}
-      <g filter={silhouette ? `url(#${instanceId}-silhouette)` : undefined}>
+      <g filter={silhouette ? `url(#${instanceId}-silhouette)` : undefined} transform={!silhouette ? roleTransform : undefined}>
         {/* Render Order: Back -> Thrusters -> Legs -> Arms -> Body -> Head -> Weapon */}
         <g className={silhouette ? undefined : `mech-anim-${instanceId}`}>
-          <Aura />
-          <ExtraBackpack />
-          <Backpack />
-          <Thrusters />
+          {/* Aura and Heavy effects skipped in isLite */}
+          {!isLite && (
+            <>
+              <Aura />
+              <ExtraBackpack />
+              <Backpack />
+              <Thrusters />
+            </>
+          )}
           <Legs />
           <Arms />
           <ShoulderArmor />
@@ -948,7 +992,7 @@ function RobotSVG({
           <DecalOverlay />
           <Head />
           <Weapon />
-          <RareEffect />
+          {!isLite && <RareEffect />}
         </g>
 
         <g id="msShadow" opacity="0.12">
@@ -981,15 +1025,36 @@ function RobotSVG({
 // Custom comparison to handle object props efficiently
 export default memo(RobotSVG, (prevProps, nextProps) => {
   // Re-render if essential props change
+  // Check parts object (shallow comparison of values)
+  if (prevProps.parts !== nextProps.parts) {
+    const p1 = prevProps.parts;
+    const p2 = nextProps.parts;
+    if (
+      p1.head !== p2.head ||
+      p1.body !== p2.body ||
+      p1.armLeft !== p2.armLeft ||
+      p1.armRight !== p2.armRight ||
+      p1.legLeft !== p2.legLeft ||
+      p1.legRight !== p2.legRight ||
+      p1.backpack !== p2.backpack ||
+      p1.weapon !== p2.weapon
+    ) {
+      return false; // Parts changed
+    }
+    // Check remaining parts if any (face, accessory usually not visual in SVG yet or strictly mapped)
+  }
+
   if (
-    prevProps.parts !== nextProps.parts ||
     prevProps.size !== nextProps.size ||
     prevProps.variant !== nextProps.variant ||
     prevProps.silhouette !== nextProps.silhouette ||
     prevProps.showGlow !== nextProps.showGlow ||
     prevProps.animate !== nextProps.animate ||
     prevProps.variantKey !== nextProps.variantKey ||
-    prevProps.isRareVariant !== nextProps.isRareVariant
+    prevProps.isRareVariant !== nextProps.isRareVariant ||
+    prevProps.simplified !== nextProps.simplified ||
+    prevProps.role !== nextProps.role ||
+    prevProps.rarityEffect !== nextProps.rarityEffect
   ) {
     return false; // Props changed, re-render
   }

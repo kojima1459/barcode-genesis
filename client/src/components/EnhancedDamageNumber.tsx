@@ -84,7 +84,7 @@ export function EnhancedDamageNumber({
 
                 {/* Main damage text */}
                 <div
-                    className={`font-bold ${getSize()} ${getColor()} drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] relative z-10`}
+                    className={`font-black italic font-orbitron tabular-nums ${getSize()} ${getColor()} drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] relative z-10`}
                     style={{
                         textShadow: isCritical
                             ? "0 0 20px rgba(255, 215, 0, 0.8), 0 0 40px rgba(255, 215, 0, 0.4)"

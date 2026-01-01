@@ -96,7 +96,11 @@ export default function Scan() {
             if (data?.robot) {
                 setRobot(data.robot);
                 setScannedBarcode(barcode);
-                setIsRare(isSpecialRare(barcode));
+                // Phase B: Check rarityTier for legendary/rare status
+                const isLegendary = data.robot.rarityTier === 'legendary' ||
+                    (data.robot.rarity && data.robot.rarity >= 4) ||
+                    isSpecialRare(barcode);
+                setIsRare(isLegendary);
                 setMode('revealing');
                 // Sound and haptic handled in reveal phase
             } else {
@@ -140,9 +144,9 @@ export default function Scan() {
     };
 
     return (
-        <div className="min-h-screen bg-bg p-4 flex flex-col pb-24 relative overflow-hidden text-text">
+        <div className="min-h-screen bg-background p-4 flex flex-col pb-24 relative overflow-hidden text-foreground">
             <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-20 pointer-events-none" />
-            <div className="absolute inset-0 bg-gradient-to-b from-transparent to-bg/90 pointer-events-none" />
+            <div className="absolute inset-0 bg-linear-to-b from-transparent to-bg/90 pointer-events-none" />
 
             <header className="flex items-center mb-8 max-w-4xl mx-auto w-full relative z-10">
                 <Link href="/">
@@ -204,7 +208,14 @@ export default function Scan() {
                         {/* Show robot preview behind reveal */}
                         <div className="w-full max-w-md px-4 opacity-20">
                             <div className="glass-panel p-8 rounded-2xl">
-                                <RobotSVG parts={robot.parts} colors={robot.colors} size={200} animate={false} />
+                                <RobotSVG
+                                    parts={robot.parts}
+                                    colors={robot.colors}
+                                    size={200}
+                                    animate={false}
+                                    role={typeof robot.role === 'string' ? robot.role : undefined}
+                                    rarityEffect={robot.rarityTier === 'legendary' ? 'legendary' : (robot.rarityTier === 'rare' ? 'rare' : undefined)}
+                                />
                             </div>
                         </div>
                     </>
@@ -213,7 +224,15 @@ export default function Scan() {
                 {mode === 'result' && robot && (
                     <div className="flex flex-col items-center gap-8 py-8 w-full pop-in" id="tutorial-scan-result">
                         <div className="glass-panel p-8 rounded-2xl border-neon-cyan shadow-[0_0_20px_rgba(62,208,240,0.3)] pop-glow">
-                            <RobotSVG parts={robot.parts} colors={robot.colors} size={200} animate={true} fx={fx} />
+                            <RobotSVG
+                                parts={robot.parts}
+                                colors={robot.colors}
+                                size={200}
+                                animate={true}
+                                fx={fx}
+                                role={typeof robot.role === 'string' ? robot.role : undefined}
+                                rarityEffect={robot.rarityTier === 'legendary' ? 'legendary' : (robot.rarityTier === 'rare' ? 'rare' : undefined)}
+                            />
                         </div>
 
                         <div className="text-center space-y-4 pop-in">
@@ -223,8 +242,16 @@ export default function Scan() {
                             <div className="flex gap-3 justify-center">
                                 {/* Role Badge */}
                                 {robot.role && (
-                                    <span className={`px-3 py-1 rounded-full text-sm font-bold border ${ROLE_COLORS[robot.role].replace('/10', '/20')}`}>
-                                        <ScrambleText text={robot.roleName || ROLE_LABELS[robot.role].ja} delay={200} />
+                                    <span className={`px-3 py-1 rounded-full text-sm font-bold border ${(() => {
+                                        const r = String(robot.role).toUpperCase();
+                                        if (r === 'STRIKER') return ROLE_COLORS.ATTACKER;
+                                        if (r === 'SUPPORT') return ROLE_COLORS.TRICKY;
+                                        if (r === 'BALANCED') return ROLE_COLORS.BALANCE;
+                                        // Fallback for legacy or direct match
+                                        return ROLE_COLORS[r as any] || ROLE_COLORS.BALANCE;
+                                    })().replace('/10', '/20')
+                                        }`}>
+                                        <ScrambleText text={robot.roleName || (typeof robot.role === 'string' ? robot.role.toUpperCase() : '')} delay={200} />
                                     </span>
                                 )}
                                 <span className="px-3 py-1 rounded-full bg-neon-cyan/20 text-neon-cyan text-sm font-bold border border-neon-cyan/50">

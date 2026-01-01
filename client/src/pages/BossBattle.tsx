@@ -150,7 +150,7 @@ export default function BossBattle() {
 
     if (loading) {
         return (
-            <div className="flex justify-center p-8 min-h-screen items-center bg-bg">
+            <div className="flex justify-center p-8 min-h-screen items-center bg-background">
                 <SystemSkeleton
                     className="w-full max-w-lg aspect-video rounded-3xl"
                     text="CONNECTING TO BOSS SERVER..."
@@ -162,7 +162,7 @@ export default function BossBattle() {
 
     if (!bossData) {
         return (
-            <div className="min-h-screen bg-bg text-text p-4 flex flex-col items-center justify-center">
+            <div className="min-h-screen bg-background text-foreground p-4 flex flex-col items-center justify-center">
                 <XCircle className="w-16 h-16 text-red-500 mb-4" />
                 <p className="text-lg">ボスデータの読み込みに失敗しました</p>
                 <Link href="/">
@@ -177,7 +177,7 @@ export default function BossBattle() {
         const isWin = battleResult.result === 'win';
 
         return (
-            <div className="min-h-screen bg-bg text-text p-4 flex flex-col pb-24">
+            <div className="min-h-screen bg-background text-foreground p-4 flex flex-col pb-24">
                 <SEO title={isWin ? t('boss_victory') : t('boss_defeat')} />
 
                 <header className="flex items-center mb-6 max-w-4xl mx-auto w-full">
@@ -256,7 +256,7 @@ export default function BossBattle() {
 
     // Pre-battle Selection Screen
     return (
-        <div className="min-h-screen bg-bg text-text p-4 flex flex-col pb-24">
+        <div className="min-h-screen bg-background text-foreground p-4 flex flex-col pb-24">
             <SEO title={`BOSS: ${bossData.name}`} />
             <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-20 pointer-events-none" />
 

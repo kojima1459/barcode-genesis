@@ -60,7 +60,7 @@ export function SoundProvider({ children }: { children: React.ReactNode }) {
     });
   }, [volume, isMuted]);
 
-  const playBGM = (type: 'bgm_menu' | 'bgm_battle') => {
+  const playBGM = (type: 'bgm_menu' | 'bgm_battle', loop: boolean = true) => {
     if (currentBGM === type && bgmRef.current && !bgmRef.current.paused) return;
 
     if (bgmRef.current) {
@@ -68,8 +68,8 @@ export function SoundProvider({ children }: { children: React.ReactNode }) {
     }
 
     const audio = new Audio(soundPaths[type]);
-    // メニューBGMはループ、バトルBGMは1回のみ再生
-    audio.loop = type === 'bgm_menu';
+    // Allow custom loop setting
+    audio.loop = loop;
     audio.volume = isMuted ? 0 : volume;
     audio.play().catch(e => console.log('Audio play failed:', e));
 

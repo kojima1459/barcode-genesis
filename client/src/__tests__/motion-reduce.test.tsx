@@ -15,7 +15,7 @@ describe("Reduced motion preference", () => {
     renderWithRouter("/battle");
 
     await waitFor(() => {
-      expect(screen.getByText("battle_arena")).toBeInTheDocument();
+      expect(screen.getByText("バトルアリーナ")).toBeInTheDocument();
     });
 
     (globalThis as any).__prefersReducedMotion = false;

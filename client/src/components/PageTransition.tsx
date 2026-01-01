@@ -47,7 +47,7 @@ export default function PageTransition({ children, className = "" }: PageTransit
             {/* Cyber Shutter (Managed by child variants) */}
             <div className="fixed inset-0 z-[9999] pointer-events-none flex flex-col">
                 <motion.div
-                    className="cyber-shutter-half bg-bg border-b-2 border-accent shadow-[0_0_30px_rgba(0,255,255,0.2)]"
+                    className="cyber-shutter-half bg-background border-b-2 border-accent shadow-[0_0_30px_rgba(0,255,255,0.2)]"
                     variants={{
                         initial: { translateY: "0%" },
                         animate: { translateY: "-100%" },
@@ -57,7 +57,7 @@ export default function PageTransition({ children, className = "" }: PageTransit
                     style={{ flex: 1 }}
                 />
                 <motion.div
-                    className="cyber-shutter-half bg-bg border-t-2 border-accent shadow-[0_0_30px_rgba(0,255,255,0.2)]"
+                    className="cyber-shutter-half bg-background border-t-2 border-accent shadow-[0_0_30px_rgba(0,255,255,0.2)]"
                     variants={{
                         initial: { translateY: "0%" },
                         animate: { translateY: "100%" },

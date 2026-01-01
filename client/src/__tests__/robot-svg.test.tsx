@@ -26,13 +26,15 @@ describe("RobotSVG overlays", () => {
   it("renders ace-only overlay when tier is B_ACE", () => {
     const { container } = render(<RobotSVG parts={makeParts(1)} colors={colors} />);
     expect(container.querySelector("#msOverlay")).toBeTruthy();
-    expect(container.querySelector("#ms-ace-extra")).toBeTruthy();
+    const aceExtra = container.querySelector("#ms-ace-extra") || container.querySelector("#ms-ace-extra-zaku");
+    expect(aceExtra).toBeTruthy();
   });
 
   it("skips ace-only overlay when tier is A_MASS", () => {
     const { container } = render(<RobotSVG parts={makeParts(10)} colors={colors} />);
     expect(container.querySelector("#msOverlay")).toBeTruthy();
-    expect(container.querySelector("#ms-ace-extra")).toBeFalsy();
+    const aceExtra = container.querySelector("#ms-ace-extra") || container.querySelector("#ms-ace-extra-zaku");
+    expect(aceExtra).toBeFalsy();
   });
 
   it("switches motif overlay deterministically", () => {

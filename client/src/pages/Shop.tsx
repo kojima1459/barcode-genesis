@@ -15,6 +15,8 @@ import { PRODUCTS } from "../../../shared/products";
 import { toast } from "sonner";
 import { Interactive } from "@/components/ui/interactive";
 import { GlobalHeader } from "@/components/GlobalHeader";
+import { useUserData } from "@/hooks/useUserData";
+import { ShopItemCard, CategoryIcon } from "@/components/ShopItemCard";
 
 type InventoryMap = Record<string, number>;
 
@@ -38,54 +40,32 @@ const getErrorMessage = (error: unknown, isCraftItem: boolean, t: (key: string) 
     if (message.includes("insufficient-tokens")) return t('shop_insufficient_tokens');
     if (message.includes("insufficient-credits")) return t('shop_insufficient_credits');
     if (message) return message;
+    return t('shop_purchase_error');
   }
   return t('shop_purchase_error');
-};
-
-const CategoryIcon = ({ category }: { category: ShopItemCategory }) => {
-  switch (category) {
-    case 'boost': return <Zap className="w-4 h-4" />;
-    case 'battle': return <Sword className="w-4 h-4" />;
-    case 'cosmetic': return <Sparkles className="w-4 h-4" />;
-  }
 };
 
 export default function Shop() {
   const { user } = useAuth();
   const { language, t } = useLanguage();
-  const [credits, setCredits] = useState(0);
-  const [scanTokens, setScanTokens] = useState(0);
-  const [xp, setXp] = useState(0);
-  const [level, setLevel] = useState(1);
+  const { userData, loading: userDataLoading } = useUserData();
+
+
   const [inventory, setInventory] = useState<InventoryMap>({});
-  const [loading, setLoading] = useState(true);
-  const [purchaseQty, setPurchaseQty] = useState<Record<string, number>>({});
+  const [loadingInventory, setLoadingInventory] = useState(true);
+
   const [purchasingItemId, setPurchasingItemId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [buyingProduct, setBuyingProduct] = useState<string | null>(null);
 
   useEffect(() => {
-    const loadData = async () => {
+    const loadInventory = async () => {
       if (!user) {
-        setLoading(false);
+        setLoadingInventory(false);
         return;
       }
 
       try {
-        const userDoc = await getDoc(doc(db, "users", user.uid));
-        if (userDoc.exists()) {
-          const data = userDoc.data();
-          setCredits(typeof data.credits === "number" ? data.credits : 0);
-          setScanTokens(typeof data.scanTokens === "number" ? data.scanTokens : 0);
-          setXp(typeof data.xp === "number" ? data.xp : 0);
-          setLevel(typeof data.level === "number" ? data.level : 1);
-        } else {
-          setCredits(0);
-          setScanTokens(0);
-          setXp(0);
-          setLevel(1);
-        }
-
         const inventorySnap = await getDocs(collection(db, "users", user.uid, "inventory"));
         const nextInventory: InventoryMap = {};
         inventorySnap.forEach((itemDoc) => {
@@ -96,17 +76,20 @@ export default function Shop() {
         });
         setInventory(nextInventory);
       } catch (error) {
-        console.error("Failed to load shop data:", error);
+        console.error("Failed to load inventory:", error);
         toast.error(t('shop_load_error'));
       } finally {
-        setLoading(false);
+        setLoadingInventory(false);
       }
     };
 
-    loadData();
+    loadInventory();
   }, [user]);
 
-  const qtyOptions = useMemo(() => Array.from({ length: 10 }, (_, index) => index + 1), []);
+  const credits = userData?.credits || 0;
+  const scanTokens = userData?.scanTokens || 0;
+  const loading = userDataLoading || loadingInventory;
+
 
   const handleBuyCoins = async (productId: string) => {
     if (!user) return;
@@ -126,12 +109,13 @@ export default function Shop() {
     }
   };
 
-  const handlePurchase = async (itemId: string) => {
+
+  const handlePurchase = async (itemId: string, qty: number = 1) => {
     if (!user) return;
     setErrorMessage(null);
     setPurchasingItemId(itemId);
     try {
-      const qty = purchaseQty[itemId] ?? 1;
+      // qty is now passed from ShopItemCard
       const item = SHOP_ITEMS.find((entry) => entry.id === itemId);
       const isCraftItem = typeof item?.tokenCost === "number";
       const action = httpsCallable(functions, isCraftItem ? "craftItem" : "purchaseItem");
@@ -143,14 +127,11 @@ export default function Shop() {
         inventoryDelta: { itemId: string; qty: number; totalQty: number };
       };
 
-      setCredits(data.credits);
-      if (typeof data.scanTokens === "number") {
-        setScanTokens(data.scanTokens);
-      }
       setInventory((prev) => ({
         ...prev,
         [data.inventoryDelta.itemId]: data.inventoryDelta.totalQty
       }));
+      // Credits/Tokens updated automatically via useUserData
       toast.success(isCraftItem ? t('shop_craft_success') : t('shop_purchase_success'));
     } catch (error) {
       console.error("Purchase failed:", error);
@@ -170,55 +151,15 @@ export default function Shop() {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {items.map((item) => (
-          <Interactive key={item.id} className="hover:border-primary/50 transition-colors h-auto overflow-hidden rounded-xl">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <CategoryIcon category={item.category} />
-                {getItemLabel(item.id, language)}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <p className="text-sm text-muted-foreground">{getItemDescription(item.id, language)}</p>
-              <div className="flex justify-between items-center text-sm">
-                <span className="font-bold text-primary">
-                  {typeof item.tokenCost === "number"
-                    ? `${t('shop_material')}: Token ${item.tokenCost} + ${item.price} ${t('shop_credits')}`
-                    : `${item.price} ${t('shop_credits')}`}
-                </span>
-                <span className="text-muted-foreground">{t('shop_owned')}: {inventory[item.id] ?? 0}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <select
-                  value={purchaseQty[item.id] ?? 1}
-                  onChange={(event) =>
-                    setPurchaseQty((prev) => ({
-                      ...prev,
-                      [item.id]: Number(event.target.value)
-                    }))
-                  }
-                  className="border rounded px-2 py-1 bg-background text-sm"
-                >
-                  {qtyOptions.map((qty) => (
-                    <option key={qty} value={qty}>
-                      x{qty}
-                    </option>
-                  ))}
-                </select>
-                <Button
-                  onClick={() => handlePurchase(item.id)}
-                  disabled={
-                    purchasingItemId === item.id ||
-                    credits < item.price * (purchaseQty[item.id] ?? 1) ||
-                    (typeof item.tokenCost === "number" && scanTokens < item.tokenCost * (purchaseQty[item.id] ?? 1))
-                  }
-                  size="sm"
-                >
-                  {purchasingItemId === item.id && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
-                  {typeof item.tokenCost === "number" ? t('shop_craft') : t('shop_buy')}
-                </Button>
-              </div>
-            </CardContent>
-          </Interactive>
+          <ShopItemCard
+            key={item.id}
+            item={item}
+            ownedCount={inventory[item.id] ?? 0}
+            credits={credits}
+            scanTokens={scanTokens}
+            onPurchase={handlePurchase}
+            isPurchasing={purchasingItemId === item.id}
+          />
         ))}
       </div>
     );
@@ -229,15 +170,15 @@ export default function Shop() {
       <div className="min-h-screen flex items-center justify-center bg-background p-8">
         <SystemSkeleton
           className="w-full max-w-2xl h-80 rounded-3xl"
-          text="ACCESSING MARKETPLACE..."
-          subtext="RETRIEVING INVENTORY DATA"
+          text={t('shop_loading_text')}
+          subtext={t('shop_loading_subtext')}
         />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen pb-24 relative overflow-hidden bg-bg text-text">
+    <div className="flex-1 flex flex-col relative pb-32 md:pb-8 bg-background text-foreground overflow-hidden">
       {/* Global Header */}
       <GlobalHeader />
 
@@ -291,7 +232,7 @@ export default function Shop() {
         <div className="flex justify-center mt-8 mb-4">
           <Link href="/premium">
             <span className="text-xs text-muted-foreground/50 underline cursor-pointer hover:text-accent transition-colors">
-              広告非表示 / 上限UP (Premium)
+              {t('shop_premium_link')}
             </span>
           </Link>
         </div>

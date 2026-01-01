@@ -198,12 +198,15 @@ export const playGenerated = (type: GeneratedSoundType) => {
       break;
     }
     case "hit_light": {
-      // White noise burst
+      // White noise burst (Deterministic/Seeded for battle consistency)
       const bufferSize = ctx.sampleRate * 0.1; // 0.1s
       const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
       const data = buffer.getChannelData(0);
+      // Use a simple deterministic sequence instead of Math.random()
+      let seed = 12345;
       for (let i = 0; i < bufferSize; i++) {
-        data[i] = Math.random() * 2 - 1;
+        seed = (seed * 1664525 + 1013904223) | 0;
+        data[i] = ((seed >>> 0) / 4294967296) * 2 - 1;
       }
       const noise = ctx.createBufferSource();
       noise.buffer = buffer;

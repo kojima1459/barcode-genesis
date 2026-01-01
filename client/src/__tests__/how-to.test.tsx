@@ -25,9 +25,9 @@ describe("how-to page", () => {
     setAuthState({ user: { uid: "user-1" }, loading: false });
     renderWithRouter("/how-to");
 
-    expect(screen.getByRole("button", { name: "スキャンへ" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "バトルへ" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "図鑑へ" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "工房へ" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /スキャンへ/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /バトルへ/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /ユニットへ/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /工房へ/ })).toBeInTheDocument();
   });
 });

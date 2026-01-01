@@ -1,12 +1,14 @@
-import { RobotData, RobotParts, RobotColors, RobotRole, RobotVisuals } from './types';
+import { RobotData, RobotParts, RobotColors, RobotRole as LegacyRole, RobotVisuals } from './types';
+import { getRoleFromSeed, getRarityFromSeed, ROLE_LABELS } from './lib/robotRoles';
+import { generateRobotName } from './lib/robotNames';
 
 // 定数定義
 const RARITY_NAMES = ["ノーマル", "レア", "スーパーレア", "ウルトラレア", "レジェンド"];
 const ELEMENT_NAMES = ["ファイア", "アクア", "ウィンド", "アース", "ライト", "ダーク", "メカ"];
 const FAMILY_NAMES = ["DRINK", "SNACK", "DAILY", "BEAUTY", "OTHER"];
 
-// ロール定義（アーキタイプ）
-const ROLE_NAMES: Record<RobotRole, string> = {
+// ロール定義（アーキタイプ）- Legacy system
+const ROLE_NAMES: Record<LegacyRole, string> = {
   'ATTACKER': 'アサルト', // Was アタッカー
   'TANK': 'タンク',
   'SPEED': 'ランナー',   // Was スピード
@@ -14,7 +16,7 @@ const ROLE_NAMES: Record<RobotRole, string> = {
   'TRICKY': 'ジャガーノート' // Was トリッキー
 };
 
-const ROLE_TITLES: Record<RobotRole, string> = {
+const ROLE_TITLES: Record<LegacyRole, string> = {
   'ATTACKER': '突撃',
   'TANK': '重装',
   'SPEED': '疾風',
@@ -22,8 +24,8 @@ const ROLE_TITLES: Record<RobotRole, string> = {
   'TRICKY': '破壊'
 };
 
-// 二つ名リスト (Epithet Prefixes)
-const EPITHET_PREFIXES: Record<RobotRole, string[]> = {
+// 二つ名リスト (Epithet Prefixes) - Legacy system
+const EPITHET_PREFIXES: Record<LegacyRole, string[]> = {
   'ATTACKER': ["紅蓮の", "深紅の", "激昴の", "無双の", "破壊の"],
   'TANK': ["不沈の", "鉄壁の", "金剛の", "守護の", "不動の"],
   'SPEED': ["瞬足の", "翠緑の", "疾風の", "閃光の", "音速の"],
@@ -195,7 +197,7 @@ function calculateRarity(digits: number[]): number {
 }
 
 // ステータス計算（ロール補正付き）
-function calculateStats(digits: number[], rarity: number, role: RobotRole) {
+function calculateStats(digits: number[], rarity: number, role: LegacyRole) {
   const totalPoints = 100 + (rarity * 20);
   const ratioSeed = digits[7] * 100 + digits[8] * 10 + digits[9];
   const ratioAttack = (ratioSeed % 100) / 100;
@@ -285,7 +287,7 @@ function calculateFamily(digits: number[]): { id: number, name: string } {
 }
 
 // ロール決定（バーコード特徴から決定的に判定）
-function calculateRole(digits: number[], features: BarcodeFeatures): { role: RobotRole, name: string, title: string } {
+function calculateRole(digits: number[], features: BarcodeFeatures): { role: LegacyRole, name: string, title: string } {
   const { oddCount, sumDigits, has7, digitCounts } = features;
   const tankScore = digitCounts[0] + digitCounts[8];
 
@@ -295,7 +297,7 @@ function calculateRole(digits: number[], features: BarcodeFeatures): { role: Rob
   const balanceScore = Math.abs(highCount - lowCount);
   const trickySeed = (digits[5] + digits[11]) % 10;
 
-  let role: RobotRole;
+  let role: LegacyRole;
 
   // Feature-based role bias (priority order)
   if (has7 && trickySeed <= 2) {
@@ -375,7 +377,7 @@ function selectParts(digits: number[], features: BarcodeFeatures): RobotParts {
 }
 
 // 二つ名生成
-function generateEpithet(digits: number[], role: RobotRole): string {
+function generateEpithet(digits: number[], role: LegacyRole): string {
   const seed = digits[11] * 10 + digits[12]; // Use last 2 digits for stability
   const list = EPITHET_PREFIXES[role];
   const selected = list[seed % list.length];
@@ -383,9 +385,9 @@ function generateEpithet(digits: number[], role: RobotRole): string {
 }
 
 // カラー生成 (ロールベース)
-function generateRoleColors(role: RobotRole, rarity: number, digits: number[]): RobotColors {
+function generateRoleColors(role: LegacyRole, rarity: number, digits: number[]): RobotColors {
   // Base Hues: Red, Yellow, Green, Blue, Purple
-  const ROLE_HUES: Record<RobotRole, number> = {
+  const ROLE_HUES: Record<LegacyRole, number> = {
     'ATTACKER': 0,    // Red
     'TANK': 45,       // Yellow/Orange
     'SPEED': 150,     // Green
@@ -441,7 +443,7 @@ function calculateRareEffect(seedHash: number): 'none' | 'rare' | 'legendary' {
   return 'none';
 }
 
-function calculateVisuals(features: BarcodeFeatures, role: RobotRole): RobotVisuals {
+function calculateVisuals(features: BarcodeFeatures, role: LegacyRole): RobotVisuals {
   const { manufacturerCode, productCode, seedHash } = features;
   const rng = (seed: number) => Math.abs(seed) % 100;
 
@@ -535,10 +537,16 @@ export function generateRobotData(barcode: string, userId: string): RobotData {
   const visuals = calculateVisuals(features, roleInfo.role);
   const rarityEffect = calculateRareEffect(features.seedHash);
 
-  // New Name Generation
-  const name = generateName(digits, roleInfo.title, features);
+  // Legacy name generation (keep for backward compat, but unused)
+  // const name = generateName(digits, roleInfo.title, features);
 
-  // 二つ名生成
+  // Phase B: New Role System (deterministic from seed)
+  const phaseB_seed = features.seedHash;
+  const phaseB_role = getRoleFromSeed(phaseB_seed);
+  const phaseB_rarity = getRarityFromSeed(phaseB_seed);
+  const phaseB_name = generateRobotName(phaseB_role, phaseB_rarity, phaseB_seed);
+
+  // 二つ名生成 (keep legacy for backward compat)
   const epithet = generateEpithet(digits, roleInfo.role);
 
   // ビジュアルバリアントキー (0-99)
@@ -557,7 +565,7 @@ export function generateRobotData(barcode: string, userId: string): RobotData {
 
   return {
     userId,
-    name,
+    name: phaseB_name,  // Use Phase B name
     epithet,
     variantKey,
     sourceBarcode: barcode,
@@ -573,9 +581,12 @@ export function generateRobotData(barcode: string, userId: string): RobotData {
     slot,
     evolutionLevel: 0,
 
-    // ロール情報
-    role: roleInfo.role,
-    roleName: roleInfo.name,
+    // Phase B: New Role System
+    role: phaseB_role,
+    rarityTier: phaseB_rarity, // Phase B rarity tier
+
+    // Legacy role fields (keep for backward compat)
+    roleName: ROLE_LABELS[phaseB_role], // Phase B updated label
     roleTitle: roleInfo.title,
 
     level: 1,

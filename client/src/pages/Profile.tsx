@@ -17,9 +17,10 @@ import { Interactive } from "@/components/ui/interactive";
 import { SystemSkeleton } from "@/components/ui/SystemSkeleton";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { SoundSettings } from "@/components/SoundSettings";
-import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { Crown, Settings } from "lucide-react";
 import { GlobalHeader } from "@/components/GlobalHeader";
+import { useUserData } from "@/hooks/useUserData";
 
 interface UserProfile {
   displayName?: string;
@@ -35,28 +36,24 @@ export default function Profile() {
   const { t } = useLanguage();
   const { playSE } = useSound();
   const { user, logout } = useAuth();
+  const { userData, loading: userDataLoading } = useUserData();
   const [, setLocation] = useLocation();
-  const [profile, setProfile] = useState<UserProfile>({});
   const [robots, setRobots] = useState<RobotData[]>([]);
   const [isEditing, setIsEditing] = useState(false);
   const [newName, setNewName] = useState("");
-  const [loading, setLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const fetchProfile = async () => {
+    if (userData) {
+      setNewName(userData.displayName || "");
+    }
+  }, [userData]);
+
+  useEffect(() => {
+    const fetchRobots = async () => {
       if (!user) return;
       try {
-        // Fetch user profile
-        const userDoc = await getDoc(doc(db, "users", user.uid));
-        if (userDoc.exists()) {
-          const data = userDoc.data();
-          setProfile(data);
-          setNewName(data.displayName || "");
-        }
-
-        // Fetch user robots for stats
         const q = query(collection(db, "users", user.uid, "robots"), orderBy("createdAt", "desc"));
         const snapshot = await getDocs(q);
         const robotData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as RobotData));
@@ -64,11 +61,9 @@ export default function Profile() {
       } catch (error) {
         console.error(error);
         toast.error(t('error'));
-      } finally {
-        setLoading(false);
       }
     };
-    fetchProfile();
+    fetchRobots();
   }, [user]);
 
   const handleSaveName = async () => {
@@ -77,7 +72,7 @@ export default function Profile() {
       await updateDoc(doc(db, "users", user.uid), {
         displayName: newName.trim()
       });
-      setProfile(prev => ({ ...prev, displayName: newName.trim() }));
+      // useUserData will auto-update
       setIsEditing(false);
       toast.success(t('success'));
       playSE('se_click');
@@ -110,7 +105,7 @@ export default function Profile() {
         photoURL: downloadURL
       });
 
-      setProfile(prev => ({ ...prev, photoURL: downloadURL }));
+      // useUserData will auto-update
       toast.success(t('upload_photo_success'));
       playSE('se_click');
     } catch (error) {
@@ -143,11 +138,11 @@ export default function Profile() {
 
   // Calculate total stats
   const totalWins = robots.reduce((acc, r) => acc + (r.level ? Math.floor(r.level * 1.5) : 0), 0);
-  const displayWins = profile.wins || 0;
-  const displayBattles = profile.battles || 0;
+  const displayWins = userData?.wins || 0;
+  const displayBattles = userData?.battles || 0;
   const winRate = displayBattles > 0 ? Math.round((displayWins / displayBattles) * 100) : 0;
 
-  if (loading) return (
+  if (userDataLoading) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background p-8">
       <SystemSkeleton
         className="w-full max-w-2xl h-64 rounded-3xl"
@@ -158,7 +153,7 @@ export default function Profile() {
   );
 
   return (
-    <div className="min-h-screen bg-bg text-text pb-24 flex flex-col relative overflow-hidden">
+    <div className="flex-1 flex flex-col relative pb-32 md:pb-8 bg-background text-foreground overflow-hidden">
       {/* Global Header */}
       <GlobalHeader />
 
@@ -191,8 +186,8 @@ export default function Profile() {
                 />
 
                 <div className="w-32 h-32 rounded-full bg-secondary flex items-center justify-center text-4xl overflow-hidden border-2 border-secondary group-hover:border-primary transition-colors relative">
-                  {profile.photoURL ? (
-                    <img src={profile.photoURL} alt="Profile" className="w-full h-full object-cover" />
+                  {userData?.photoURL ? (
+                    <img src={userData.photoURL} alt="Profile" className="w-full h-full object-cover" />
                   ) : (
                     "👤"
                   )}
@@ -227,7 +222,7 @@ export default function Profile() {
                     </div>
                   ) : (
                     <div className="flex items-center gap-4">
-                      <h2 className="text-3xl font-bold">{profile.displayName || t('name_no_name')}</h2>
+                      <h2 className="text-3xl font-bold">{userData?.displayName || t('name_no_name')}</h2>
                       <Button variant="ghost" size="icon" onClick={() => setIsEditing(true)}>
                         <Edit2 className="h-4 w-4" />
                       </Button>
@@ -262,15 +257,15 @@ export default function Profile() {
                 {/* Level / XP / Lines */}
                 <div className="grid grid-cols-3 gap-4 pt-2">
                   <Interactive className="text-center p-4 bg-secondary/10 rounded-lg h-auto">
-                    <div className="text-2xl font-bold text-blue-500">{profile.level || 1}</div>
+                    <div className="text-2xl font-bold text-blue-500">{userData?.level || 1}</div>
                     <div className="text-xs text-muted-foreground">{t('level_label')}</div>
                   </Interactive>
                   <Interactive className="text-center p-4 bg-secondary/10 rounded-lg h-auto">
-                    <div className="text-2xl font-bold text-purple-500">{profile.xp || 0}</div>
+                    <div className="text-2xl font-bold text-purple-500">{userData?.xp || 0}</div>
                     <div className="text-xs text-muted-foreground">{t('xp_label')}</div>
                   </Interactive>
                   <Interactive className="text-center p-4 bg-secondary/10 rounded-lg h-auto">
-                    <div className="text-2xl font-bold text-orange-500">{profile.workshopLines || 1}</div>
+                    <div className="text-2xl font-bold text-orange-500">{userData?.workshopLines || 1}</div>
                     <div className="text-xs text-muted-foreground">{t('factory_lines')}</div>
                   </Interactive>
                 </div>

@@ -6,61 +6,83 @@
 @custom-variant dark (&:is(.dark *, [data-theme="dark"] *));
 
 @theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
+  /* Spacing Scale (Rem based) */
+  --spacing-1: 0.25rem;  /* 4px */
+  --spacing-2: 0.5rem;   /* 8px */
+  --spacing-3: 0.75rem;  /* 12px */
+  --spacing-4: 1rem;     /* 16px */
+  --spacing-6: 1.5rem;   /* 24px */
+  
+  /* Radius Scale */
+  --radius-sm: 0.5rem;   /* 8px */
+  --radius-md: 0.75rem;  /* 12px */
+  --radius-lg: 1rem;     /* 16px */
+  --radius-xl: 1.25rem;  /* 20px */
+  --radius-2xl: 1.5rem;  /* 24px */
+
+  /* Typography Scale */
+  --text-xs: 0.75rem;    /* 12px */
+  --text-sm: 0.875rem;   /* 14px */
+  --text-base: 1rem;     /* 16px */
+  --text-lg: 1.25rem;    /* 20px */
+  --text-xl: 1.5rem;     /* 24px */
+
+  /* Font Families */
   --font-display: "Orbitron", "Oxanium", "Rajdhani", system-ui, sans-serif;
   --font-body: "IBM Plex Sans JP", "Inter", "Noto Sans JP", system-ui, sans-serif;
   --font-orbitron: "Orbitron", "Oxanium", "Rajdhani", system-ui, sans-serif;
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
+
+  /* Color Palette - Commercial Grade */
+  --color-background: var(--bg);
+  --color-foreground: var(--text);
+  
+  --color-card: var(--surface);
+  --color-card-foreground: var(--text);
+  
+  --color-popover: var(--surface);
+  --color-popover-foreground: var(--text);
+  
   --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
+  --color-primary-foreground: #000000;
+  
+  --color-secondary: var(--surface2);
+  --color-secondary-foreground: var(--text);
+  
+  --color-muted: var(--surface2);
+  --color-muted-foreground: var(--muted);
+  
   --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
+  --color-accent-foreground: #000000;
+  
+  --color-destructive: var(--danger);
+  --color-destructive-foreground: #ffffff;
+  
   --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-bg: var(--bg);
-  --color-panel: var(--panel);
-  --color-surface: var(--surface);
-  --color-surface2: var(--surface2);
-  --color-text: var(--text);
-  --color-danger: var(--danger);
-  --color-success: var(--success);
-  --color-accent2: var(--accent2);
+  --color-input: var(--border);
+  --color-ring: var(--accent);
   
   /* Cyberpunk Custom Colors */
   --color-neon-cyan: var(--accent);
   --color-neon-purple: var(--accent2);
   --color-neon-pink: var(--danger);
-  --color-neon-yellow: var(--accent2);
+  --color-neon-yellow: #facc15;
   --color-dark-bg: var(--bg);
   --color-glass-border: color-mix(in oklab, var(--border) 70%, transparent);
+
+  /* Sidebar & Charts (Preserved) */
+  --color-sidebar: var(--surface);
+  --color-sidebar-foreground: var(--text);
+  --color-sidebar-primary: var(--accent);
+  --color-sidebar-primary-foreground: #000000;
+  --color-sidebar-accent: var(--surface2);
+  --color-sidebar-accent-foreground: var(--text);
+  --color-sidebar-border: var(--border);
+  --color-sidebar-ring: var(--accent);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
 }
 
 @layer utilities {
@@ -111,6 +133,16 @@
   .bg-noise {
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
     pointer-events: none;
+  }
+  /* Typography Utilities */
+  .text-balance {
+    text-wrap: balance;
+  }
+  .text-pretty {
+    text-wrap: pretty;
+  }
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
   }
 }
 
@@ -169,7 +201,7 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-bg text-text;
+    @apply bg-background text-foreground;
     text-rendering: optimizeLegibility;
     background-color: #050a10;
     background-image: 
@@ -303,4 +335,81 @@
   2%, 64% { transform: translate(2px,0) skew(0deg); }
   4%, 60% { transform: translate(-2px,0) skew(0deg); }
   62% { transform: translate(0,0) skew(5deg); }
+}
+
+/* Battle FX Animations */
+@keyframes camera-shake-light {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-2px) translateY(1px); }
+  50% { transform: translateX(2px) translateY(-1px); }
+  75% { transform: translateX(-1px) translateY(1px); }
+}
+
+@keyframes camera-shake-medium {
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  20% { transform: translateX(-4px) translateY(2px) rotate(-0.5deg); }
+  40% { transform: translateX(4px) translateY(-2px) rotate(0.5deg); }
+  60% { transform: translateX(-3px) translateY(1px) rotate(-0.3deg); }
+  80% { transform: translateX(3px) translateY(-1px) rotate(0.3deg); }
+}
+
+@keyframes camera-shake-heavy {
+  0%, 100% { transform: translateX(0) rotate(0deg) scale(1); }
+  10% { transform: translateX(-6px) translateY(3px) rotate(-1deg) scale(1.02); }
+  20% { transform: translateX(6px) translateY(-3px) rotate(1deg) scale(1.02); }
+  30% { transform: translateX(-5px) translateY(2px) rotate(-0.8deg) scale(1.01); }
+  40% { transform: translateX(5px) translateY(-2px) rotate(0.8deg) scale(1.01); }
+  50% { transform: translateX(-4px) translateY(1px) rotate(-0.5deg) scale(1); }
+  60% { transform: translateX(4px) translateY(-1px) rotate(0.5deg) scale(1); }
+  70% { transform: translateX(-2px) translateY(1px) rotate(-0.3deg) scale(1); }
+  80% { transform: translateX(2px) translateY(-1px) rotate(0.3deg) scale(1); }
+  90% { transform: translateX(-1px) rotate(-0.1deg) scale(1); }
+}
+
+@keyframes camera-zoom-in {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+@keyframes camera-zoom-out {
+  0% { transform: scale(1); }
+  50% { transform: scale(0.98); }
+  100% { transform: scale(1); }
+}
+
+@keyframes hit-flash-normal {
+  0% { filter: brightness(1); }
+  50% { filter: brightness(1.5); }
+  100% { filter: brightness(1); }
+}
+
+@keyframes hit-flash-critical {
+  0% { filter: brightness(1) saturate(1); }
+  50% { filter: brightness(2) saturate(1.5) drop-shadow(0 0 10px rgba(255,255,255,0.8)); }
+  100% { filter: brightness(1) saturate(1); }
+}
+
+@layer utilities {
+  .camera-shake-light {
+    animation: camera-shake-light 300ms ease-out;
+  }
+  .camera-shake-medium {
+    animation: camera-shake-medium 400ms ease-out;
+  }
+  .camera-shake-heavy {
+    animation: camera-shake-heavy 500ms ease-out;
+  }
+  .camera-zoom-in {
+    animation: camera-zoom-in 200ms ease-out;
+  }
+  .camera-zoom-out {
+    animation: camera-zoom-out 200ms ease-out;
+  }
+  .hit-flash-normal {
+    animation: hit-flash-normal 120ms ease-out;
+  }
+  .hit-flash-critical {
+    animation: hit-flash-critical 250ms ease-out;
+  }
 }
