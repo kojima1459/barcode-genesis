@@ -6,7 +6,8 @@ export interface Product {
   currency: string;
   image: string;
   amount: number; // Amount of coins/items given
-  type: 'coin' | 'item';
+  type: 'coin' | 'item' | 'subscription';
+  stripePriceId?: string; // Stripe Price ID
 }
 
 export const PRODUCTS: Product[] = [
@@ -14,11 +15,12 @@ export const PRODUCTS: Product[] = [
     id: 'coin_pack_small',
     name: 'Coin Pouch',
     description: 'A small pouch of coins to get you started.',
-    price: 100,
+    price: 120,
     currency: 'jpy',
     image: '/images/coin_small.png',
     amount: 100,
-    type: 'coin'
+    type: 'coin',
+    stripePriceId: 'price_1SjPcuRy3cnjpOGFNMSku9Op'
   },
   {
     id: 'coin_pack_medium',
@@ -27,17 +29,30 @@ export const PRODUCTS: Product[] = [
     price: 500,
     currency: 'jpy',
     image: '/images/coin_medium.png',
-    amount: 550, // 10% bonus
-    type: 'coin'
+    amount: 500,
+    type: 'coin',
+    stripePriceId: 'price_1SjPsxRy3cnjpOGFK5rCDh9q'
   },
   {
     id: 'coin_pack_large',
     name: 'Coin Chest',
     description: 'A treasure chest overflowing with coins!',
-    price: 1000,
+    price: 980,
     currency: 'jpy',
     image: '/images/coin_large.png',
-    amount: 1200, // 20% bonus
-    type: 'coin'
+    amount: 1200,
+    type: 'coin',
+    stripePriceId: 'price_1SjPqhRy3cnjpOGF1EIsZba4'
+  },
+  {
+    id: 'premium_monthly',
+    name: 'Premium Monthly',
+    description: 'Monthly premium subscription with exclusive benefits.',
+    price: 390,
+    currency: 'jpy',
+    image: '/images/premium.png',
+    amount: 0, // Not applicable for subscriptions
+    type: 'subscription',
+    stripePriceId: 'price_1SkiWvRy3cnjpOGFW3lhDJSZ'
   }
 ];
