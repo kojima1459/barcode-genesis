@@ -46,12 +46,34 @@ export default function ShareCardModal({ robot, trigger }: ShareCardModalProps) 
     const generateImage = async () => {
         if (!cardRef.current) {
             console.error('[ShareCardModal] Card ref is null');
+            toast.error('カード要素が見つかりません', {
+                description: 'ページを再読み込みしてください',
+                duration: 5000
+            });
             return;
+        }
+
+        // Validate robot data
+        if (!robot || !robot.parts || !robot.colors) {
+            console.error('[ShareCardModal] Invalid robot data:', robot);
+            toast.error('ロボットデータが不正です', {
+                description: 'もう一度スキャンしてください',
+                duration: 5000
+            });
+            return;
+        }
+
+        // Wait for element to be visible
+        const rect = cardRef.current.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) {
+            console.warn('[ShareCardModal] Card element has zero size, waiting...');
+            await new Promise(resolve => setTimeout(resolve, 500));
         }
 
         setIsGenerating(true);
         try {
             console.log('[ShareCardModal] Starting image generation for robot:', robot.name);
+            console.log('[ShareCardModal] Robot data:', { id: robot.id, rarity: robot.rarity, parts: !!robot.parts, colors: !!robot.colors });
 
             const blob = await generateImageFromElement(cardRef.current, {
                 width: 600,
@@ -63,17 +85,21 @@ export default function ShareCardModal({ robot, trigger }: ShareCardModalProps) 
                 const url = URL.createObjectURL(blob);
                 setGeneratedImage(url);
                 setGeneratedBlob(blob);
-                console.log('[ShareCardModal] Image generated successfully');
+                console.log('[ShareCardModal] Image generated successfully:', blob.size, 'bytes');
             } else {
                 console.error('[ShareCardModal] Image generation returned null');
                 toast.error('画像生成に失敗しました', {
-                    description: 'カードの読み込みに時間がかかっている可能性があります。もう一度お試しください。'
+                    description: 'カードの読み込みに時間がかかっている可能性があります。もう一度お試しください。',
+                    duration: 5000
                 });
             }
         } catch (error) {
             console.error('[ShareCardModal] Image generation error:', error);
+            console.error('[ShareCardModal] Error stack:', error instanceof Error ? error.stack : 'No stack');
+            console.error('[ShareCardModal] Robot causing error:', { name: robot.name, id: robot.id });
             toast.error('画像生成に失敗しました', {
-                description: error instanceof Error ? error.message : '不明なエラー'
+                description: error instanceof Error ? error.message : '不明なエラー',
+                duration: 5000
             });
         } finally {
             setIsGenerating(false);
