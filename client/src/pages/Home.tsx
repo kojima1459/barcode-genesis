@@ -79,7 +79,33 @@ export default function Home() {
   const [bossData, setBossData] = useState<BossData | null>(null);
   const [canChallengeBoss, setCanChallengeBoss] = useState(false);
   const [bossLoading, setBossLoading] = useState(true);
+  const [bossError, setBossError] = useState<string | null>(null);
   const [, setLocation] = useLocation();
+
+  // Load Daily Boss function (extracted for retry)
+  const loadBoss = async () => {
+    setBossLoading(true);
+    setBossError(null);
+    try {
+      const getDailyBoss = httpsCallable(functions, "getDailyBoss");
+      const result = await getDailyBoss();
+      const data = result.data as { boss: BossData; canChallenge: boolean };
+      setBossData(data.boss);
+      setCanChallengeBoss(data.canChallenge);
+    } catch (error: any) {
+      console.error("Failed to load daily boss:", error);
+      const code = error?.code || '';
+      if (code === 'unauthenticated') {
+        setBossError("ログインが必要です");
+      } else if (code === 'internal') {
+        setBossError("サーバーエラーが発生しました");
+      } else {
+        setBossError("ボス情報を取得できませんでした");
+      }
+    } finally {
+      setBossLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -144,22 +170,6 @@ export default function Home() {
     loadMissions();
     loadFollowing();
     loadRobots();
-
-    // Load Daily Boss
-    const loadBoss = async () => {
-      setBossLoading(true);
-      try {
-        const getDailyBoss = httpsCallable(functions, "getDailyBoss");
-        const result = await getDailyBoss();
-        const data = result.data as { boss: BossData; canChallenge: boolean };
-        setBossData(data.boss);
-        setCanChallengeBoss(data.canChallenge);
-      } catch (error) {
-        console.error("Failed to load daily boss:", error);
-      } finally {
-        setBossLoading(false);
-      }
-    };
     loadBoss();
   }, [user]);
 
@@ -355,7 +365,9 @@ export default function Home() {
                   boss={bossData}
                   canChallenge={canChallengeBoss}
                   isLoading={bossLoading}
+                  error={bossError}
                   onChallenge={() => setLocation('/boss')}
+                  onRetry={loadBoss}
                 />
               </section>
 

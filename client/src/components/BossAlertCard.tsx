@@ -1,8 +1,7 @@
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { Skull, Shield, Zap, RefreshCw, Flame, Loader2 } from "lucide-react";
+import { Skull, Shield, Zap, RefreshCw, Flame, Loader2, AlertCircle } from "lucide-react";
 import RobotSVG from "@/components/RobotSVG";
 import { TechCard } from "@/components/ui/TechCard";
 import { cn } from "@/lib/utils";
@@ -33,7 +32,9 @@ interface BossAlertCardProps {
     boss: BossData | null;
     canChallenge: boolean;
     isLoading?: boolean;
+    error?: string | null;
     onChallenge: () => void;
+    onRetry?: () => void;
 }
 
 const BOSS_TYPE_ICONS: Record<BossType, React.ReactNode> = {
@@ -52,7 +53,7 @@ const BOSS_TYPE_COLORS: Record<BossType, string> = {
     BERSERK: "text-red-400",
 };
 
-export function BossAlertCard({ boss, canChallenge, isLoading, onChallenge }: BossAlertCardProps) {
+export function BossAlertCard({ boss, canChallenge, isLoading, error, onChallenge, onRetry }: BossAlertCardProps) {
     const { t } = useLanguage();
 
     if (isLoading) {
@@ -60,6 +61,32 @@ export function BossAlertCard({ boss, canChallenge, isLoading, onChallenge }: Bo
             <TechCard className="border-red-500/30 bg-linear-to-br from-red-500/5 to-orange-500/5">
                 <div className="flex items-center justify-center py-8">
                     <Loader2 className="w-6 h-6 animate-spin text-red-500" />
+                </div>
+            </TechCard>
+        );
+    }
+
+    // Error state with retry button
+    if (error) {
+        return (
+            <TechCard className="border-yellow-500/30 bg-linear-to-br from-yellow-500/5 to-orange-500/5">
+                <div className="flex flex-col items-center justify-center py-6 px-4 text-center gap-3">
+                    <AlertCircle className="w-8 h-8 text-yellow-500" />
+                    <div>
+                        <p className="text-sm text-yellow-100 font-medium">{t('boss_load_error') || 'ボス情報を取得できませんでした'}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{error}</p>
+                    </div>
+                    {onRetry && (
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={onRetry}
+                            className="border-yellow-500/30 text-yellow-500 hover:bg-yellow-500/10"
+                        >
+                            <RefreshCw className="w-4 h-4 mr-2" />
+                            {t('retry') || '再試行'}
+                        </Button>
+                    )}
                 </div>
             </TechCard>
         );
