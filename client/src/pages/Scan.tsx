@@ -23,6 +23,7 @@ import { isSpecialRare } from "@/lib/rarity";
 import { Interactive } from "@/components/ui/interactive";
 import { ScrambleText } from "@/components/ui/ScrambleText";
 import { ROLE_COLORS, ROLE_LABELS } from "@/lib/dexRegistry";
+import { normalizeToEan13, type BarcodeKind } from "@/lib/barcodeNormalize"; // REF: EAN8
 
 const getCallableErrorCode = (error: unknown) => {
     if (error && typeof error === "object" && "code" in error) {
@@ -43,13 +44,23 @@ export default function Scan() {
     const [limitMessage, setLimitMessage] = useState("");
     const [isRare, setIsRare] = useState(false);
     const [scannedBarcode, setScannedBarcode] = useState("");
+    const [barcodeKind, setBarcodeKind] = useState<BarcodeKind | null>(null); // REF: EAN8
 
     const { triggerHaptic } = useHaptic();
 
     const { completeStep } = useTutorial();
     const { fx, trigger } = useRobotFx();
 
-    const handleScan = async (barcode: string) => {
+    const handleScan = async (rawBarcode: string) => {
+        // REF: EAN8 - Normalize barcode to EAN-13
+        const normalized = normalizeToEan13(rawBarcode);
+        if (!normalized.ok) {
+            toast.error(normalized.reason);
+            return;
+        }
+        const barcode = normalized.ean13;
+        setBarcodeKind(normalized.kind);
+
         triggerHaptic('medium');
         completeStep('SCAN_BARCODE');
 
