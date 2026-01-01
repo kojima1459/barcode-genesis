@@ -711,6 +711,29 @@ const normalizePreBattleItem = (item?: string | null): PreBattleItemType | null 
   return PRE_BATTLE_ITEM_TYPES.includes(item as PreBattleItemType) ? (item as PreBattleItemType) : null;
 };
 
+/**
+ * Recursively remove undefined values from an object to prevent Firestore errors.
+ * Firestore does not allow undefined values.
+ */
+const sanitizeForFirestore = (obj: Record<string, any>): Record<string, any> => {
+  const sanitized: Record<string, any> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value === undefined) {
+      continue;
+    }
+    if (value !== null && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
+      sanitized[key] = sanitizeForFirestore(value);
+    } else if (Array.isArray(value)) {
+      sanitized[key] = value.map(item =>
+        item !== null && typeof item === 'object' ? sanitizeForFirestore(item) : item
+      ).filter(item => item !== undefined);
+    } else {
+      sanitized[key] = value;
+    }
+  }
+  return sanitized;
+}
+
 const stripItemFields = (log: Record<string, any>) => {
   const { itemApplied, itemSide, itemType, itemEffect, itemEvent, itemMessage, ...rest } = log;
   // Remove undefined values to prevent Firestore errors
@@ -2757,8 +2780,8 @@ export const createVariant = functions.https.onCall(async (data: any, context) =
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     };
 
-    // 5. Writes
-    t.set(variantRef, variantData);
+    // 5. Writes - sanitize to remove undefined values (e.g. overlayKey)
+    t.set(variantRef, sanitizeForFirestore(variantData as any));
 
     const userUpdates: any = {
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -3070,7 +3093,7 @@ export const executeBossBattle = functions
         playerRobotId: robotId || variantId,
         result: isWin ? 'win' : 'loss',
         winnerId: battleResult.winnerId,
-        logs: battleResult.logs,
+        logs: battleResult.logs.map(stripItemFields),
         rewards: {
           xp: xpReward,
           credits: creditsReward,
@@ -3086,7 +3109,7 @@ export const executeBossBattle = functions
         battleId,
         result: isWin ? 'win' : 'loss',
         winnerId: battleResult.winnerId,
-        logs: battleResult.logs,
+        logs: battleResult.logs.map(stripItemFields),
         rewards: {
           xp: xpReward,
           credits: creditsReward,
