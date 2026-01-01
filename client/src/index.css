@@ -147,6 +147,7 @@
   --icon-size: 1.25rem;
   --icon-stroke: 1.75;
   --bottom-nav-height: 88px;
+  --header-height: calc(3.5rem + env(safe-area-inset-top));
   --background: var(--bg);
   --foreground: var(--text);
   --card: var(--surface);

@@ -47,6 +47,15 @@ export default function AppShell({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // Reset scroll position on route change (prevent confusion)
+  useEffect(() => {
+    // Find the main element and scroll it to top
+    const main = document.querySelector('main');
+    if (main) {
+      main.scrollTo({ top: 0, behavior: 'instant' });
+    }
+  }, [location]);
+
   // User subscription removed - handled by useUserData
 
   useEffect(() => {
@@ -100,7 +109,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const isActive = (path: string) => (path === "/" ? location === "/" : location.startsWith(path));
 
   return (
-    <div className="min-h-dvh bg-background text-foreground relative overflow-hidden overscroll-y-contain flex flex-col">
+    <div className="h-dvh bg-background text-foreground relative overflow-hidden flex flex-col">
       {/* Dynamic Background Elements */}
       <div className="pointer-events-none fixed inset-0 z-0">
         <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-[0.05] [mask-image:radial-gradient(ellipse_at_center,black,transparent_80%)]" />
@@ -110,10 +119,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
         <div className="absolute -bottom-[10%] -right-[10%] w-[40%] h-[40%] bg-accent2/5 blur-[120px] rounded-full animate-pulse-slow" />
       </div>
 
-      <div className="relative z-10 flex flex-col flex-1">
+      <div className="relative z-10 flex flex-col flex-1 min-h-0">
 
         {/* Desktop Header - Hiding on mobile to save space (replaced by GlobalHeader + BottomNav) */}
-        <header className="hidden md:flex sticky top-0 z-40 border-b border-border/60 bg-surface/80 backdrop-blur w-full">
+        <header className="hidden md:flex sticky top-0 z-40 border-b border-border/60 bg-surface/80 backdrop-blur w-full shrink-0">
           <div className="container px-4 py-3 flex items-center justify-between gap-2">
             {/* Left: Rank & Badge */}
             <div className="flex items-center gap-2 text-xs md:text-sm shrink-0">
@@ -150,11 +159,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
           </div>
         </header>
 
-        <main className="pb-0 flex-1 flex flex-col">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain -webkit-overflow-scrolling-touch"
+          style={{ paddingBottom: "calc(var(--bottom-nav-height) + env(safe-area-inset-bottom) + 16px)" }}>
           {children}
 
           {/* Footer - inside main for proper spacing */}
-          <footer className="border-t border-border/50 bg-surface/50 backdrop-blur-sm mt-8 mb-4" style={{ marginBottom: "calc(var(--bottom-nav-height, 88px) + env(safe-area-inset-bottom) + 24px)" }}>
+          <footer className="border-t border-border/50 bg-surface/50 backdrop-blur-sm mt-8">
             <div className="mx-auto max-w-6xl px-4 py-6">
               <div className="flex flex-col items-center gap-4 text-sm">
                 {/* Footer links - single row with Premium larger */}
