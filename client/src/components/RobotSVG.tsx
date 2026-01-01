@@ -1023,7 +1023,7 @@ function RobotSVGComponent({
 
 // Memoize to prevent expensive re-renders of complex SVG
 // Custom comparison to handle object props efficiently
-export default memo(RobotSVG, (prevProps, nextProps) => {
+export default memo(RobotSVGComponent, (prevProps, nextProps) => {
   // Re-render if essential props change
   // Check parts object (shallow comparison of values)
   if (prevProps.parts !== nextProps.parts) {
