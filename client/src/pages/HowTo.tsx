@@ -1,3 +1,4 @@
+import { Link } from "wouter";
 import { ArrowLeft, ScanLine, Swords, Factory, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import SEO from "@/components/SEO";
