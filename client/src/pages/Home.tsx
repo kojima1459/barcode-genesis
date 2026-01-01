@@ -449,7 +449,16 @@ export default function Home() {
                     <div key={r.id} className="snap-start shrink-0 w-32">
                       <Link href={`/robots/${r.id}`}>
                         <div className="aspect-square rounded-lg bg-surface1 border border-white/10 overflow-hidden relative">
-                          <RobotSVG robot={r} className="w-full h-full p-2" />
+                          <RobotSVG
+                            parts={r.parts}
+                            colors={r.colors}
+                            className="w-full h-full p-2"
+                            role={r.role}
+                            variantKey={r.variantKey}
+                            visuals={r.visuals}
+                            rarityEffect={r.rarityEffect}
+                            simplified
+                          />
                           <div className="absolute bottom-0 w-full bg-black/60 backdrop-blur-sm p-1 text-[9px] text-center truncate font-mono">
                             {r.name}
                           </div>

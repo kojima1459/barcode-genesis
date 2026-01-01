@@ -6,31 +6,28 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useSound } from "@/contexts/SoundContext";
 import { db, storage } from "@/lib/firebase";
-import { doc, getDoc, updateDoc, collection, getDocs, query, orderBy } from "firebase/firestore";
+// [REFACTOR 1.3] Removed unused import: getDoc
+import { doc, updateDoc, collection, getDocs, query, orderBy } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { ArrowLeft, Copy, Edit2, Save, User, Trophy, Sword, Shield, LogOut, Camera, Loader2 } from "lucide-react";
+// [REFACTOR 1.3] Removed unused imports: ArrowLeft
+import { Copy, Edit2, Save, User, Trophy, Sword, Shield, LogOut, Camera, Loader2 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
 import RobotSVG from "@/components/RobotSVG";
 import { RobotData } from "@/types/shared";
 import { Interactive } from "@/components/ui/interactive";
 import { SystemSkeleton } from "@/components/ui/SystemSkeleton";
-import { ThemeSwitcher } from "@/components/ThemeSwitcher";
-import { SoundSettings } from "@/components/SoundSettings";
-import LanguageSwitcher from "@/components/LanguageSwitcher";
-import { Crown, Settings } from "lucide-react";
+// [REFACTOR 1.3] Removed unused imports: ThemeSwitcher, SoundSettings, LanguageSwitcher, Crown, Settings
 import { GlobalHeader } from "@/components/GlobalHeader";
 import { useUserData } from "@/hooks/useUserData";
+// [REFACTOR 1.1] Import compressImage and validation from imageUtils
+import { compressImage, validateImageFile } from "@/lib/imageUtils";
 
-interface UserProfile {
-  displayName?: string;
-  photoURL?: string;
-  wins?: number;
-  battles?: number;
-  level?: number;
-  xp?: number;
-  workshopLines?: number;
-}
+// [REFACTOR 3.1] Constants for name validation
+const MAX_NAME_LENGTH = 20;
+const NAME_PATTERN = /^[\p{L}\p{N}\s\-_]+$/u; // Letters, numbers, spaces, hyphens, underscores
+
+// [REFACTOR 1.4] Removed unused interface: UserProfile
 
 export default function Profile() {
   const { t } = useLanguage();
@@ -68,9 +65,23 @@ export default function Profile() {
 
   const handleSaveName = async () => {
     if (!user || !newName.trim()) return;
+
+    // [REFACTOR 3.1] Name validation - length check
+    const trimmedName = newName.trim();
+    if (trimmedName.length > MAX_NAME_LENGTH) {
+      toast.error(`名前は${MAX_NAME_LENGTH}文字以内にしてください`);
+      return;
+    }
+
+    // [REFACTOR 3.1] Name validation - character check
+    if (!NAME_PATTERN.test(trimmedName)) {
+      toast.error("名前に使用できない文字が含まれています");
+      return;
+    }
+
     try {
       await updateDoc(doc(db, "users", user.uid), {
-        displayName: newName.trim()
+        displayName: trimmedName
       });
       // useUserData will auto-update
       setIsEditing(false);
@@ -86,19 +97,29 @@ export default function Profile() {
     fileInputRef.current?.click();
   };
 
+  // [REFACTOR 1.1] compressImage function moved to lib/imageUtils.ts
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!user || !e.target.files || e.target.files.length === 0) return;
 
     const file = e.target.files[0];
-    if (file.size > 5 * 1024 * 1024) { // 5MB limit
-      toast.error("Image too large (max 5MB)");
+
+    // [REFACTOR 2.2] File validation (size and type check)
+    const validation = validateImageFile(file);
+    if (!validation.valid) {
+      toast.error(validation.error || "Invalid file");
       return;
     }
 
     setIsUploading(true);
     try {
+      // Compress image before upload
+      // [REFACTOR 1.1] Using imported compressImage from imageUtils
+      const compressedBlob = await compressImage(file);
+      // [REFACTOR 3.3] Removed console.log in production - compression info
+
       const storageRef = ref(storage, `users/${user.uid}/avatar`);
-      await uploadBytes(storageRef, file);
+      await uploadBytes(storageRef, compressedBlob);
       const downloadURL = await getDownloadURL(storageRef);
 
       await updateDoc(doc(db, "users", user.uid), {
@@ -128,16 +149,21 @@ export default function Profile() {
     }
   };
 
-  const copyId = () => {
-    if (user) {
-      navigator.clipboard.writeText(user.uid);
+  // [REFACTOR 2.3] Added error handling for clipboard API
+  const copyId = async () => {
+    if (!user) return;
+    try {
+      await navigator.clipboard.writeText(user.uid);
       toast.success(t('copied_to_clipboard'));
       playSE('se_click');
+    } catch (error) {
+      console.error("Clipboard copy failed:", error);
+      toast.error("クリップボードへのコピーに失敗しました");
     }
   };
 
-  // Calculate total stats
-  const totalWins = robots.reduce((acc, r) => acc + (r.level ? Math.floor(r.level * 1.5) : 0), 0);
+  // Calculate display stats
+  // [REFACTOR 5.3] Removed unused totalWins calculation
   const displayWins = userData?.wins || 0;
   const displayBattles = userData?.battles || 0;
   const winRate = displayBattles > 0 ? Math.round((displayWins / displayBattles) * 100) : 0;
