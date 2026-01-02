@@ -6,6 +6,7 @@ import path from "path";
 import { defineConfig } from "vite";
 import { vitePluginManusRuntime } from "vite-plugin-manus-runtime";
 import { VitePWA } from "vite-plugin-pwa";
+import { visualizer } from "rollup-plugin-visualizer";
 
 const plugins = [
   react(),
@@ -116,6 +117,13 @@ const plugins = [
         }
       ]
     }
+  }),
+  // Bundle analyzer - generates stats.html in dist
+  visualizer({
+    filename: 'dist/stats.html',
+    open: false,
+    gzipSize: true,
+    brotliSize: true,
   })
 ];
 
@@ -136,21 +144,38 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          // Core vendor chunks - loaded on every page
+          // Core vendor chunks - loaded on every page (keep minimal)
           vendor: ['react', 'react-dom'],
+
+          // Firebase - loaded after auth
           firebase: ['firebase/app', 'firebase/firestore', 'firebase/auth', 'firebase/functions'],
+
           // Heavy libraries - lazy loaded only when needed
           'framer-motion': ['framer-motion'],
+
+          // Barcode scanning - only loaded on /scan page
           'quagga': ['@ericblade/quagga2'],
+          'zxing': ['@zxing/browser', '@zxing/library'],
+
+          // OCR - very heavy, only for specific features
+          'tesseract': ['tesseract.js'],
+
+          // Charts - only for specific pages
+          'recharts': ['recharts'],
+
           // Share/Image generation - only used when sharing
           'html-to-image': ['html-to-image'],
-          // UI libraries
+
+          // UI libraries - commonly used but can be deferred
           'radix-ui': [
             '@radix-ui/react-dialog',
             '@radix-ui/react-tooltip',
             '@radix-ui/react-tabs',
             '@radix-ui/react-select',
-            '@radix-ui/react-slot'
+            '@radix-ui/react-slot',
+            '@radix-ui/react-switch',
+            '@radix-ui/react-checkbox',
+            '@radix-ui/react-progress',
           ],
         }
       }
