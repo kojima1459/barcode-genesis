@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useMemo, memo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { BattleResult, RobotData } from "@/types/shared";
 import { BattleEvent, generateBattleEvents } from "@/lib/battleReplay";
 import RobotSVG from "@/components/RobotSVG";
@@ -18,6 +18,8 @@ import { useScreenShake } from "@/hooks/useScreenShake";
 import { EnhancedDamageNumber } from "@/components/EnhancedDamageNumber";
 import { playSfx, setMuted as setSfxMuted, getMuted as getSfxMuted } from "@/lib/sfx";
 import { PLAY_STEP_MS, IMPORTANT_EVENT_BONUS_MS, getImpactIntensity, isImportantLog } from "@/lib/battleFx";
+import SpecialCutIn from "@/components/SpecialCutIn";
+import BattleHUDExtended from "@/components/BattleHUDExtended";
 
 // Deterministic PRNG based on LCG (Linear Congruential Generator)
 const createPRNG = (seed: string) => {
@@ -117,6 +119,25 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
     const [showResultsOnly, setShowResultsOnly] = useState(false);
     const [lastHp, setLastHp] = useState<Record<string, number>>({ [p1.id]: p1.baseHp, [p2.id]: p2.baseHp });
 
+    // Extended HUD State
+    const [currentEvent, setCurrentEvent] = useState<BattleEvent | null>(null);
+    const [p1OverdriveGauge, setP1OverdriveGauge] = useState(0);
+    const [p2OverdriveGauge, setP2OverdriveGauge] = useState(0);
+
+    // SpecialCutIn State
+    const [showCutIn, setShowCutIn] = useState(false);
+    const [cutInData, setCutInData] = useState<{
+        robotName?: string;
+        overdriveTriggered?: boolean;
+        overdriveMessage?: string;
+        specialTriggered?: boolean;
+        specialName?: string;
+        specialRoleName?: string;
+        specialImpact?: string;
+        specialHits?: number;
+    }>({});
+    const prefersReducedMotion = useReducedMotion();
+
     // Initial Setup
     useEffect(() => {
         const generated = generateBattleEvents(result.logs, p1.id, p2.id);
@@ -166,8 +187,32 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
         if (isSkipped) delay = 20;
 
         const execute = () => {
+            // Update current event for HUD
+            setCurrentEvent(event);
+
             // Process Event Side Effects
             switch (event.type) {
+                case 'SPECIAL_CUT_IN':
+                    // Show cut-in overlay
+                    const attackerRobot = event.attackerId === p1.id ? p1 : p2;
+                    setCutInData({
+                        robotName: attackerRobot.name,
+                        overdriveTriggered: event.overdriveTriggered,
+                        overdriveMessage: event.overdriveMessage,
+                        specialTriggered: event.specialTriggered,
+                        specialName: event.specialName,
+                        specialRoleName: event.specialRoleName,
+                        specialImpact: event.specialImpact,
+                        specialHits: event.specialHits
+                    });
+                    setShowCutIn(true);
+                    // Play special SFX
+                    playSfx('crit', { volume: 0.8 });
+                    shake({ intensity: 'medium', duration: 400 });
+                    // Auto-hide after delay
+                    setTimeout(() => setShowCutIn(false), (event.delay || 800) / speed);
+                    break;
+
                 case 'LOG_MESSAGE':
                     if (event.message) {
                         setActiveMessage(event.message);
@@ -175,49 +220,65 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
                             setHighlightMessages(prev => [...prev, event.message!].slice(-5));
                         }
                     }
+                    // Update overdrive gauges from LOG_MESSAGE events
+                    if (event.attackerOverdriveGauge !== undefined) {
+                        if (event.attackerId === p1.id) {
+                            setP1OverdriveGauge(event.attackerOverdriveGauge);
+                        } else {
+                            setP2OverdriveGauge(event.attackerOverdriveGauge);
+                        }
+                    }
+                    if (event.defenderOverdriveGauge !== undefined) {
+                        if (event.defenderId === p1.id) {
+                            setP1OverdriveGauge(event.defenderOverdriveGauge);
+                        } else {
+                            setP2OverdriveGauge(event.defenderOverdriveGauge);
+                        }
+                    }
                     break;
+
                 case 'ATTACK_PREPARE':
                     if (event.attackerId) {
                         setLungeId(event.attackerId);
                         setCurrentAttackerId(event.attackerId);
                         setTimeout(() => setLungeId(null), 200 / speed);
-                        // Play attack SE
                         playSfx('attack', { volume: 0.4 });
                     }
                     break;
+
                 case 'ATTACK_IMPACT':
                     if (event.defenderId) {
-                        // Shake
                         setShakeId(event.defenderId);
                         setTimeout(() => setShakeId(null), 300 / speed);
 
-                        // Screen shake for heavy hits
-                        if (event.isCritical) {
+                        // Enhanced shake for special/overdrive
+                        if (event.specialTriggered || event.overdriveTriggered) {
+                            shake({ intensity: 'heavy', duration: 400 });
+                        } else if (event.isCritical) {
                             shake({ intensity: 'heavy', duration: 300 });
                         } else if (!event.isMiss) {
                             shake({ intensity: 'light', duration: 200 });
                         }
 
-                        // Sound - use new SFX system
                         if (event.isMiss) {
-                            playGenerated('miss'); // Keep existing miss sound
-                        } else if (event.isCritical) {
+                            playGenerated('miss');
+                        } else if (event.isCritical || event.specialTriggered) {
                             playSfx('crit', { volume: 0.7 });
                         } else {
                             playSfx('hit', { volume: 0.5 });
                         }
 
-                        // Cheer SE if applied
                         if (event.cheerApplied) {
                             setTimeout(() => playSfx('cheer', { volume: 0.6 }), 100);
                         }
                     }
                     break;
+
                 case 'DAMAGE_POPUP':
                     if (event.defenderId) {
                         const popupId = `popup-${currentEventIndex}-${Date.now()}`;
                         const value = event.damage || 0;
-                        const isCritical = Boolean(event.isCritical);
+                        const isCritical = Boolean(event.isCritical) || Boolean(event.specialTriggered);
                         const isDodge = Boolean(event.isMiss);
 
                         setPopups(prev => [...prev.slice(-4), {
@@ -226,8 +287,8 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
                             isCritical,
                             isDodge,
                             cheerApplied: event.cheerApplied,
-                            x: 40 + ((currentEventIndex * 17) % 20), // deterministic spread
-                            y: 30 + ((currentEventIndex * 13) % 20), // deterministic spread
+                            x: 40 + ((currentEventIndex * 17) % 20),
+                            y: 30 + ((currentEventIndex * 13) % 20),
                             targetId: event.defenderId!
                         }]);
                         setTimeout(() => {
@@ -235,9 +296,9 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
                         }, 1200);
                     }
                     break;
+
                 case 'HP_UPDATE':
                     if (event.currentHp) {
-                        // Flash HP bar if decreased
                         if (event.currentHp[p1.id] < (lastHp[p1.id] ?? p1.baseHp)) {
                             setFlashP1(true);
                             setTimeout(() => setFlashP1(false), 300);
@@ -249,9 +310,17 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
                         setLastHp(event.currentHp);
                         setHp(prev => ({ ...prev, ...event.currentHp }));
                     }
+                    // Also update gauges from HP_UPDATE
+                    if (event.attackerOverdriveGauge !== undefined) {
+                        setP1OverdriveGauge(event.attackerOverdriveGauge);
+                    }
+                    if (event.defenderOverdriveGauge !== undefined) {
+                        setP2OverdriveGauge(event.defenderOverdriveGauge);
+                    }
                     break;
+
                 case 'PHASE_START':
-                    setCurrentTurn(prev => prev + 1);
+                    if (event.turn) setCurrentTurn(event.turn);
                     break;
             }
 
@@ -327,6 +396,20 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
             {isFinished && result.winnerId === p1.id && <Confetti seed={result.battleId || 'victory'} />}
             {isFinished && result.winnerId !== p1.id && <DefeatEffect />}
 
+            {/* Special/Overdrive Cut-In Overlay */}
+            <SpecialCutIn
+                show={showCutIn}
+                robotName={cutInData.robotName}
+                overdriveTriggered={cutInData.overdriveTriggered}
+                overdriveMessage={cutInData.overdriveMessage}
+                specialTriggered={cutInData.specialTriggered}
+                specialName={cutInData.specialName}
+                specialRoleName={cutInData.specialRoleName}
+                specialImpact={cutInData.specialImpact}
+                specialHits={cutInData.specialHits}
+                onComplete={() => setShowCutIn(false)}
+            />
+
             {/* NEW: Fixed Battle HUD */}
             {!isFinished && (
                 <div className="fixed top-0 left-0 right-0 z-50">
@@ -391,6 +474,20 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
                                 />
                             </div>
                         </div>
+
+                        {/* Extended HUD: Advantage, Stance, Gauges, Status */}
+                        <BattleHUDExtended
+                            p1Id={p1.id}
+                            p2Id={p2.id}
+                            p1Name={p1.name}
+                            p2Name={p2.name}
+                            p1MaxHp={p1.baseHp}
+                            p2MaxHp={p2.baseHp}
+                            currentHp={hp}
+                            currentEvent={currentEvent}
+                            p1OverdriveGauge={p1OverdriveGauge}
+                            p2OverdriveGauge={p2OverdriveGauge}
+                        />
                     </div>
                 </div>
             )}
