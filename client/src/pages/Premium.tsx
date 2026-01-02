@@ -1,13 +1,12 @@
-import { useState, useEffect, useCallback } from "react";
-import { Link, useLocation } from "wouter";
+import { useState, useEffect } from "react";
+import { Link } from "wouter";
 import { httpsCallable } from "firebase/functions";
-import { doc, getDoc } from "firebase/firestore";
 import { ArrowLeft, Loader2, CreditCard, Crown, Coins, Sparkles, Zap, Shield, ChevronDown, Check, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { functions, db } from "@/lib/firebase";
+import { functions } from "@/lib/firebase";
 import { toast } from "sonner";
 import { Interactive } from "@/components/ui/interactive";
 import { useUserData } from "@/hooks/useUserData";
@@ -29,7 +28,7 @@ export default function Premium() {
     const [loadingPackId, setLoadingPackId] = useState<string | null>(null);
     const [loadingSubscription, setLoadingSubscription] = useState(false);
     const [loadingPortal, setLoadingPortal] = useState(false);
-    const [location] = useLocation();
+
 
     // Reflection wait state (webhook may take a few seconds)
     const [waitingForReflection, setWaitingForReflection] = useState(false);
