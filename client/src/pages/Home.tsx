@@ -626,10 +626,10 @@ export default function Home() {
                 </div>
               </TechCard>
 
-              {/* Quick Link Rows (Vertical Stack in Side Column) */}
-              <div className="flex flex-col gap-3">
+              {/* Quick Link Rows (Grid in Side Column) */}
+              <div className="grid grid-cols-2 gap-3">
                 <Link href="/shop">
-                  <TechCard className="p-3 flex items-center gap-3 cursor-pointer group hover:bg-white/5 transition-colors" variant="outline" intensity="low">
+                  <TechCard className="p-3 flex items-center gap-3 cursor-pointer group hover:bg-white/5 transition-colors h-full" variant="outline" intensity="low">
                     <div className="p-2 rounded bg-surface2 text-primary group-hover:text-white transition-colors">
                       <ShoppingCart className="w-4 h-4" />
                     </div>
@@ -640,7 +640,7 @@ export default function Home() {
                   </TechCard>
                 </Link>
                 <Link href="/premium">
-                  <TechCard className="p-3 flex items-center gap-3 cursor-pointer group hover:bg-white/5 transition-colors" variant="outline" intensity="low">
+                  <TechCard className="p-3 flex items-center gap-3 cursor-pointer group hover:bg-white/5 transition-colors h-full" variant="outline" intensity="low">
                     <div className="p-2 rounded bg-surface2 text-primary group-hover:text-white transition-colors">
                       <Crown className="w-4 h-4 text-yellow-500" />
                     </div>
@@ -650,7 +650,7 @@ export default function Home() {
                     </div>
                   </TechCard>
                 </Link>
-                <Link href="/collection">
+                <Link href="/collection" className="col-span-2">
                   <TechCard className="p-3 flex items-center gap-3 cursor-pointer group hover:bg-white/5 transition-colors" variant="outline" intensity="low">
                     <div className="p-2 rounded bg-surface2 text-primary group-hover:text-white transition-colors">
                       <Users className="w-4 h-4" />
