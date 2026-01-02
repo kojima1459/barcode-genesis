@@ -167,7 +167,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
           <footer className="border-t border-border/50 bg-surface/50 backdrop-blur-sm mt-8">
             <div className="mx-auto max-w-6xl px-4 py-6">
               <div className="flex flex-col items-center gap-4 text-sm">
-                {/* Footer links - single row with Premium larger */}
+                {/* Footer links - Row 1: Standard links */}
                 <div className="flex flex-wrap justify-center items-center gap-3 md:gap-6">
                   <Link href="/how-to" className="text-muted hover:text-primary transition-colors flex items-center gap-1">
                     <BookOpen className="h-4 w-4" />
@@ -182,11 +182,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
                   <Link href="/privacy" className="text-muted hover:text-primary transition-colors">
                     {t('footer_privacy')}
                   </Link>
-                  <Link href="/premium" className="text-yellow-500 hover:text-yellow-400 transition-colors flex items-center gap-1 font-bold text-lg transform scale-110">
-                    <Crown className="h-5 w-5" />
-                    {t('premium')}
-                  </Link>
                 </div>
+                {/* Footer links - Row 2: Premium centered */}
+                <Link href="/premium" className="text-yellow-500 hover:text-yellow-400 transition-colors flex items-center gap-1 font-bold text-lg">
+                  <Crown className="h-5 w-5" />
+                  {t('premium')}
+                </Link>
               </div>
               <div className="text-center text-xs text-muted mt-4">
                 © 2024 Barcode Genesis. All rights reserved. v1.0.0
