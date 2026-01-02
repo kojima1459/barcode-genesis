@@ -27,8 +27,8 @@ export default function AdBanner() {
         overflow: 'hidden'
       });
       iframe.scrolling = 'no';
-      // Add sandbox to prevent ad from messing with parent window, but allow scripts
-      iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-popups allow-forms allow-popups-to-escape-sandbox allow-presentation');
+      // Add sandbox to prevent ad from messing with parent window, but allow scripts and user-activated navigation
+      iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-popups allow-forms allow-popups-to-escape-sandbox allow-presentation allow-top-navigation-by-user-activation');
 
       container.appendChild(iframe);
 
