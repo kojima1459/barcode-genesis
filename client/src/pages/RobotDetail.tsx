@@ -155,7 +155,7 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
         }
       } catch (error) {
         console.error("Failed to load robot detail:", error);
-        toast.error("Failed to load robot detail");
+        toast.error(t('failed_load_robot_detail'));
       } finally {
         setLoading(false);
       }
@@ -389,7 +389,7 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
   if (!baseRobot) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4 text-center">
-        <p className="text-lg text-muted-foreground mb-4">Robot not found.</p>
+        <p className="text-lg text-muted-foreground mb-4">{t('robot_not_found')}</p>
         <Link href="/collection">
           <Button>Back to Collection</Button>
         </Link>
@@ -397,7 +397,7 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
     );
   }
   if (loading) return <div className="flex justify-center p-8 min-h-screen items-center bg-dark-bg"><Loader2 className="animate-spin text-neon-cyan" /></div>;
-  if (!baseRobot) return <div className="p-8 text-center text-white bg-dark-bg min-h-screen">Robot not found</div>;
+  if (!baseRobot) return <div className="p-8 text-center text-white bg-dark-bg min-h-screen">{t('robot_not_found')}</div>;
 
   const { level, nextLevelExp, progress } = getLevelInfo(baseRobot);
 

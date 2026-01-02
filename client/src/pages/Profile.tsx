@@ -145,7 +145,7 @@ export default function Profile() {
       setLocation("/");
     } catch (error) {
       console.error("Logout failed:", error);
-      toast.error("Failed to logout");
+      toast.error(t('failed_logout'));
     }
   };
 

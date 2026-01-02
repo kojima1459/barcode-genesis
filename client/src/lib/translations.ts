@@ -596,6 +596,16 @@ export const translations = {
     scan_limit_upgrade: "アップグレードして制限を解除しませんか？",
     view_premium: "プレミアムプランを見る",
     close: "閉じる",
+
+    // Phase 3: Additional hardcoded text translations
+    enable_notifications: "通知を有効にする",
+    robot_not_found: "ロボットが見つかりません",
+    back_to_collection: "コレクションに戻る",
+    variant_name_default: "バリアント",
+    failed_load_collection: "コレクションの読み込みに失敗しました",
+    failed_load_workshop: "工房データの読み込みに失敗しました",
+    failed_load_robot_detail: "ロボット詳細の読み込みに失敗しました",
+    failed_logout: "ログアウトに失敗しました",
   },
   en: {
     // Common

@@ -87,7 +87,7 @@ export default function Collection() {
         setRobots(robotsData);
       } catch (error) {
         console.error("Error fetching robots:", error);
-        toast.error("Failed to load your robot collection");
+        toast.error(t('failed_load_collection'));
       } finally {
         setLoading(false);
       }

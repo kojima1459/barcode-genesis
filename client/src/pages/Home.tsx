@@ -672,7 +672,7 @@ export default function Home() {
           <div className="text-center pb-8 pt-4">
             {permission === 'default' && (
               <Button variant="ghost" size="sm" onClick={requestPermission} className="text-xs text-muted-foreground hover:text-white">
-                <Zap className="w-3 h-3 mr-1" /> Enable Notifications
+                <Zap className="w-3 h-3 mr-1" /> {t('enable_notifications')}
               </Button>
             )}
             <p className="text-[10px] text-white/20 mt-4 font-mono">
