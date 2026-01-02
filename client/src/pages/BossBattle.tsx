@@ -3,7 +3,7 @@
  * Dedicated page for Daily Boss battles
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { db, functions } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
 import { collection, getDocs } from "firebase/firestore";
-import { ArrowLeft, Skull, Loader2, Shield, Zap, Trophy, XCircle } from "lucide-react";
+import { ArrowLeft, Skull, Loader2, Shield, Zap, Trophy, XCircle, RotateCw } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -65,44 +65,50 @@ export default function BossBattle() {
     const [useSpecial, setUseSpecial] = useState(false);
     const [isBattling, setIsBattling] = useState(false);
     const [battleResult, setBattleResult] = useState<BossBattleResult | null>(null);
+    const [loadError, setLoadError] = useState<string | null>(null);
+
+    const loadData = useCallback(async () => {
+        if (!user) return;
+        setLoading(true);
+        setLoadError(null);
+        try {
+            // Load boss data
+            const getDailyBoss = httpsCallable(functions, "getDailyBoss");
+            const bossResult = await getDailyBoss();
+            const bossResponse = bossResult.data as { boss: BossData; canChallenge: boolean };
+            setBossData(bossResponse.boss);
+            setCanChallenge(bossResponse.canChallenge);
+
+            // Load robots
+            const robotsSnap = await getDocs(collection(db, "users", user.uid, "robots"));
+            const robotList = robotsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as RobotData));
+            setRobots(robotList);
+
+            // Load variants
+            const variantsSnap = await getDocs(collection(db, "users", user.uid, "variants"));
+            const variantList = variantsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as VariantData));
+            setVariants(variantList);
+
+            // Auto-select first robot
+            if (robotList.length > 0 && !selectedRobotId) {
+                setSelectedRobotId(robotList[0].id!);
+            }
+        } catch (error: any) {
+            console.error("Failed to load boss battle data:", error);
+            const code = error?.code || '';
+            if (code === 'unauthenticated') {
+                setLoadError("ログインが必要です");
+            } else {
+                setLoadError("データの読み込みに失敗しました");
+            }
+        } finally {
+            setLoading(false);
+        }
+    }, [user, selectedRobotId]);
 
     useEffect(() => {
-        if (!user) return;
-
-        const loadData = async () => {
-            setLoading(true);
-            try {
-                // Load boss data
-                const getDailyBoss = httpsCallable(functions, "getDailyBoss");
-                const bossResult = await getDailyBoss();
-                const bossResponse = bossResult.data as { boss: BossData; canChallenge: boolean };
-                setBossData(bossResponse.boss);
-                setCanChallenge(bossResponse.canChallenge);
-
-                // Load robots
-                const robotsSnap = await getDocs(collection(db, "users", user.uid, "robots"));
-                const robotList = robotsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as RobotData));
-                setRobots(robotList);
-
-                // Load variants
-                const variantsSnap = await getDocs(collection(db, "users", user.uid, "variants"));
-                const variantList = variantsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as VariantData));
-                setVariants(variantList);
-
-                // Auto-select first robot
-                if (robotList.length > 0 && !selectedRobotId) {
-                    setSelectedRobotId(robotList[0].id!);
-                }
-            } catch (error) {
-                console.error("Failed to load boss battle data:", error);
-                toast.error("データの読み込みに失敗しました");
-            } finally {
-                setLoading(false);
-            }
-        };
-
         loadData();
-    }, [user]);
+    }, [loadData]);
 
     const handleStartBattle = async () => {
         if (!selectedRobotId || !bossData || !canChallenge) return;
@@ -160,14 +166,23 @@ export default function BossBattle() {
         );
     }
 
-    if (!bossData) {
+    if (loadError || !bossData) {
         return (
-            <div className="min-h-screen bg-background text-foreground p-4 flex flex-col items-center justify-center">
-                <XCircle className="w-16 h-16 text-red-500 mb-4" />
-                <p className="text-lg">ボスデータの読み込みに失敗しました</p>
-                <Link href="/">
-                    <Button className="mt-4">ホームに戻る</Button>
-                </Link>
+            <div className="min-h-screen bg-background text-foreground p-4 flex flex-col items-center justify-center gap-4">
+                <XCircle className="w-16 h-16 text-red-500" />
+                <p className="text-lg font-medium text-center">ボスデータの読み込みに失敗しました</p>
+                {loadError && (
+                    <p className="text-sm text-muted-foreground">{loadError}</p>
+                )}
+                <div className="flex gap-3 mt-2">
+                    <Button onClick={loadData} variant="default" className="gap-2">
+                        <RotateCw className="w-4 h-4" />
+                        リトライ
+                    </Button>
+                    <Link href="/">
+                        <Button variant="outline">ホームに戻る</Button>
+                    </Link>
+                </div>
             </div>
         );
     }

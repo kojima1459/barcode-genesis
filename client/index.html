@@ -38,7 +38,6 @@
       content="https://barcodegame-42858.web.app/ogp.jpg"
     />
 
-    <!-- PWA Manifest -->
     <!-- PWA Manifest (Injected by VitePWA) -->
 
     <!-- Icons -->
@@ -47,17 +46,21 @@
     <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
     <link rel="mask-icon" href="/icon-512.png" color="#0f172a" />
 
-    <!-- Preload critical assets -->
-    <link rel="preload" href="/noise.svg" as="image" type="image/svg+xml" />
-
-    <!-- Font optimization with display=swap and preconnect -->
+    <!-- DNS Prefetch for third-party services -->
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
+    <link rel="dns-prefetch" href="https://firestore.googleapis.com" />
+    
+    <!-- Preconnect to font origins -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    
+    <!-- Font optimization with display=swap and deferred loading -->
     <link
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700&family=Oxanium:wght@400;500;600;700&display=swap"
       rel="stylesheet"
       media="print"
-      onload="this.media = 'all'"
+      onload="this.media='all'"
     />
     <noscript>
       <link
@@ -65,10 +68,24 @@
         rel="stylesheet"
       />
     </noscript>
+    
+    <!-- Critical inline styles for faster perceived load -->
+    <style>
+      body { margin: 0; background: linear-gradient(to bottom, #020408, #0a111a); min-height: 100vh; }
+      #root { min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+      .app-loader { text-align: center; color: #3ed0f0; font-family: system-ui, sans-serif; }
+      .app-loader-spinner { width: 40px; height: 40px; margin: 16px auto; border: 3px solid #3ed0f0; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
   </head>
 
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="app-loader">
+        <div class="app-loader-spinner"></div>
+        <div>LOADING...</div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
