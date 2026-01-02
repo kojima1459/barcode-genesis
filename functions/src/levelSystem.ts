@@ -16,6 +16,21 @@ export const getWorkshopLines = (level: number): number => {
     return 7;
 };
 
+// Milestone Boss thresholds - each cleared milestone grants +1 workshop capacity
+export const MILESTONE_LEVELS = [5, 10, 15, 20, 25] as const;
+
+/**
+ * Calculate total workshop capacity including milestone bonuses
+ * @param level User's current level
+ * @param clearedMilestones Array of cleared milestone level strings (e.g., ["5", "10"])
+ * @returns Total workshop capacity
+ */
+export const getWorkshopCapacity = (level: number, clearedMilestones: string[] = []): number => {
+    const baseCapacity = getWorkshopLines(level);
+    const milestoneBonus = clearedMilestones.length;
+    return baseCapacity + milestoneBonus;
+};
+
 export interface LevelUpdateResult {
     newLevel: number;
     newXp: number;

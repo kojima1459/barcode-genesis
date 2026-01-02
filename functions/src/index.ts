@@ -8,7 +8,7 @@ import { simulateBattle } from "./battleSystem";
 import { GenerateRobotRequest, GenerateRobotResponse, VariantData, FighterRef } from "./types";
 import { getRandomSkill, normalizeSkillIds } from "./skills";
 import { SeededRandom } from "./seededRandom";
-import { getWorkshopLines, applyRobotXp } from "./levelSystem";
+import { getWorkshopLines, getWorkshopCapacity, MILESTONE_LEVELS, applyRobotXp } from "./levelSystem";
 import { generateVariantRecipe, resolveVariantStats, resolveVariantAppearance, resolveVariant } from "./variantSystem";
 import { applyBattleRewards, DAILY_CREDITS_CAP, levelFromXp, XP_REWARD } from "./battleRewards";
 import { applyScanDailyAward, normalizeScanDaily, normalizeScanTokens, SCAN_TOKEN_PER_SCAN } from "./scanTokens";
@@ -2731,7 +2731,11 @@ export const createVariant = functions.https.onCall(async (data: any, context) =
 
     if (!rA.exists || !rB.exists) throw new functions.https.HttpsError('not-found', 'Parent not found');
     const userData = userDoc.data() || {};
-    const limit = userData.workshopLines || 0;
+
+    // Calculate capacity including milestone bonuses
+    const userLevel = typeof userData.level === 'number' ? userData.level : 1;
+    const clearedMilestones: string[] = Array.isArray(userData.clearedMilestones) ? userData.clearedMilestones : [];
+    const limit = getWorkshopCapacity(userLevel, clearedMilestones);
 
     // 2. Check Capacity (Count variants)
     // Note: Transactional count of collection is strict. 
@@ -3130,6 +3134,297 @@ export const executeBossBattle = functions
           scanTokens: scanTokensReward,
         },
         bossShieldBroken: boss.type === 'SHIELD' && battleResult.logs.some(l => l.bossShieldBroken),
+        turnCount: battleResult.turnCount,
+      };
+    });
+
+    return result;
+  });
+
+// ============================================
+// Milestone Boss (Rank-up Exam) Functions
+// ============================================
+
+/**
+ * Get milestone boss status for the user
+ * Returns which milestones are locked/available/cleared
+ */
+export const getMilestoneBoss = functions
+  .runWith({ memory: '256MB', timeoutSeconds: 30 })
+  .https.onCall(async (_data, context) => {
+    const db = admin.firestore();
+    if (!context.auth) {
+      throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
+    }
+
+    const uid = context.auth.uid;
+    const userDoc = await db.collection('users').doc(uid).get();
+    const userData = userDoc.data() || {};
+
+    const userLevel = typeof userData.level === 'number' ? userData.level : 1;
+    const clearedMilestones: string[] = Array.isArray(userData.clearedMilestones)
+      ? userData.clearedMilestones
+      : [];
+
+    // Build milestone status list
+    const milestones = MILESTONE_LEVELS.map(level => {
+      const levelStr = String(level);
+      const cleared = clearedMilestones.includes(levelStr);
+      const canChallenge = userLevel >= level && !cleared;
+      return {
+        level,
+        cleared,
+        canChallenge,
+        locked: userLevel < level,
+      };
+    });
+
+    // Find next available (challengeable) milestone
+    const nextMilestone = milestones.find(m => m.canChallenge) || null;
+
+    // Generate boss data for next challengeable milestone
+    let bossData = null;
+    if (nextMilestone) {
+      // Use milestone level as seed for deterministic boss generation
+      const seed = `milestone_${nextMilestone.level}`;
+      bossData = generateMilestoneBoss(nextMilestone.level, seed);
+    }
+
+    return {
+      userLevel,
+      milestones,
+      nextMilestone: nextMilestone?.level || null,
+      bossData,
+      currentCapacity: getWorkshopCapacity(userLevel, clearedMilestones),
+      clearedCount: clearedMilestones.length,
+    };
+  });
+
+/**
+ * Generate a milestone boss based on level threshold
+ */
+function generateMilestoneBoss(milestoneLevel: number, _seed: string) {
+  // Boss difficulty scales with milestone level
+  const difficultyMultiplier = 1 + (milestoneLevel / 10);
+
+  const baseHp = Math.floor(80 * difficultyMultiplier);
+  const baseAtk = Math.floor(15 * difficultyMultiplier);
+  const baseDef = Math.floor(12 * difficultyMultiplier);
+  const baseSpd = Math.floor(10 * difficultyMultiplier);
+
+  const bossNames = [
+    'GUARDIAN', 'WARDEN', 'SENTINEL', 'OVERSEER', 'COMMANDER'
+  ];
+  const nameIndex = Math.floor(milestoneLevel / 5) - 1;
+  const name = `${bossNames[nameIndex] || 'ELITE'} Lv${milestoneLevel}`;
+
+  return {
+    bossId: `milestone_${milestoneLevel}`,
+    name,
+    milestoneLevel,
+    stats: {
+      hp: baseHp,
+      attack: baseAtk,
+      defense: baseDef,
+      speed: baseSpd,
+    },
+    reward: {
+      type: 'capacity',
+      value: 1,
+      description: 'CAPACITY +1',
+    },
+  };
+}
+
+/**
+ * Execute a milestone boss battle
+ * On victory: grants permanent capacity bonus
+ */
+export const executeMilestoneBattle = functions
+  .runWith({ memory: '512MB', timeoutSeconds: 60 })
+  .https.onCall(async (data, context) => {
+    const db = admin.firestore();
+    if (!context.auth) {
+      throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
+    }
+
+    const uid = context.auth.uid;
+    const { milestoneLevel, robotId, variantId, useCheer } = data as {
+      milestoneLevel: number;
+      robotId?: string;
+      variantId?: string;
+      useCheer?: boolean;
+    };
+
+    if (!milestoneLevel || !MILESTONE_LEVELS.includes(milestoneLevel as typeof MILESTONE_LEVELS[number])) {
+      throw new functions.https.HttpsError('invalid-argument', 'Invalid milestone level');
+    }
+    if (!robotId && !variantId) {
+      throw new functions.https.HttpsError('invalid-argument', 'robotId or variantId required');
+    }
+
+    const battleId = `milestone_${uid}_${milestoneLevel}`;
+
+    const result = await db.runTransaction(async (transaction) => {
+      const userRef = db.collection('users').doc(uid);
+      const battleRef = db.collection('milestoneBattles').doc(battleId);
+
+      const [userSnap, battleSnap] = await Promise.all([
+        transaction.get(userRef),
+        transaction.get(battleRef)
+      ]);
+
+      if (!userSnap.exists) {
+        throw new functions.https.HttpsError('not-found', 'User not found');
+      }
+
+      const userData = userSnap.data() || {};
+      const userLevel = typeof userData.level === 'number' ? userData.level : 1;
+      const clearedMilestones: string[] = Array.isArray(userData.clearedMilestones)
+        ? userData.clearedMilestones
+        : [];
+
+      // Check if already cleared (idempotency)
+      if (clearedMilestones.includes(String(milestoneLevel))) {
+        if (battleSnap.exists) {
+          const existingResult = battleSnap.data();
+          return {
+            alreadyCleared: true,
+            ...existingResult
+          };
+        }
+        throw new functions.https.HttpsError('failed-precondition', 'already-cleared');
+      }
+
+      // Check level requirement
+      if (userLevel < milestoneLevel) {
+        throw new functions.https.HttpsError('failed-precondition', 'level-not-reached');
+      }
+
+      // Get player's robot
+      let playerRobot: any;
+      if (variantId) {
+        playerRobot = await resolveVariant(uid, variantId, db, transaction);
+      } else {
+        const robotRef = userRef.collection('robots').doc(robotId!);
+        const robotSnap = await transaction.get(robotRef);
+        if (!robotSnap.exists) {
+          throw new functions.https.HttpsError('not-found', 'Robot not found');
+        }
+        playerRobot = { id: robotSnap.id, ...robotSnap.data() };
+      }
+
+      // Generate boss
+      const boss = generateMilestoneBoss(milestoneLevel, `milestone_${milestoneLevel}`);
+      const bossRobot = {
+        id: boss.bossId,
+        name: boss.name,
+        hp: boss.stats.hp,
+        attack: boss.stats.attack,
+        defense: boss.stats.defense,
+        speed: boss.stats.speed,
+        level: milestoneLevel,
+        role: 'balanced',
+        baseHp: boss.stats.hp,
+        baseAttack: boss.stats.attack,
+        baseDefense: boss.stats.defense,
+        baseSpeed: boss.stats.speed,
+      };
+
+      // Run battle simulation - use base stats for RobotData compatibility
+      const battleResult = simulateBattle(
+        {
+          id: playerRobot.id,
+          userId: '',
+          name: playerRobot.name,
+          sourceBarcode: playerRobot.sourceBarcode || '',
+          rarity: playerRobot.rarity || 1,
+          rarityName: playerRobot.rarityName || 'Common',
+          baseHp: playerRobot.baseHp || 50,
+          baseAttack: playerRobot.baseAttack || 10,
+          baseDefense: playerRobot.baseDefense || 10,
+          baseSpeed: playerRobot.baseSpeed || 10,
+          elementType: playerRobot.elementType || 1,
+          elementName: playerRobot.elementName || 'Fire',
+          level: playerRobot.level || 1,
+          skills: playerRobot.skills || [],
+          parts: playerRobot.parts,
+          colors: playerRobot.colors,
+          evolutionLevel: playerRobot.evolutionLevel || 0,
+          totalBattles: 0,
+          totalWins: 0,
+          isFavorite: false,
+          role: playerRobot.role || 'balanced',
+          cheer: useCheer || false,
+        } as any,
+        {
+          id: bossRobot.id,
+          userId: '',
+          name: bossRobot.name,
+          sourceBarcode: '',
+          rarity: 1,
+          rarityName: 'Boss',
+          baseHp: bossRobot.baseHp,
+          baseAttack: bossRobot.baseAttack,
+          baseDefense: bossRobot.baseDefense,
+          baseSpeed: bossRobot.baseSpeed,
+          elementType: 1,
+          elementName: 'Neutral',
+          level: milestoneLevel,
+          skills: [],
+          parts: {} as any,
+          colors: {} as any,
+          evolutionLevel: 0,
+          totalBattles: 0,
+          totalWins: 0,
+          isFavorite: false,
+          role: 'balanced',
+          cheer: false,
+        } as any,
+        `${battleId}_${Date.now()}`
+      );
+
+      const isWin = battleResult.winnerId === playerRobot.id;
+
+      // Prepare update
+      const updateData: any = {
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+
+      let rewardGranted = false;
+      if (isWin) {
+        // Add to cleared milestones
+        const newClearedMilestones = [...clearedMilestones, String(milestoneLevel)];
+        updateData.clearedMilestones = newClearedMilestones;
+
+        // Update workshopLines with new capacity
+        updateData.workshopLines = getWorkshopCapacity(userLevel, newClearedMilestones);
+        rewardGranted = true;
+      }
+
+      transaction.set(userRef, updateData, { merge: true });
+
+      // Create battle record
+      const battleRecord = {
+        milestoneLevel,
+        playerId: uid,
+        playerRobotId: robotId || variantId,
+        result: isWin ? 'win' : 'loss',
+        winnerId: battleResult.winnerId,
+        logs: battleResult.logs.slice(0, 20), // Limit log size
+        rewardGranted,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+
+      transaction.set(battleRef, battleRecord);
+
+      return {
+        battleId,
+        result: isWin ? 'win' : 'loss',
+        winnerId: battleResult.winnerId,
+        logs: battleResult.logs.slice(0, 20),
+        rewardGranted,
+        reward: isWin ? { type: 'capacity', value: 1 } : null,
         turnCount: battleResult.turnCount,
       };
     });

@@ -29,6 +29,7 @@ import { SystemSkeleton } from "@/components/ui/SystemSkeleton";
 import HangarCard from "@/components/HangarCard";
 import { TechCard } from "@/components/ui/TechCard";
 import { BossAlertCard, BossData } from "@/components/BossAlertCard";
+import { MilestoneBossCard } from "@/components/MilestoneBossCard";
 import { cn } from "@/lib/utils";
 import { useLocation, Link } from "wouter";
 import { GlobalHeader } from "@/components/GlobalHeader";
@@ -83,6 +84,31 @@ export default function Home() {
   const [bossError, setBossError] = useState<string | null>(null);
   const [, setLocation] = useLocation();
 
+  // Milestone Boss state
+  interface MilestoneData {
+    level: number;
+    cleared: boolean;
+    canChallenge: boolean;
+    locked: boolean;
+  }
+  interface MilestoneBossData {
+    bossId: string;
+    name: string;
+    milestoneLevel: number;
+    stats: { hp: number; attack: number; defense: number; speed: number };
+    reward: { type: string; value: number; description: string };
+  }
+  const [milestoneData, setMilestoneData] = useState<{
+    userLevel: number;
+    milestones: MilestoneData[];
+    nextMilestone: number | null;
+    bossData: MilestoneBossData | null;
+    currentCapacity: number;
+    clearedCount: number;
+  } | null>(null);
+  const [milestoneLoading, setMilestoneLoading] = useState(true);
+  const [milestoneError, setMilestoneError] = useState<string | null>(null);
+
   // Load Daily Boss function (extracted for retry)
   const loadBoss = async () => {
     setBossLoading(true);
@@ -106,6 +132,22 @@ export default function Home() {
       }
     } finally {
       setBossLoading(false);
+    }
+  };
+
+  // Load Milestone Boss function
+  const loadMilestoneBoss = async () => {
+    setMilestoneLoading(true);
+    setMilestoneError(null);
+    try {
+      const getMilestoneBoss = httpsCallable(functions, "getMilestoneBoss");
+      const result = await getMilestoneBoss();
+      setMilestoneData(result.data as any);
+    } catch (error: any) {
+      console.error("Failed to load milestone boss:", error);
+      setMilestoneError("昇格試験情報を取得できませんでした");
+    } finally {
+      setMilestoneLoading(false);
     }
   };
 
@@ -173,6 +215,7 @@ export default function Home() {
     loadFollowing();
     loadRobots();
     loadBoss();
+    loadMilestoneBoss();
   }, [user]);
 
   const handleScan = async (barcode: string) => {
@@ -371,6 +414,22 @@ export default function Home() {
                   error={bossError}
                   onChallenge={() => setLocation('/boss')}
                   onRetry={loadBoss}
+                />
+              </section>
+
+              {/* 2.6. Milestone Boss Card */}
+              <section>
+                <MilestoneBossCard
+                  userLevel={milestoneData?.userLevel || 1}
+                  milestones={milestoneData?.milestones || []}
+                  nextMilestone={milestoneData?.nextMilestone || null}
+                  bossData={milestoneData?.bossData || null}
+                  currentCapacity={milestoneData?.currentCapacity || 1}
+                  clearedCount={milestoneData?.clearedCount || 0}
+                  isLoading={milestoneLoading}
+                  error={milestoneError}
+                  onChallenge={(level) => setLocation(`/milestone-boss?level=${level}`)}
+                  onRetry={loadMilestoneBoss}
                 />
               </section>
 

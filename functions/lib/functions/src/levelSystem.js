@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getLevelMultiplier = exports.applyRobotXp = exports.calculateEffectiveStatsWithRole = exports.calculateEffectiveStats = exports.STAT_MULTIPLIER_CAP = exports.applyUserXp = exports.getWorkshopLines = exports.calculateNextLevelXp = exports.LEVEL_CAP = void 0;
+exports.getLevelMultiplier = exports.applyRobotXp = exports.calculateEffectiveStatsWithRole = exports.calculateEffectiveStats = exports.STAT_MULTIPLIER_CAP = exports.applyUserXp = exports.getWorkshopCapacity = exports.MILESTONE_LEVELS = exports.getWorkshopLines = exports.calculateNextLevelXp = exports.LEVEL_CAP = void 0;
 const robotRoles_1 = require("./lib/robotRoles");
 exports.LEVEL_CAP = 30;
 const calculateNextLevelXp = (level) => {
@@ -25,6 +25,20 @@ const getWorkshopLines = (level) => {
     return 7;
 };
 exports.getWorkshopLines = getWorkshopLines;
+// Milestone Boss thresholds - each cleared milestone grants +1 workshop capacity
+exports.MILESTONE_LEVELS = [5, 10, 15, 20, 25];
+/**
+ * Calculate total workshop capacity including milestone bonuses
+ * @param level User's current level
+ * @param clearedMilestones Array of cleared milestone level strings (e.g., ["5", "10"])
+ * @returns Total workshop capacity
+ */
+const getWorkshopCapacity = (level, clearedMilestones = []) => {
+    const baseCapacity = (0, exports.getWorkshopLines)(level);
+    const milestoneBonus = clearedMilestones.length;
+    return baseCapacity + milestoneBonus;
+};
+exports.getWorkshopCapacity = getWorkshopCapacity;
 const applyUserXp = (currentLevel, currentXp, xpToAdd) => {
     let level = currentLevel || 1;
     let xp = (currentXp || 0) + xpToAdd;
