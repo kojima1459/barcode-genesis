@@ -1,11 +1,18 @@
-import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, connectAuthEmulator } from "firebase/auth";
-import { getFirestore, connectFirestoreEmulator, enableIndexedDbPersistence } from "firebase/firestore";
-import { getStorage, connectStorageEmulator } from "firebase/storage";
-import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
-import { getMessaging } from "firebase/messaging";
+/**
+ * Firebase Configuration - Centralized
+ * 
+ * All Firebase services are initialized here and exported.
+ * Services are loaded dynamically on first access to reduce initial bundle.
+ */
 
-// Firebase Console から取得した正しい設定
+import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
+import { getAuth as getFirebaseAuth, GoogleAuthProvider, connectAuthEmulator, type Auth } from "firebase/auth";
+import { getFirestore as getFirebaseFirestore, connectFirestoreEmulator, type Firestore } from "firebase/firestore";
+import { getStorage as getFirebaseStorage, connectStorageEmulator, type FirebaseStorage } from "firebase/storage";
+import { getFunctions as getFirebaseFunctions, connectFunctionsEmulator, type Functions } from "firebase/functions";
+import { getMessaging as getFirebaseMessaging, type Messaging } from "firebase/messaging";
+
+// Firebase Console configuration
 const firebaseConfig = {
   apiKey: "AIzaSyBV5GUqsQTsHM9PxZbwnirS2FSUNV6k4z4",
   authDomain: "barcodegame-42858.firebaseapp.com",
@@ -16,30 +23,134 @@ const firebaseConfig = {
   measurementId: "G-Q69RL7BNFQ"
 };
 
-const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
-export const db = getFirestore(app);
-// Cloud Functions は us-central1 にデプロイされているため、リージョンを明示的に指定
-export const functions = getFunctions(app, 'us-central1');
-export const storage = getStorage(app);
-export const messaging = getMessaging(app);
-export const googleProvider = new GoogleAuthProvider();
+// Singleton instances
+let app: FirebaseApp;
+let authInstance: Auth;
+let dbInstance: Firestore;
+let functionsInstance: Functions;
+let storageInstance: FirebaseStorage;
+let messagingInstance: Messaging;
+let emulatorConnected = false;
 
-// Connect to emulators BEFORE enabling persistence or other operations
-if (import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === "1") {
-  connectAuthEmulator(auth, "http://localhost:9099");
-  connectFirestoreEmulator(db, "localhost", 8084);
-  connectFunctionsEmulator(functions, "localhost", 5001);
-  connectStorageEmulator(storage, "localhost", 9199);
+// Initialize app only once
+function getAppInstance(): FirebaseApp {
+  if (!app) {
+    app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+  }
+  return app;
 }
 
-// Enable offline persistence for Firestore (for PWA offline support)
-// enableIndexedDbPersistence(db).catch((err) => {
-//   if (err.code === 'failed-precondition') {
-//     // Multiple tabs open, persistence can only be enabled in one tab at a time
-//     console.warn('Firestore persistence unavailable: multiple tabs open');
-//   } else if (err.code === 'unimplemented') {
-//     // The browser doesn't support IndexedDB
-//     console.warn('Firestore persistence unavailable: browser not supported');
-//   }
-// });
+// Connect to emulators once
+function connectEmulators() {
+  if (emulatorConnected) return;
+  if (import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === "1") {
+    if (authInstance) connectAuthEmulator(authInstance, "http://localhost:9099");
+    if (dbInstance) connectFirestoreEmulator(dbInstance, "localhost", 8084);
+    if (functionsInstance) connectFunctionsEmulator(functionsInstance, "localhost", 5001);
+    if (storageInstance) connectStorageEmulator(storageInstance, "localhost", 9199);
+    emulatorConnected = true;
+  }
+}
+
+// Lazy getters - services are only created when first accessed
+export const auth = new Proxy({} as Auth, {
+  get(_, prop) {
+    if (!authInstance) {
+      authInstance = getFirebaseAuth(getAppInstance());
+      connectEmulators();
+    }
+    return (authInstance as any)[prop];
+  }
+});
+
+export const db = new Proxy({} as Firestore, {
+  get(_, prop) {
+    if (!dbInstance) {
+      dbInstance = getFirebaseFirestore(getAppInstance());
+      connectEmulators();
+    }
+    return (dbInstance as any)[prop];
+  }
+});
+
+export const functions = new Proxy({} as Functions, {
+  get(_, prop) {
+    if (!functionsInstance) {
+      functionsInstance = getFirebaseFunctions(getAppInstance(), 'us-central1');
+      connectEmulators();
+    }
+    return (functionsInstance as any)[prop];
+  }
+});
+
+export const storage = new Proxy({} as FirebaseStorage, {
+  get(_, prop) {
+    if (!storageInstance) {
+      storageInstance = getFirebaseStorage(getAppInstance());
+      connectEmulators();
+    }
+    return (storageInstance as any)[prop];
+  }
+});
+
+export const googleProvider = new GoogleAuthProvider();
+
+// For direct access when proxy doesn't work
+export function getAuth(): Auth {
+  if (!authInstance) {
+    authInstance = getFirebaseAuth(getAppInstance());
+    connectEmulators();
+  }
+  return authInstance;
+}
+
+export function getDb(): Firestore {
+  if (!dbInstance) {
+    dbInstance = getFirebaseFirestore(getAppInstance());
+    connectEmulators();
+  }
+  return dbInstance;
+}
+
+export function getFunctions(): Functions {
+  if (!functionsInstance) {
+    functionsInstance = getFirebaseFunctions(getAppInstance(), 'us-central1');
+    connectEmulators();
+  }
+  return functionsInstance;
+}
+
+export function getStorage(): FirebaseStorage {
+  if (!storageInstance) {
+    storageInstance = getFirebaseStorage(getAppInstance());
+    connectEmulators();
+  }
+  return storageInstance;
+}
+
+// Messaging - lazy loaded (only works in supported browsers)
+export const messaging = new Proxy({} as Messaging, {
+  get(_, prop) {
+    if (!messagingInstance) {
+      try {
+        messagingInstance = getFirebaseMessaging(getAppInstance());
+      } catch (e) {
+        console.warn("Firebase Messaging not supported in this browser");
+        return undefined;
+      }
+    }
+    return (messagingInstance as any)[prop];
+  }
+});
+
+export function getMessaging(): Messaging | null {
+  if (!messagingInstance) {
+    try {
+      messagingInstance = getFirebaseMessaging(getAppInstance());
+    } catch (e) {
+      console.warn("Firebase Messaging not supported in this browser");
+      return null;
+    }
+  }
+  return messagingInstance;
+}

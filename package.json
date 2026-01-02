@@ -15,7 +15,8 @@
     "check": "tsc --noEmit",
     "format": "prettier --write .",
     "check-battle-code": "! grep \"damage \\* 1.2\" client/src/pages/Battle.tsx",
-    "check-no-math-random": "! grep -v -E '^\\s*(//|\\*)' client/src/lib/battleEngine.ts | grep -E 'Math\\.random'"
+    "check-no-math-random": "! grep -v -E '^\\s*(//|\\*)' client/src/lib/battleEngine.ts | grep -E 'Math\\.random'",
+    "analyze": "npm run build && open dist/public/stats.html"
   },
   "dependencies": {
     "@ericblade/quagga2": "^1.12.1",
