@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useSound } from "@/contexts/SoundContext";
 import RobotSVG from "@/components/RobotSVG";
-import { BossData, BossType } from "@/components/BossAlertCard";
+import { DailyBossData, BossType } from "@/types/boss";
 import { RobotData, VariantData } from "@/types/shared";
 import { SystemSkeleton } from "@/components/ui/SystemSkeleton";
 import Interactive from "@/components/ui/interactive";
@@ -56,7 +56,7 @@ export default function BossBattle() {
 
     // States
     const [loading, setLoading] = useState(true);
-    const [bossData, setBossData] = useState<BossData | null>(null);
+    const [bossData, setBossData] = useState<DailyBossData | null>(null);
     const [canChallenge, setCanChallenge] = useState(false);
     const [hasScannedToday, setHasScannedToday] = useState(false);
     const [robots, setRobots] = useState<RobotData[]>([]);
@@ -76,7 +76,7 @@ export default function BossBattle() {
             // Load boss data
             const getDailyBoss = httpsCallable(functions, "getDailyBoss");
             const bossResult = await getDailyBoss();
-            const bossResponse = bossResult.data as { boss: BossData; canChallenge: boolean; hasScannedToday: boolean };
+            const bossResponse = bossResult.data as { boss: DailyBossData; canChallenge: boolean; hasScannedToday: boolean };
             setBossData(bossResponse.boss);
             setCanChallenge(bossResponse.canChallenge);
             setHasScannedToday(bossResponse.hasScannedToday);
@@ -90,23 +90,25 @@ export default function BossBattle() {
             const variantsSnap = await getDocs(collection(db, "users", user.uid, "variants"));
             const variantList = variantsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as VariantData));
             setVariants(variantList);
-
-            // Auto-select first robot
-            if (robotList.length > 0 && !selectedRobotId) {
-                setSelectedRobotId(robotList[0].id!);
-            }
         } catch (error: any) {
             console.error("Failed to load boss battle data:", error);
             const code = error?.code || '';
             if (code === 'unauthenticated') {
-                setLoadError("ログインが必要です");
+                setLoadError(t('login_required'));
             } else {
-                setLoadError("データの読み込みに失敗しました");
+                setLoadError(t('data_load_error'));
             }
         } finally {
             setLoading(false);
         }
-    }, [user, selectedRobotId]);
+    }, [user]);
+
+    // Auto-select first robot when robots are loaded
+    useEffect(() => {
+        if (robots.length > 0 && !selectedRobotId) {
+            setSelectedRobotId(robots[0].id!);
+        }
+    }, [robots, selectedRobotId]);
 
     useEffect(() => {
         loadData();

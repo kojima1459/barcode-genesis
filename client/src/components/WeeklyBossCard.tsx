@@ -1,3 +1,4 @@
+import React, { memo } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -5,21 +6,7 @@ import { Skull, Loader2, Check, Coins } from "lucide-react";
 import { TechCard } from "@/components/ui/TechCard";
 import { cn } from "@/lib/utils";
 
-interface WeeklyBossData {
-    bossId: string;
-    name: string;
-    weekKey: string;
-    stats: {
-        hp: number;
-        attack: number;
-        defense: number;
-        speed: number;
-    };
-    reward: {
-        credits: number;
-        xp: number;
-    };
-}
+import { WeeklyBossData } from "@/types/boss";
 
 interface WeeklyBossCardProps {
     boss: WeeklyBossData | null;
@@ -32,7 +19,7 @@ interface WeeklyBossCardProps {
     onRetry?: () => void;
 }
 
-export function WeeklyBossCard({
+export const WeeklyBossCard = memo(function WeeklyBossCard({
     boss,
     weekKey,
     rewardClaimed,
@@ -49,7 +36,7 @@ export function WeeklyBossCard({
             <TechCard className="p-4" variant="outline" intensity="low">
                 <div className="flex items-center justify-center gap-2 py-4">
                     <Loader2 className="w-5 h-5 animate-spin text-amber-400" />
-                    <span className="text-sm text-muted-foreground">Loading...</span>
+                    <span className="text-sm text-muted-foreground">{t('loading')}</span>
                 </div>
             </TechCard>
         );
@@ -62,7 +49,7 @@ export function WeeklyBossCard({
                     {error}
                     {onRetry && (
                         <Button size="sm" variant="ghost" onClick={onRetry} className="ml-2">
-                            再試行
+                            {t('button_retry')}
                         </Button>
                     )}
                 </div>
@@ -95,9 +82,9 @@ export function WeeklyBossCard({
                         )}
                     </div>
                     <div>
-                        <h3 className="text-sm font-bold text-white">今週のボス</h3>
+                        <h3 className="text-sm font-bold text-white">{t('this_week_boss')}</h3>
                         <p className="text-[10px] text-muted-foreground">
-                            週1回、報酬を獲得
+                            {t('weekly_reward_desc')}
                         </p>
                     </div>
                 </div>
@@ -120,7 +107,7 @@ export function WeeklyBossCard({
                         </div>
                     </div>
                     <div className="text-right">
-                        <div className="text-[10px] text-muted-foreground">報酬</div>
+                        <div className="text-[10px] text-muted-foreground">{t('reward')}</div>
                         <div className="text-xs font-bold text-yellow-400 flex items-center gap-1">
                             <Coins className="w-3 h-3" />
                             {boss.reward.credits} CR + {boss.reward.xp} XP
@@ -131,7 +118,7 @@ export function WeeklyBossCard({
                 {rewardClaimed ? (
                     <div className="text-center py-2">
                         <div className="text-green-400 text-sm font-bold">
-                            ✓ 今週の報酬獲得済み
+                            ✓ {t('rewards_claimed')}
                         </div>
                         <Button
                             size="sm"
@@ -139,7 +126,7 @@ export function WeeklyBossCard({
                             className="mt-2 text-muted-foreground"
                             onClick={onChallenge}
                         >
-                            再戦する（報酬なし）
+                            {t('challenge_again')}
                         </Button>
                     </div>
                 ) : (
@@ -149,10 +136,10 @@ export function WeeklyBossCard({
                         onClick={onChallenge}
                     >
                         <Skull className="w-4 h-4 mr-2" />
-                        挑戦する
+                        {t('boss_challenge')}
                     </Button>
                 )}
             </div>
         </TechCard>
     );
-}
+});

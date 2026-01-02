@@ -10,6 +10,8 @@ interface CollectionSlotProps {
     rarity: number; // 1-5
     robot?: RobotData;
     unlocked: boolean;
+    placeholderParts?: any;
+    placeholderColors?: any;
 }
 
 const PLACEHOLDER_PARTS = {
@@ -32,7 +34,7 @@ const PLACEHOLDER_COLORS = {
     glow: "#ffffff",
 };
 
-const CollectionSlot = memo(function CollectionSlot({ role, rarity, robot, unlocked }: CollectionSlotProps) {
+const CollectionSlot = memo(function CollectionSlot({ role, rarity, robot, unlocked, placeholderParts, placeholderColors }: CollectionSlotProps) {
     const rarityLabel = ["COMMON", "UNCOMMON", "RARE", "EPIC", "LEGENDARY"][rarity - 1] || "COMMON";
     const rarityColor = [
         "border-white/20 bg-white/5 text-white/60", // Common
@@ -63,7 +65,11 @@ const CollectionSlot = memo(function CollectionSlot({ role, rarity, robot, unloc
                         <div className="relative w-full h-full flex items-center justify-center">
                             {/* Silhouette */}
                             <div className="opacity-20 filter brightness-0">
-                                <RobotSVG parts={PLACEHOLDER_PARTS} colors={PLACEHOLDER_COLORS} size={80} />
+                                <RobotSVG
+                                    parts={placeholderParts || PLACEHOLDER_PARTS}
+                                    colors={placeholderColors || PLACEHOLDER_COLORS}
+                                    size={80}
+                                />
                             </div>
                             {/* Question Mark */}
                             <div className="absolute inset-0 flex items-center justify-center">

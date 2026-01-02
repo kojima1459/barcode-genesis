@@ -2041,6 +2041,85 @@ exports.stripeWebhook = functions
                 }
                 break;
             }
+            case 'customer.subscription.updated': {
+                // サブスク更新時（cancel_at_period_end変更、ステータス変更など）
+                const subscription = event.data.object;
+                const customerId = subscription.customer;
+                const status = subscription.status; // active, past_due, canceled, etc.
+                const cancelAtPeriodEnd = subscription.cancel_at_period_end;
+                const usersUpdSnap = await db.collection('users')
+                    .where('stripeCustomerId', '==', customerId)
+                    .limit(1)
+                    .get();
+                if (!usersUpdSnap.empty) {
+                    const userDoc = usersUpdSnap.docs[0];
+                    const updateData = {
+                        subscriptionStatus: status,
+                        cancelAtPeriodEnd: cancelAtPeriodEnd,
+                        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+                    };
+                    // active/trialing は isPremium: true, それ以外は false
+                    if (status === 'active' || status === 'trialing') {
+                        updateData.isPremium = true;
+                    }
+                    else if (status === 'canceled' || status === 'unpaid') {
+                        updateData.isPremium = false;
+                    }
+                    // past_due は isPremium を維持（猶予期間）
+                    if (subscription.current_period_end) {
+                        updateData.currentPeriodEnd = admin.firestore.Timestamp.fromMillis(subscription.current_period_end * 1000);
+                    }
+                    await userDoc.ref.update(updateData);
+                    console.log(`Subscription updated for user ${userDoc.id}: status=${status}, cancelAtPeriodEnd=${cancelAtPeriodEnd}`);
+                }
+                else {
+                    console.warn(`User not found for subscription update (Customer: ${customerId})`);
+                }
+                break;
+            }
+            case 'invoice.payment_succeeded': {
+                // 支払い成功時（更新支払いも含む）
+                const invoice = event.data.object;
+                const customerId = invoice.customer;
+                const subscriptionId = invoice.subscription;
+                if (subscriptionId) {
+                    const usersInvSnap = await db.collection('users')
+                        .where('stripeCustomerId', '==', customerId)
+                        .limit(1)
+                        .get();
+                    if (!usersInvSnap.empty) {
+                        const userDoc = usersInvSnap.docs[0];
+                        await userDoc.ref.update({
+                            isPremium: true,
+                            subscriptionStatus: 'active',
+                            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+                        });
+                        console.log(`Invoice payment succeeded for user ${userDoc.id}`);
+                    }
+                }
+                break;
+            }
+            case 'invoice.payment_failed': {
+                // 支払い失敗時
+                const invoice = event.data.object;
+                const customerId = invoice.customer;
+                const subscriptionId = invoice.subscription;
+                if (subscriptionId) {
+                    const usersFailSnap = await db.collection('users')
+                        .where('stripeCustomerId', '==', customerId)
+                        .limit(1)
+                        .get();
+                    if (!usersFailSnap.empty) {
+                        const userDoc = usersFailSnap.docs[0];
+                        await userDoc.ref.update({
+                            subscriptionStatus: 'past_due',
+                            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+                        });
+                        console.log(`Invoice payment failed for user ${userDoc.id}, marked as past_due`);
+                    }
+                }
+                break;
+            }
         }
         res.json({ received: true });
     }

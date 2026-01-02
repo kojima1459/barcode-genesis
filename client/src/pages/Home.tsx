@@ -28,11 +28,18 @@ import { Interactive } from "@/components/ui/interactive";
 import { SystemSkeleton } from "@/components/ui/SystemSkeleton";
 import HangarCard from "@/components/HangarCard";
 import { TechCard } from "@/components/ui/TechCard";
-import { BossAlertCard, BossData } from "@/components/BossAlertCard";
+import { BossAlertCard } from "@/components/BossAlertCard";
 import { MilestoneBossCard } from "@/components/MilestoneBossCard";
 import { WeeklyBossCard } from "@/components/WeeklyBossCard";
 import { cn } from "@/lib/utils";
 import { useLocation, Link } from "wouter";
+import {
+  DailyBossData,
+  DailyBossResponse,
+  MilestoneBossResponse,
+  WeeklyBossData,
+  WeeklyBossResponse
+} from "@/types/boss";
 import { GlobalHeader } from "@/components/GlobalHeader";
 import { BookOpen } from "lucide-react";
 
@@ -78,7 +85,7 @@ export default function Home() {
   const [limitMessage, setLimitMessage] = useState("");
 
   // Daily Boss state
-  const [bossData, setBossData] = useState<BossData | null>(null);
+  const [bossData, setBossData] = useState<DailyBossData | null>(null);
   const [canChallengeBoss, setCanChallengeBoss] = useState(false);
   const [hasScannedToday, setHasScannedToday] = useState(false);
   const [bossLoading, setBossLoading] = useState(true);
@@ -86,38 +93,11 @@ export default function Home() {
   const [, setLocation] = useLocation();
 
   // Milestone Boss state
-  interface MilestoneData {
-    level: number;
-    cleared: boolean;
-    canChallenge: boolean;
-    locked: boolean;
-  }
-  interface MilestoneBossData {
-    bossId: string;
-    name: string;
-    milestoneLevel: number;
-    stats: { hp: number; attack: number; defense: number; speed: number };
-    reward: { type: string; value: number; description: string };
-  }
-  const [milestoneData, setMilestoneData] = useState<{
-    userLevel: number;
-    milestones: MilestoneData[];
-    nextMilestone: number | null;
-    bossData: MilestoneBossData | null;
-    currentCapacity: number;
-    clearedCount: number;
-  } | null>(null);
+  const [milestoneData, setMilestoneData] = useState<MilestoneBossResponse | null>(null);
   const [milestoneLoading, setMilestoneLoading] = useState(true);
   const [milestoneError, setMilestoneError] = useState<string | null>(null);
 
   // Weekly Boss state
-  interface WeeklyBossData {
-    bossId: string;
-    name: string;
-    weekKey: string;
-    stats: { hp: number; attack: number; defense: number; speed: number };
-    reward: { credits: number; xp: number };
-  }
   const [weeklyBossData, setWeeklyBossData] = useState<WeeklyBossData | null>(null);
   const [weeklyWeekKey, setWeeklyWeekKey] = useState('');
   const [weeklyRewardClaimed, setWeeklyRewardClaimed] = useState(false);
@@ -132,7 +112,7 @@ export default function Home() {
     try {
       const getDailyBoss = httpsCallable(functions, "getDailyBoss");
       const result = await getDailyBoss();
-      const data = result.data as { boss: BossData; canChallenge: boolean; hasScannedToday: boolean };
+      const data = result.data as DailyBossResponse;
       setBossData(data.boss);
       setCanChallengeBoss(data.canChallenge);
       setHasScannedToday(data.hasScannedToday);
@@ -158,7 +138,7 @@ export default function Home() {
     try {
       const getMilestoneBoss = httpsCallable(functions, "getMilestoneBoss");
       const result = await getMilestoneBoss();
-      setMilestoneData(result.data as any);
+      setMilestoneData(result.data as MilestoneBossResponse);
     } catch (error: any) {
       console.error("Failed to load milestone boss:", error);
       setMilestoneError("昇格試験情報を取得できませんでした");
@@ -174,7 +154,7 @@ export default function Home() {
     try {
       const getWeeklyBoss = httpsCallable(functions, "getWeeklyBoss");
       const result = await getWeeklyBoss();
-      const data = result.data as any;
+      const data = result.data as WeeklyBossResponse;
       setWeeklyBossData(data.boss);
       setWeeklyWeekKey(data.weekKey || '');
       setWeeklyRewardClaimed(data.rewardClaimed || false);

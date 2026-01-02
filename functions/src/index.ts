@@ -2463,8 +2463,8 @@ export const stripeWebhook = functions
             }
             // past_due は isPremium を維持（猶予期間）
 
-            if (subscription.current_period_end) {
-              updateData.currentPeriodEnd = admin.firestore.Timestamp.fromMillis(subscription.current_period_end * 1000);
+            if ((subscription as any).current_period_end) {
+              updateData.currentPeriodEnd = admin.firestore.Timestamp.fromMillis((subscription as any).current_period_end * 1000);
             }
 
             await userDoc.ref.update(updateData);
@@ -2479,7 +2479,7 @@ export const stripeWebhook = functions
           // 支払い成功時（更新支払いも含む）
           const invoice = event.data.object as Stripe.Invoice;
           const customerId = invoice.customer as string;
-          const subscriptionId = invoice.subscription as string;
+          const subscriptionId = (invoice as any).subscription as string | null;
 
           if (subscriptionId) {
             const usersInvSnap = await db.collection('users')
@@ -2504,7 +2504,7 @@ export const stripeWebhook = functions
           // 支払い失敗時
           const invoice = event.data.object as Stripe.Invoice;
           const customerId = invoice.customer as string;
-          const subscriptionId = invoice.subscription as string;
+          const subscriptionId = (invoice as any).subscription as string | null;
 
           if (subscriptionId) {
             const usersFailSnap = await db.collection('users')

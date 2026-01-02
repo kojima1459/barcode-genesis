@@ -564,6 +564,24 @@ export const translations = {
     label_id: "ID:",
     label_capacity: "CAPACITY:",
     label_credits_label: "CREDITS:",
+
+    // Boss Features (New)
+    scan_to_unlock: "スキャンして解放",
+    boss_load_error: "ボス情報を取得できませんでした",
+    milestone_exam: "昇格試験",
+    capacity_plus: "クリアでCAPACITY+1",
+    exam_cleared: "全試験クリア！",
+    cleared_count: "クリア済",
+    this_week_boss: "今週のボス",
+    weekly_reward_desc: "週1回、報酬を獲得",
+    rewards_claimed: "今週の報酬獲得済み",
+    challenge_again: "再戦する（報酬なし）",
+    unlock_at_lv: "Lv{level} で解放",
+    levels_remaining: "あと {level} Lv",
+    reward: "報酬",
+    login_required: "ログインが必要です",
+    server_error: "サーバーエラーが発生しました",
+    data_load_error: "データの読み込みに失敗しました",
   },
   en: {
     // Common
@@ -946,5 +964,23 @@ export const translations = {
     label_id: "ID:",
     label_capacity: "CAPACITY:",
     label_credits_label: "CREDITS:",
+
+    // Boss Features (New)
+    scan_to_unlock: "Scan to Unlock",
+    boss_load_error: "Failed to load boss data",
+    milestone_exam: "Promotion Exam",
+    capacity_plus: "Clear for CAPACITY+1",
+    exam_cleared: "All Exams Cleared!",
+    cleared_count: "Cleared",
+    this_week_boss: "This Week's Boss",
+    weekly_reward_desc: "Earn rewards once a week",
+    rewards_claimed: "Rewards Claimed",
+    challenge_again: "Challenge Again (No Reward)",
+    unlock_at_lv: "Unlock at Lv{level}",
+    levels_remaining: "Need {level} levels",
+    reward: "Reward",
+    login_required: "Login Required",
+    server_error: "Server Error",
+    data_load_error: "Failed to load data",
   }
 };

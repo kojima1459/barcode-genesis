@@ -1,3 +1,4 @@
+import React, { memo } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -6,35 +7,13 @@ import { TechCard } from "@/components/ui/TechCard";
 import { cn } from "@/lib/utils";
 import { Link } from "wouter";
 
-interface MilestoneData {
-    level: number;
-    cleared: boolean;
-    canChallenge: boolean;
-    locked: boolean;
-}
-
-interface BossData {
-    bossId: string;
-    name: string;
-    milestoneLevel: number;
-    stats: {
-        hp: number;
-        attack: number;
-        defense: number;
-        speed: number;
-    };
-    reward: {
-        type: string;
-        value: number;
-        description: string;
-    };
-}
+import { MilestoneData, MilestoneBossData } from "@/types/boss";
 
 interface MilestoneBossCardProps {
     userLevel: number;
     milestones: MilestoneData[];
     nextMilestone: number | null;
-    bossData: BossData | null;
+    bossData: MilestoneBossData | null;
     currentCapacity: number;
     clearedCount: number;
     isLoading?: boolean;
@@ -43,7 +22,7 @@ interface MilestoneBossCardProps {
     onRetry?: () => void;
 }
 
-export function MilestoneBossCard({
+export const MilestoneBossCard = memo(function MilestoneBossCard({
     userLevel,
     milestones,
     nextMilestone,
@@ -62,7 +41,7 @@ export function MilestoneBossCard({
             <TechCard className="p-4" variant="outline" intensity="low">
                 <div className="flex items-center justify-center gap-2 py-4">
                     <Loader2 className="w-5 h-5 animate-spin text-purple-400" />
-                    <span className="text-sm text-muted-foreground">Loading...</span>
+                    <span className="text-sm text-muted-foreground">{t('loading')}</span>
                 </div>
             </TechCard>
         );
@@ -75,7 +54,7 @@ export function MilestoneBossCard({
                     {error}
                     {onRetry && (
                         <Button size="sm" variant="ghost" onClick={onRetry} className="ml-2">
-                            再試行
+                            {t('button_retry')}
                         </Button>
                     )}
                 </div>
@@ -119,16 +98,16 @@ export function MilestoneBossCard({
                         )}
                     </div>
                     <div>
-                        <h3 className="text-sm font-bold text-white">昇格試験</h3>
+                        <h3 className="text-sm font-bold text-white">{t('milestone_exam')}</h3>
                         <p className="text-[10px] text-muted-foreground">
-                            クリアでCAPACITY+1
+                            {t('capacity_plus')}
                         </p>
                     </div>
                 </div>
 
                 {/* Progress indicator */}
                 <div className="text-right">
-                    <div className="text-xs text-muted-foreground">クリア済</div>
+                    <div className="text-xs text-muted-foreground">{t('cleared_count')}</div>
                     <div className="text-lg font-bold text-purple-400">
                         {clearedCount}/{milestones.length}
                     </div>
@@ -140,7 +119,7 @@ export function MilestoneBossCard({
                 {allCleared ? (
                     <div className="text-center py-4">
                         <div className="text-green-400 font-bold text-sm mb-1">
-                            ✨ 全試験クリア！
+                            ✨ {t('exam_cleared')}
                         </div>
                         <div className="text-xs text-muted-foreground">
                             CAPACITY: {currentCapacity}
@@ -152,14 +131,14 @@ export function MilestoneBossCard({
                         <div className="flex items-center justify-between bg-black/20 rounded-lg p-3">
                             <div>
                                 <Badge variant="outline" className="text-purple-400 border-purple-400/50 mb-1">
-                                    Lv{bossData.milestoneLevel} 試験
+                                    Lv{bossData.milestoneLevel} {t('milestone_exam')}
                                 </Badge>
                                 <div className="text-sm font-bold text-white">
                                     {bossData.name}
                                 </div>
                             </div>
                             <div className="text-right">
-                                <div className="text-[10px] text-muted-foreground">報酬</div>
+                                <div className="text-[10px] text-muted-foreground">{t('reward')}</div>
                                 <div className="text-xs font-bold text-yellow-400 flex items-center gap-1">
                                     <Zap className="w-3 h-3" />
                                     {bossData.reward.description}
@@ -174,17 +153,17 @@ export function MilestoneBossCard({
                             onClick={() => onChallenge(bossData.milestoneLevel)}
                         >
                             <Trophy className="w-4 h-4 mr-2" />
-                            挑戦する
+                            {t('boss_challenge')}
                         </Button>
                     </div>
                 ) : activeMilestone?.locked ? (
                     <div className="text-center py-3">
                         <div className="text-muted-foreground text-sm mb-1">
                             <Lock className="w-4 h-4 inline mr-1" />
-                            Lv{activeMilestone.level} で解放
+                            {t('unlock_at_lv', { level: activeMilestone.level })}
                         </div>
                         <div className="text-xs text-gray-500">
-                            あと {activeMilestone.level - userLevel} Lv
+                            {t('levels_remaining', { level: activeMilestone.level - userLevel })}
                         </div>
                     </div>
                 ) : null}
@@ -207,4 +186,4 @@ export function MilestoneBossCard({
             </div>
         </TechCard>
     );
-}
+});

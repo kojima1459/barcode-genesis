@@ -393,6 +393,18 @@ export default function Dex() {
     return generateDexSlots();
   }, []);
 
+  // Memoize placeholder generation (B2 optimization)
+  const slotPlaceholders = useMemo(() => {
+    const map = new Map<string, { parts: any; colors: any }>();
+    dexSlots.forEach((slot) => {
+      map.set(slot.id, {
+        parts: getPlaceholderParts(slot),
+        colors: getPlaceholderColors(),
+      });
+    });
+    return map;
+  }, [dexSlots]);
+
   // Map slots to unlocked robots (if any)
   const getRobotForSlot = (slotId: string): RobotData | undefined => {
     // Find the first robot that matches the slot criteria
@@ -516,6 +528,8 @@ export default function Dex() {
                           const robot = getRobotForSlot(slot.id);
                           const unlocked = !!robot;
 
+                          const placeholders = slotPlaceholders.get(slot.id);
+
                           return (
                             <CollectionSlot
                               key={slot.id}
@@ -523,8 +537,8 @@ export default function Dex() {
                               rarity={slot.rarity}
                               robot={robot}
                               unlocked={unlocked}
-                              placeholderParts={getPlaceholderParts(slot)}
-                              placeholderColors={getPlaceholderColors()}
+                              placeholderParts={placeholders?.parts}
+                              placeholderColors={placeholders?.colors}
                             />
                           );
                         })}

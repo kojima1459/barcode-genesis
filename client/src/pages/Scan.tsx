@@ -259,7 +259,7 @@ export default function Scan() {
                                         if (r === 'SUPPORT') return ROLE_COLORS.TRICKY;
                                         if (r === 'BALANCED') return ROLE_COLORS.BALANCE;
                                         // Fallback for legacy or direct match
-                                        return ROLE_COLORS[r as any] || ROLE_COLORS.BALANCE;
+                                        return ROLE_COLORS[r as keyof typeof ROLE_COLORS] || ROLE_COLORS.BALANCE;
                                     })().replace('/10', '/20')
                                         }`}>
                                         <ScrambleText text={robot.roleName || (typeof robot.role === 'string' ? robot.role.toUpperCase() : '')} delay={200} />

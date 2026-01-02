@@ -1,3 +1,4 @@
+import React, { memo } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -7,30 +8,13 @@ import RobotSVG from "@/components/RobotSVG";
 import { TechCard } from "@/components/ui/TechCard";
 import { cn } from "@/lib/utils";
 
-// Boss type definition (matches server)
-export type BossType = 'TANK' | 'SPEED' | 'SHIELD' | 'REFLECT' | 'BERSERK';
+import { DailyBossData } from "@/types/boss";
 
-export interface BossData {
-    bossId: string;
-    dateKey: string;
-    type: BossType;
-    name: string;
-    epithet: string;
-    baseName: string;
-    stats: {
-        hp: number;
-        attack: number;
-        defense: number;
-        speed: number;
-    };
-    shieldHp?: number;
-    role: string;
-    parts: any;
-    colors: any;
-}
+// Boss type definition matches server
+import { BossType } from "@/types/boss";
 
 interface BossAlertCardProps {
-    boss: BossData | null;
+    boss: DailyBossData | null;
     canChallenge: boolean;
     hasScannedToday?: boolean;
     isLoading?: boolean;
@@ -55,7 +39,7 @@ const BOSS_TYPE_COLORS: Record<BossType, string> = {
     BERSERK: "text-red-400",
 };
 
-export function BossAlertCard({ boss, canChallenge, hasScannedToday = true, isLoading, error, onChallenge, onRetry }: BossAlertCardProps) {
+export const BossAlertCard = memo(function BossAlertCard({ boss, canChallenge, hasScannedToday = true, isLoading, error, onChallenge, onRetry }: BossAlertCardProps) {
     const { t } = useLanguage();
 
     if (isLoading) {
@@ -75,7 +59,7 @@ export function BossAlertCard({ boss, canChallenge, hasScannedToday = true, isLo
                 <div className="flex flex-col items-center justify-center py-6 px-4 text-center gap-3">
                     <AlertCircle className="w-8 h-8 text-yellow-500" />
                     <div>
-                        <p className="text-sm text-yellow-100 font-medium">{t('boss_load_error') || 'ボス情報を取得できませんでした'}</p>
+                        <p className="text-sm text-yellow-100 font-medium">{t('boss_load_error')}</p>
                         <p className="text-xs text-muted-foreground mt-1">{error}</p>
                     </div>
                     {onRetry && (
@@ -86,7 +70,7 @@ export function BossAlertCard({ boss, canChallenge, hasScannedToday = true, isLo
                             className="border-yellow-500/30 text-yellow-500 hover:bg-yellow-500/10"
                         >
                             <RefreshCw className="w-4 h-4 mr-2" />
-                            {t('retry') || '再試行'}
+                            {t('button_retry')}
                         </Button>
                     )}
                 </div>
@@ -155,7 +139,7 @@ export function BossAlertCard({ boss, canChallenge, hasScannedToday = true, isLo
                                 className="w-full h-9 bg-yellow-500 hover:bg-yellow-600 text-black"
                             >
                                 <ScanBarcode className="w-4 h-4 mr-2" />
-                                スキャンして解放
+                                {t('scan_to_unlock')}
                             </Button>
                         </Link>
                     ) : (
@@ -183,4 +167,4 @@ export function BossAlertCard({ boss, canChallenge, hasScannedToday = true, isLo
             </div>
         </TechCard>
     );
-}
+});

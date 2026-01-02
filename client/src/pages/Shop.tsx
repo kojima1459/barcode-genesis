@@ -148,7 +148,7 @@ export default function Shop() {
       console.error("Purchase failed:", error);
       const item = SHOP_ITEMS.find((entry) => entry.id === itemId);
       const isCraftItem = typeof item?.tokenCost === "number";
-      const message = getErrorMessage(error as any, isCraftItem, t as any);
+      const message = getErrorMessage(error, isCraftItem, t as any);
       setErrorMessage(message);
     } finally {
       setPurchasingItemId(null);

@@ -22,6 +22,7 @@ import { useRobotFx } from "@/hooks/useRobotFx";
 import { Interactive } from "@/components/ui/interactive";
 import { ScrambleText } from "@/components/ui/ScrambleText";
 import { SystemSkeleton } from "@/components/ui/SystemSkeleton";
+import { Timestamp } from "firebase/firestore";
 
 
 type InventoryMap = Record<string, number>;
@@ -471,10 +472,12 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
               <div>
                 <div className="text-xs text-muted-foreground">Genesis Date</div>
                 <div className="font-mono">
-                  {baseRobot.createdAt?.toDate?.()?.toLocaleDateString("ja-JP") ||
-                    (baseRobot.createdAt as any)?.seconds ?
-                    new Date((baseRobot.createdAt as any).seconds * 1000).toLocaleDateString("ja-JP") :
-                    "Unknown"}
+                  {baseRobot.createdAt instanceof Timestamp ?
+                    baseRobot.createdAt.toDate().toLocaleDateString("ja-JP") :
+                    // Fallback for serialized objects
+                    (baseRobot.createdAt as { seconds: number })?.seconds ?
+                      new Date((baseRobot.createdAt as { seconds: number }).seconds * 1000).toLocaleDateString("ja-JP") :
+                      "Unknown"}
                 </div>
               </div>
             </div>
@@ -584,8 +587,12 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
                     <Zap className="w-4 h-4" />
                   </div>
                   <div>
-                    {/* Assuming skill is string or object, simplified for display */}
-                    <div className="font-bold text-sm">{typeof skill === 'string' ? skill : (skill as any).name || 'Unknown Skill'}</div>
+                    {/* Check if skill is object and has name property */}
+                    <div className="font-bold text-sm">
+                      {typeof skill === 'string' ? skill :
+                        (skill && typeof skill === 'object' && 'name' in skill) ? (skill as { name: string }).name :
+                          'Unknown Skill'}
+                    </div>
                   </div>
                 </div>
               ))}
