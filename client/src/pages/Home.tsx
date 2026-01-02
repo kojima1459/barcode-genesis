@@ -387,7 +387,7 @@ export default function Home() {
   const mainRobot = selectActiveRobot(robots, activeUnitId);
 
   return (
-    <div className="min-h-screen bg-black text-white relative font-body"
+    <div className="bg-black text-white relative font-body"
       style={{ paddingBottom: "calc(var(--bottom-nav-height) + 1rem)" }}>
       {/* Background Effect */}
       <div className="fixed inset-0 bg-[url('/grid.svg')] opacity-10 pointer-events-none z-0" />
