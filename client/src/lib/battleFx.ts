@@ -6,6 +6,7 @@
  */
 
 import { BattleLog } from '@/types/shared';
+import { SfxName } from '@/lib/sfx';
 
 /**
  * Base timing for log step progression (milliseconds)
@@ -18,6 +19,135 @@ export const PLAY_STEP_MS = 500;
 export const IMPORTANT_EVENT_BONUS_MS = 100;
 
 /**
+ * Log Type Classification for tempo optimization
+ * NORMAL: Fast playback (0.75x delay)
+ * HIGHLIGHT: Standard playback (1.0x delay)  
+ * CLIMAX: Slow playback for dramatic effect (1.35x delay)
+ */
+export type LogType = 'NORMAL' | 'HIGHLIGHT' | 'CLIMAX';
+
+/**
+ * Tempo multipliers per log type
+ */
+export const TEMPO_MULTIPLIERS: Record<LogType, number> = {
+    NORMAL: 0.75,
+    HIGHLIGHT: 1.0,
+    CLIMAX: 1.35,
+};
+
+/**
+ * Max delay cap at 3x speed to prevent CLIMAX from feeling slow
+ */
+export const MAX_DELAY_AT_3X = 250; // ms
+
+/**
+ * Classify a BattleLog into NORMAL/HIGHLIGHT/CLIMAX
+ */
+export function classifyLogType(log: BattleLog): LogType {
+    // CLIMAX: Major events that should be dramatic
+    if (
+        log.overdriveTriggered ||
+        log.specialTriggered ||
+        log.finisherApplied ||
+        log.bossShieldBroken ||
+        log.suddenDeathTick
+    ) {
+        return 'CLIMAX';
+    }
+
+    // HIGHLIGHT: Notable but not dramatic
+    if (
+        log.isCritical ||
+        log.pursuitDamage ||
+        log.followUpDamage ||
+        log.guarded ||
+        log.stunApplied ||
+        log.stunned ||
+        log.itemApplied ||
+        log.cheerApplied
+    ) {
+        return 'HIGHLIGHT';
+    }
+
+    // NORMAL: Regular attacks/damage
+    return 'NORMAL';
+}
+
+/**
+ * Calculate adjusted delay based on log type and speed setting
+ * @param baseDelay - Original delay (ms)
+ * @param logType - Classification of the log
+ * @param speed - Speed multiplier (1, 2, or 3)
+ */
+export function calculateAdjustedDelay(
+    baseDelay: number,
+    logType: LogType,
+    speed: 1 | 2 | 3
+): number {
+    const tempoMultiplier = TEMPO_MULTIPLIERS[logType];
+    let adjusted = (baseDelay * tempoMultiplier) / speed;
+
+    // Cap delay at 3x speed to keep CLIMAX from dragging
+    if (speed === 3) {
+        adjusted = Math.min(adjusted, MAX_DELAY_AT_3X);
+    }
+
+    return Math.max(adjusted, 20); // Minimum 20ms
+}
+
+/**
+ * Get appropriate SE name from a BattleLog
+ * Returns null if no SE should play for this log
+ */
+export function getSfxForLog(log: BattleLog): SfxName | null {
+    // Priority order for SE selection
+
+    // 1. Ultimate/Special moves
+    if (log.overdriveTriggered || log.specialTriggered) {
+        return 'ult';
+    }
+
+    // 2. Finisher
+    if (log.finisherApplied) {
+        return 'finisher';
+    }
+
+    // 3. Boss shield break
+    if (log.bossShieldBroken) {
+        return 'break';
+    }
+
+    // 4. Stun applied
+    if (log.stunApplied) {
+        return 'stun';
+    }
+
+    // 5. Guard
+    if (log.guarded) {
+        return 'guard';
+    }
+
+    // 6. Cheer
+    if (log.cheerApplied) {
+        return 'cheer';
+    }
+
+    // 7. Critical hit
+    if (log.isCritical && log.damage && log.damage > 0) {
+        return 'crit';
+    }
+
+    // 8. Normal attack with damage
+    if (log.damage && log.damage > 0) {
+        // Only play attack SE, let BattleReplay handle hit
+        return 'attack';
+    }
+
+    // No SE for this log
+    return null;
+}
+
+/**
  * Impact intensity levels for visual effects
  */
 export type ImpactIntensity = 'none' | 'light' | 'medium' | 'heavy';
@@ -27,15 +157,23 @@ export type ImpactIntensity = 'none' | 'light' | 'medium' | 'heavy';
  * Used to determine shake strength, flash duration, etc.
  */
 export function getImpactIntensity(log: BattleLog): ImpactIntensity {
-    const msg = log.message?.toLowerCase() || '';
-
-    // Critical hits = heavy impact
-    if (msg.includes('クリティカル') || msg.includes('critical') || msg.includes('会心')) {
+    // Climax events = heavy
+    if (log.overdriveTriggered || log.specialTriggered || log.finisherApplied) {
         return 'heavy';
     }
 
+    // Critical hits = heavy impact
+    if (log.isCritical) {
+        return 'heavy';
+    }
+
+    // Shield break, stun = medium
+    if (log.bossShieldBroken || log.stunApplied || log.guarded) {
+        return 'medium';
+    }
+
     // Cheer applied = medium impact
-    if (log.cheerApplied || msg.includes('応援') || msg.includes('cheer')) {
+    if (log.cheerApplied) {
         return 'medium';
     }
 
@@ -53,14 +191,14 @@ export function getImpactIntensity(log: BattleLog): ImpactIntensity {
  */
 export function isImportantLog(log: BattleLog): boolean {
     const msg = log.message?.toLowerCase() || '';
+    const logType = classifyLogType(log);
 
     return (
+        logType === 'CLIMAX' ||
+        logType === 'HIGHLIGHT' ||
         msg.includes('クリティカル') ||
         msg.includes('critical') ||
         msg.includes('会心') ||
-        log.cheerApplied === true ||
-        msg.includes('応援') ||
-        msg.includes('cheer') ||
         msg.includes('撃破') ||
         msg.includes('ko') ||
         msg.includes('defeated')
@@ -139,3 +277,4 @@ export function applyHitFlash(
         element.classList.remove(flashClass);
     };
 }
+

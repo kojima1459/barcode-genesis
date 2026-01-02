@@ -1,4 +1,5 @@
 import { BattleLog, RobotData } from "@/types/shared";
+import { classifyLogType, LogType, TEMPO_MULTIPLIERS } from "@/lib/battleFx";
 
 export type BattleEventType =
     | 'PHASE_START'
@@ -68,20 +69,38 @@ export interface BattleEvent {
 
     // Turn tracking
     turn?: number;
+
+    // Log type for tempo optimization (used by BattleReplay)
+    logType?: LogType;
 }
+
+// Base delays (ms) - will be multiplied by tempo
+const BASE_DELAYS = {
+    MESSAGE: 100,
+    PREPARE: 100,
+    IMPACT: 50,
+    POPUP: 100,
+    HP_UPDATE: 150,
+    CUT_IN: 800,
+};
 
 export function generateBattleEvents(logs: BattleLog[], p1Id: string, p2Id: string): BattleEvent[] {
     const events: BattleEvent[] = [];
 
     logs.forEach((log, index) => {
-        // Check if this is a special moment (overdrive or special trigger)
-        const isSpecialMoment = log.overdriveTriggered || log.specialTriggered;
-        const baseDelay = isSpecialMoment ? 150 : 100; // Slightly longer for special
-        const impactDelay = isSpecialMoment ? 80 : 50;
-        const hpUpdateDelay = isSpecialMoment ? 200 : 150;
+        // Classify log type for tempo optimization
+        const logType = classifyLogType(log);
+        const tempoMultiplier = TEMPO_MULTIPLIERS[logType];
 
-        // 0. SPECIAL_CUT_IN event (before attack if triggered)
-        if (isSpecialMoment) {
+        // Calculate tempo-adjusted delays
+        const messageDelay = Math.round(BASE_DELAYS.MESSAGE * tempoMultiplier);
+        const prepareDelay = Math.round(BASE_DELAYS.PREPARE * tempoMultiplier);
+        const impactDelay = Math.round(BASE_DELAYS.IMPACT * tempoMultiplier);
+        const popupDelay = Math.round(BASE_DELAYS.POPUP * tempoMultiplier);
+        const hpUpdateDelay = Math.round(BASE_DELAYS.HP_UPDATE * tempoMultiplier);
+
+        // 0. SPECIAL_CUT_IN event (before attack if CLIMAX)
+        if (logType === 'CLIMAX') {
             events.push({
                 type: 'SPECIAL_CUT_IN',
                 attackerId: log.attackerId,
@@ -92,7 +111,8 @@ export function generateBattleEvents(logs: BattleLog[], p1Id: string, p2Id: stri
                 specialRoleName: log.specialRoleName,
                 specialImpact: log.specialImpact,
                 specialHits: log.specialHits,
-                delay: 800 // Cut-in duration (will be displayed for this long)
+                logType,
+                delay: BASE_DELAYS.CUT_IN // Cut-in duration
             });
         }
 
@@ -132,14 +152,16 @@ export function generateBattleEvents(logs: BattleLog[], p1Id: string, p2Id: stri
             specialTriggered: log.specialTriggered,
             finisherApplied: log.finisherApplied,
             finisherMultiplier: log.finisherMultiplier,
-            delay: baseDelay
+            logType,
+            delay: messageDelay
         });
 
         // 2. Attack Animation Start (Attacker lunges)
         events.push({
             type: 'ATTACK_PREPARE',
             attackerId: log.attackerId,
-            delay: baseDelay
+            logType,
+            delay: prepareDelay
         });
 
         // 3. Impact (Flash/Shake)
@@ -170,7 +192,8 @@ export function generateBattleEvents(logs: BattleLog[], p1Id: string, p2Id: stri
                 cheerApplied: log.cheerApplied,
                 specialTriggered: log.specialTriggered,
                 specialHits: log.specialHits,
-                delay: baseDelay
+                logType,
+                delay: popupDelay
             });
         }
 
