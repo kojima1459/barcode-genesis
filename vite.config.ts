@@ -142,6 +142,8 @@ export default defineConfig({
           // Heavy libraries - lazy loaded only when needed
           'framer-motion': ['framer-motion'],
           'quagga': ['@ericblade/quagga2'],
+          // Share/Image generation - only used when sharing
+          'html-to-image': ['html-to-image'],
           // UI libraries
           'radix-ui': [
             '@radix-ui/react-dialog',

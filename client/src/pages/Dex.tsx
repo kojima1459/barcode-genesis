@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { collection, onSnapshot, orderBy, query, doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { collection, getDocs, orderBy, query, doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { Loader2, Swords, Factory, ChevronDown, ChevronRight, ScanBarcode, Star } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -271,35 +271,33 @@ export default function Dex() {
   useEffect(() => {
     if (!user) return;
 
-    // User subscription removed - handled by useUserData
-
-    setLoadingRobots(true);
-    const qRobots = query(collection(db, "users", user.uid, "robots"), orderBy("createdAt", "desc"));
-    const unsubRobots = onSnapshot(
-      qRobots,
-      (snap) => {
-        setRobots(snap.docs.map((d) => ({ id: d.id, ...d.data() } as RobotData)));
+    const loadData = async () => {
+      // Load robots
+      setLoadingRobots(true);
+      try {
+        const qRobots = query(collection(db, "users", user.uid, "robots"), orderBy("createdAt", "desc"));
+        const robotSnap = await getDocs(qRobots);
+        setRobots(robotSnap.docs.map((d) => ({ id: d.id, ...d.data() } as RobotData)));
+      } catch (err) {
+        console.error("Failed to load robots:", err);
+      } finally {
         setLoadingRobots(false);
-      },
-      () => setLoadingRobots(false),
-    );
+      }
 
-    setLoadingVariants(true);
-    const qVariants = query(collection(db, "users", user.uid, "variants"), orderBy("createdAt", "desc"));
-    const unsubVariants = onSnapshot(
-      qVariants,
-      (snap) => {
-        setVariants(snap.docs.map((d) => ({ id: d.id, ...d.data() } as VariantData)));
+      // Load variants
+      setLoadingVariants(true);
+      try {
+        const qVariants = query(collection(db, "users", user.uid, "variants"), orderBy("createdAt", "desc"));
+        const variantSnap = await getDocs(qVariants);
+        setVariants(variantSnap.docs.map((d) => ({ id: d.id, ...d.data() } as VariantData)));
+      } catch (err) {
+        console.error("Failed to load variants:", err);
+      } finally {
         setLoadingVariants(false);
-      },
-      () => setLoadingVariants(false),
-    );
-
-    return () => {
-      // unsubUser();
-      unsubRobots();
-      unsubVariants();
+      }
     };
+
+    loadData();
   }, [user]);
 
   const variantsEmpty = !loadingVariants && variants.length === 0;

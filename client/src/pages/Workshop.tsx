@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
 import { db, functions } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
-import { collection, orderBy, query, onSnapshot } from "firebase/firestore";
+import { collection, orderBy, query, getDocs } from "firebase/firestore";
 import { ArrowLeft, Loader2, Plus, RefreshCw, AlertCircle, Trash2 } from "lucide-react";
 import RobotSVG from "@/components/RobotSVG";
 import { Link } from "wouter";
@@ -61,50 +61,39 @@ export default function Workshop() {
     const [loadingRobots, setLoadingRobots] = useState(true);
     const [loadingVariants, setLoadingVariants] = useState(true);
 
-    useEffect(() => {
+    // Load data function (reusable for refresh)
+    const loadData = async () => {
         if (!user) return;
-
 
         setLoadingRobots(true);
         setLoadingVariants(true);
 
-        // User data subscription removed - handled by useUserData
+        try {
+            const robotsQuery = query(collection(db, "users", user.uid, "robots"), orderBy("createdAt", "desc"));
+            const robotSnap = await getDocs(robotsQuery);
+            setRobots(robotSnap.docs.map(d => ({ id: d.id, ...d.data() } as RobotData)));
+        } catch (error) {
+            console.error(error);
+            toast.error("Failed to load workshop data");
+        } finally {
+            setLoadingRobots(false);
+        }
 
-        const robotsQuery = query(collection(db, "users", user.uid, "robots"), orderBy("createdAt", "desc"));
-        const unsubRobots = onSnapshot(
-            robotsQuery,
-            (snapshot) => {
-                const rList = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as RobotData));
-                setRobots(rList);
-                setLoadingRobots(false);
-            },
-            (error) => {
-                console.error(error);
-                toast.error("Failed to load workshop data");
-                setLoadingRobots(false);
-            }
-        );
+        try {
+            const variantsQuery = query(collection(db, "users", user.uid, "variants"), orderBy("createdAt", "desc"));
+            const variantSnap = await getDocs(variantsQuery);
+            setVariants(variantSnap.docs.map(d => ({ id: d.id, ...d.data() } as VariantData)));
+        } catch (error) {
+            console.error(error);
+            toast.error(t('workshop_error_load'));
+        } finally {
+            setLoadingVariants(false);
+        }
+    };
 
-        const variantsQuery = query(collection(db, "users", user.uid, "variants"), orderBy("createdAt", "desc"));
-        const unsubVariants = onSnapshot(
-            variantsQuery,
-            (snapshot) => {
-                const vList = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as VariantData));
-                setVariants(vList);
-                setLoadingVariants(false);
-            },
-            (error) => {
-                console.error(error);
-                toast.error(t('workshop_error_load'));
-                setLoadingVariants(false);
-            }
-        );
-
-        return () => {
-            // unsubUser();
-            unsubRobots();
-            unsubVariants();
-        };
+    useEffect(() => {
+        if (!user) return;
+        loadData();
     }, [user]);
 
     useEffect(() => {
@@ -299,6 +288,8 @@ export default function Workshop() {
             const deleteVariantFn = httpsCallable(functions, 'deleteVariant');
             await deleteVariantFn({ variantId });
             toast.success(t('workshop_variant_deleted'));
+            // Refresh data since we no longer have real-time subscription
+            loadData();
         } catch (e: any) {
             console.error('Delete variant error:', e);
             toast.error(t('workshop_delete_failed'));
@@ -520,7 +511,8 @@ export default function Workshop() {
                     onClose={() => {
                         setShowAnimation(false);
                         setFusionResult(null);
-                        // Live listeners refresh data. // REF: A4
+                        // Refresh data since we no longer have real-time subscription
+                        loadData();
                         toast.success(t('workshop_success_variant'));
                     }}
                 />
