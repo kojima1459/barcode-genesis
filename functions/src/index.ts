@@ -15,7 +15,7 @@ import { applyScanDailyAward, normalizeScanDaily, normalizeScanTokens, SCAN_TOKE
 import { applyCraftBalances, getCraftCosts, isCraftItemId } from "./crafting";
 import { resolveEntryFee } from "./battleEntryFee";
 import { buildLedgerEntry } from "./ledger";
-import { getJstDateKey, getYesterdayJstDateKey } from "./dateKey";
+import { getJstDateKey, getYesterdayJstDateKey, getJstWeekKey } from "./dateKey";
 import { resolveDailyLogin } from "./dailyLogin";
 import { generateDailyBoss, bossToRobotData, getBossTraits } from "./dailyBoss";
 // Node.js 20 has native fetch - no need for node-fetch
@@ -3425,6 +3425,238 @@ export const executeMilestoneBattle = functions
         logs: battleResult.logs.slice(0, 20),
         rewardGranted,
         reward: isWin ? { type: 'capacity', value: 1 } : null,
+        turnCount: battleResult.turnCount,
+      };
+    });
+
+    return result;
+  });
+
+// ============================================
+// Weekly Boss Functions
+// ============================================
+
+const WEEKLY_BOSS_CREDITS_REWARD = 50;
+const WEEKLY_BOSS_XP_REWARD = 10;
+
+/**
+ * Generate a deterministic weekly boss based on week key
+ */
+function generateWeeklyBoss(weekKey: string) {
+  const rng = new SeededRandom(`weekly_${weekKey}`);
+
+  // Boss scales slightly each week for variety
+  const weekNum = parseInt(weekKey.split('-')[1] || '1', 10);
+  const difficultyMultiplier = 1 + (weekNum % 10) * 0.05;
+
+  const baseHp = Math.floor(100 * difficultyMultiplier);
+  const baseAtk = Math.floor(18 * difficultyMultiplier);
+  const baseDef = Math.floor(14 * difficultyMultiplier);
+  const baseSpd = Math.floor(12 * difficultyMultiplier);
+
+  const bossNames = [
+    'COLOSSUS', 'TITAN', 'LEVIATHAN', 'BEHEMOTH',
+    'GOLIATH', 'JUGGERNAUT', 'MONOLITH', 'DREADNOUGHT'
+  ];
+  const nameIdx = rng.nextInt(0, bossNames.length - 1);
+  const name = `${bossNames[nameIdx]} W${weekNum}`;
+
+  return {
+    bossId: `weekly_${weekKey}`,
+    name,
+    weekKey,
+    stats: {
+      hp: baseHp,
+      attack: baseAtk,
+      defense: baseDef,
+      speed: baseSpd,
+    },
+    reward: {
+      credits: WEEKLY_BOSS_CREDITS_REWARD,
+      xp: WEEKLY_BOSS_XP_REWARD,
+    },
+  };
+}
+
+/**
+ * Get weekly boss status for the user
+ */
+export const getWeeklyBoss = functions
+  .runWith({ memory: '256MB', timeoutSeconds: 30 })
+  .https.onCall(async (_data, context) => {
+    const db = admin.firestore();
+    if (!context.auth) {
+      throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
+    }
+
+    const uid = context.auth.uid;
+    const weekKey = getJstWeekKey();
+
+    // Generate this week's boss
+    const boss = generateWeeklyBoss(weekKey);
+
+    // Check if user has already claimed reward this week
+    const weeklyRef = db.collection('users').doc(uid).collection('weeklyBoss').doc(weekKey);
+    const weeklySnap = await weeklyRef.get();
+    const weeklyData = weeklySnap.exists ? weeklySnap.data() : null;
+
+    const rewardClaimed = !!weeklyData?.claimed;
+    const lastResult = weeklyData?.result || null;
+
+    return {
+      boss,
+      weekKey,
+      rewardClaimed,
+      lastResult,
+      canChallenge: true, // Can always challenge, but reward only once
+    };
+  });
+
+/**
+ * Execute a weekly boss battle
+ * Rewards are granted only once per week
+ */
+export const executeWeeklyBattle = functions
+  .runWith({ memory: '512MB', timeoutSeconds: 60 })
+  .https.onCall(async (data, context) => {
+    const db = admin.firestore();
+    if (!context.auth) {
+      throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
+    }
+
+    const uid = context.auth.uid;
+    const { robotId, variantId, useCheer } = data as {
+      robotId?: string;
+      variantId?: string;
+      useCheer?: boolean;
+    };
+
+    if (!robotId && !variantId) {
+      throw new functions.https.HttpsError('invalid-argument', 'robotId or variantId required');
+    }
+
+    const weekKey = getJstWeekKey();
+    const boss = generateWeeklyBoss(weekKey);
+    const battleId = `weekly_${uid}_${weekKey}_${Date.now()}`;
+
+    const result = await db.runTransaction(async (transaction) => {
+      const userRef = db.collection('users').doc(uid);
+      const weeklyRef = userRef.collection('weeklyBoss').doc(weekKey);
+
+      const [userSnap, weeklySnap] = await Promise.all([
+        transaction.get(userRef),
+        transaction.get(weeklyRef)
+      ]);
+
+      if (!userSnap.exists) {
+        throw new functions.https.HttpsError('not-found', 'User not found');
+      }
+
+      const weeklyData = weeklySnap.exists ? weeklySnap.data() : null;
+      const alreadyClaimed = !!weeklyData?.claimed;
+
+      // Get player's robot
+      let playerRobot: any;
+      if (variantId) {
+        playerRobot = await resolveVariant(uid, variantId, db, transaction);
+      } else {
+        const robotRef = userRef.collection('robots').doc(robotId!);
+        const robotSnap = await transaction.get(robotRef);
+        if (!robotSnap.exists) {
+          throw new functions.https.HttpsError('not-found', 'Robot not found');
+        }
+        playerRobot = { id: robotSnap.id, ...robotSnap.data() };
+      }
+
+      // Run battle simulation
+      const battleResult = simulateBattle(
+        {
+          id: playerRobot.id,
+          userId: '',
+          name: playerRobot.name,
+          sourceBarcode: playerRobot.sourceBarcode || '',
+          rarity: playerRobot.rarity || 1,
+          rarityName: playerRobot.rarityName || 'Common',
+          baseHp: playerRobot.baseHp || 50,
+          baseAttack: playerRobot.baseAttack || 10,
+          baseDefense: playerRobot.baseDefense || 10,
+          baseSpeed: playerRobot.baseSpeed || 10,
+          elementType: playerRobot.elementType || 1,
+          elementName: playerRobot.elementName || 'Fire',
+          level: playerRobot.level || 1,
+          skills: playerRobot.skills || [],
+          parts: playerRobot.parts,
+          colors: playerRobot.colors,
+          evolutionLevel: playerRobot.evolutionLevel || 0,
+          totalBattles: 0,
+          totalWins: 0,
+          isFavorite: false,
+          role: playerRobot.role || 'balanced',
+          cheer: useCheer || false,
+        } as any,
+        {
+          id: boss.bossId,
+          userId: '',
+          name: boss.name,
+          sourceBarcode: '',
+          rarity: 1,
+          rarityName: 'Weekly Boss',
+          baseHp: boss.stats.hp,
+          baseAttack: boss.stats.attack,
+          baseDefense: boss.stats.defense,
+          baseSpeed: boss.stats.speed,
+          elementType: 1,
+          elementName: 'Neutral',
+          level: 10,
+          skills: [],
+          parts: {} as any,
+          colors: {} as any,
+          evolutionLevel: 0,
+          totalBattles: 0,
+          totalWins: 0,
+          isFavorite: false,
+          role: 'balanced',
+          cheer: false,
+        } as any,
+        battleId
+      );
+
+      const isWin = battleResult.winnerId === playerRobot.id;
+
+      let creditsReward = 0;
+      let xpReward = 0;
+      let rewardGranted = false;
+
+      // Grant reward only if won AND hasn't claimed yet
+      if (isWin && !alreadyClaimed) {
+        creditsReward = WEEKLY_BOSS_CREDITS_REWARD;
+        xpReward = WEEKLY_BOSS_XP_REWARD;
+        rewardGranted = true;
+
+        transaction.set(userRef, {
+          credits: admin.firestore.FieldValue.increment(creditsReward),
+          xp: admin.firestore.FieldValue.increment(xpReward),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+      }
+
+      // Record weekly boss attempt
+      transaction.set(weeklyRef, {
+        result: isWin ? 'win' : 'loss',
+        claimed: alreadyClaimed || (isWin && rewardGranted),
+        claimedAt: rewardGranted ? admin.firestore.FieldValue.serverTimestamp() : (weeklyData?.claimedAt || null),
+        lastBattleAt: admin.firestore.FieldValue.serverTimestamp(),
+        attempts: admin.firestore.FieldValue.increment(1),
+      }, { merge: true });
+
+      return {
+        battleId,
+        result: isWin ? 'win' : 'loss',
+        winnerId: battleResult.winnerId,
+        logs: battleResult.logs.slice(0, 20),
+        rewardGranted,
+        rewards: rewardGranted ? { credits: creditsReward, xp: xpReward } : null,
+        alreadyClaimed,
         turnCount: battleResult.turnCount,
       };
     });

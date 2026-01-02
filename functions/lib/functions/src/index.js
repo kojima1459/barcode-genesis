@@ -11,7 +11,7 @@ var __rest = (this && this.__rest) || function (s, e) {
     return t;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.executeMilestoneBattle = exports.getMilestoneBoss = exports.executeBossBattle = exports.getDailyBoss = exports.resolveFighterData = exports.deleteVariant = exports.createVariant = exports.scanBarcodeFromImage = exports.checkMatchStatus = exports.leaveMatchmaking = exports.joinMatchmaking = exports.stripeWebhook = exports.createPortalSession = exports.createSubscriptionSession = exports.createCheckoutSession = exports.applyCosmeticItem = exports.useUpgradeItem = exports.craftItem = exports.checkAchievements = exports.updateRanking = exports.followUser = exports.claimMissionReward = exports.getDailyMissions = exports.claimLoginBonus = exports.claimDailyLogin = exports.equipItem = exports.purchaseItem = exports.inheritSkill = exports.synthesizeRobots = exports.matchBattle = exports.evolveRobot = exports.batchDisassemble = exports.awardScanToken = exports.generateRobot = exports.ping = exports.debugPing = exports.testFunctionHealth = void 0;
+exports.executeWeeklyBattle = exports.getWeeklyBoss = exports.executeMilestoneBattle = exports.getMilestoneBoss = exports.executeBossBattle = exports.getDailyBoss = exports.resolveFighterData = exports.deleteVariant = exports.createVariant = exports.scanBarcodeFromImage = exports.checkMatchStatus = exports.leaveMatchmaking = exports.joinMatchmaking = exports.stripeWebhook = exports.createPortalSession = exports.createSubscriptionSession = exports.createCheckoutSession = exports.applyCosmeticItem = exports.useUpgradeItem = exports.craftItem = exports.checkAchievements = exports.updateRanking = exports.followUser = exports.claimMissionReward = exports.getDailyMissions = exports.claimLoginBonus = exports.claimDailyLogin = exports.equipItem = exports.purchaseItem = exports.inheritSkill = exports.synthesizeRobots = exports.matchBattle = exports.evolveRobot = exports.batchDisassemble = exports.awardScanToken = exports.generateRobot = exports.ping = exports.debugPing = exports.testFunctionHealth = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
@@ -2864,6 +2864,201 @@ exports.executeMilestoneBattle = functions
             logs: battleResult.logs.slice(0, 20),
             rewardGranted,
             reward: isWin ? { type: 'capacity', value: 1 } : null,
+            turnCount: battleResult.turnCount,
+        };
+    });
+    return result;
+});
+// ============================================
+// Weekly Boss Functions
+// ============================================
+const WEEKLY_BOSS_CREDITS_REWARD = 50;
+const WEEKLY_BOSS_XP_REWARD = 10;
+/**
+ * Generate a deterministic weekly boss based on week key
+ */
+function generateWeeklyBoss(weekKey) {
+    const rng = new seededRandom_1.SeededRandom(`weekly_${weekKey}`);
+    // Boss scales slightly each week for variety
+    const weekNum = parseInt(weekKey.split('-')[1] || '1', 10);
+    const difficultyMultiplier = 1 + (weekNum % 10) * 0.05;
+    const baseHp = Math.floor(100 * difficultyMultiplier);
+    const baseAtk = Math.floor(18 * difficultyMultiplier);
+    const baseDef = Math.floor(14 * difficultyMultiplier);
+    const baseSpd = Math.floor(12 * difficultyMultiplier);
+    const bossNames = [
+        'COLOSSUS', 'TITAN', 'LEVIATHAN', 'BEHEMOTH',
+        'GOLIATH', 'JUGGERNAUT', 'MONOLITH', 'DREADNOUGHT'
+    ];
+    const nameIdx = rng.nextInt(0, bossNames.length - 1);
+    const name = `${bossNames[nameIdx]} W${weekNum}`;
+    return {
+        bossId: `weekly_${weekKey}`,
+        name,
+        weekKey,
+        stats: {
+            hp: baseHp,
+            attack: baseAtk,
+            defense: baseDef,
+            speed: baseSpd,
+        },
+        reward: {
+            credits: WEEKLY_BOSS_CREDITS_REWARD,
+            xp: WEEKLY_BOSS_XP_REWARD,
+        },
+    };
+}
+/**
+ * Get weekly boss status for the user
+ */
+exports.getWeeklyBoss = functions
+    .runWith({ memory: '256MB', timeoutSeconds: 30 })
+    .https.onCall(async (_data, context) => {
+    const db = admin.firestore();
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
+    }
+    const uid = context.auth.uid;
+    const weekKey = (0, dateKey_1.getJstWeekKey)();
+    // Generate this week's boss
+    const boss = generateWeeklyBoss(weekKey);
+    // Check if user has already claimed reward this week
+    const weeklyRef = db.collection('users').doc(uid).collection('weeklyBoss').doc(weekKey);
+    const weeklySnap = await weeklyRef.get();
+    const weeklyData = weeklySnap.exists ? weeklySnap.data() : null;
+    const rewardClaimed = !!(weeklyData === null || weeklyData === void 0 ? void 0 : weeklyData.claimed);
+    const lastResult = (weeklyData === null || weeklyData === void 0 ? void 0 : weeklyData.result) || null;
+    return {
+        boss,
+        weekKey,
+        rewardClaimed,
+        lastResult,
+        canChallenge: true, // Can always challenge, but reward only once
+    };
+});
+/**
+ * Execute a weekly boss battle
+ * Rewards are granted only once per week
+ */
+exports.executeWeeklyBattle = functions
+    .runWith({ memory: '512MB', timeoutSeconds: 60 })
+    .https.onCall(async (data, context) => {
+    const db = admin.firestore();
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
+    }
+    const uid = context.auth.uid;
+    const { robotId, variantId, useCheer } = data;
+    if (!robotId && !variantId) {
+        throw new functions.https.HttpsError('invalid-argument', 'robotId or variantId required');
+    }
+    const weekKey = (0, dateKey_1.getJstWeekKey)();
+    const boss = generateWeeklyBoss(weekKey);
+    const battleId = `weekly_${uid}_${weekKey}_${Date.now()}`;
+    const result = await db.runTransaction(async (transaction) => {
+        const userRef = db.collection('users').doc(uid);
+        const weeklyRef = userRef.collection('weeklyBoss').doc(weekKey);
+        const [userSnap, weeklySnap] = await Promise.all([
+            transaction.get(userRef),
+            transaction.get(weeklyRef)
+        ]);
+        if (!userSnap.exists) {
+            throw new functions.https.HttpsError('not-found', 'User not found');
+        }
+        const weeklyData = weeklySnap.exists ? weeklySnap.data() : null;
+        const alreadyClaimed = !!(weeklyData === null || weeklyData === void 0 ? void 0 : weeklyData.claimed);
+        // Get player's robot
+        let playerRobot;
+        if (variantId) {
+            playerRobot = await (0, variantSystem_1.resolveVariant)(uid, variantId, db, transaction);
+        }
+        else {
+            const robotRef = userRef.collection('robots').doc(robotId);
+            const robotSnap = await transaction.get(robotRef);
+            if (!robotSnap.exists) {
+                throw new functions.https.HttpsError('not-found', 'Robot not found');
+            }
+            playerRobot = Object.assign({ id: robotSnap.id }, robotSnap.data());
+        }
+        // Run battle simulation
+        const battleResult = (0, battleSystem_1.simulateBattle)({
+            id: playerRobot.id,
+            userId: '',
+            name: playerRobot.name,
+            sourceBarcode: playerRobot.sourceBarcode || '',
+            rarity: playerRobot.rarity || 1,
+            rarityName: playerRobot.rarityName || 'Common',
+            baseHp: playerRobot.baseHp || 50,
+            baseAttack: playerRobot.baseAttack || 10,
+            baseDefense: playerRobot.baseDefense || 10,
+            baseSpeed: playerRobot.baseSpeed || 10,
+            elementType: playerRobot.elementType || 1,
+            elementName: playerRobot.elementName || 'Fire',
+            level: playerRobot.level || 1,
+            skills: playerRobot.skills || [],
+            parts: playerRobot.parts,
+            colors: playerRobot.colors,
+            evolutionLevel: playerRobot.evolutionLevel || 0,
+            totalBattles: 0,
+            totalWins: 0,
+            isFavorite: false,
+            role: playerRobot.role || 'balanced',
+            cheer: useCheer || false,
+        }, {
+            id: boss.bossId,
+            userId: '',
+            name: boss.name,
+            sourceBarcode: '',
+            rarity: 1,
+            rarityName: 'Weekly Boss',
+            baseHp: boss.stats.hp,
+            baseAttack: boss.stats.attack,
+            baseDefense: boss.stats.defense,
+            baseSpeed: boss.stats.speed,
+            elementType: 1,
+            elementName: 'Neutral',
+            level: 10,
+            skills: [],
+            parts: {},
+            colors: {},
+            evolutionLevel: 0,
+            totalBattles: 0,
+            totalWins: 0,
+            isFavorite: false,
+            role: 'balanced',
+            cheer: false,
+        }, battleId);
+        const isWin = battleResult.winnerId === playerRobot.id;
+        let creditsReward = 0;
+        let xpReward = 0;
+        let rewardGranted = false;
+        // Grant reward only if won AND hasn't claimed yet
+        if (isWin && !alreadyClaimed) {
+            creditsReward = WEEKLY_BOSS_CREDITS_REWARD;
+            xpReward = WEEKLY_BOSS_XP_REWARD;
+            rewardGranted = true;
+            transaction.set(userRef, {
+                credits: admin.firestore.FieldValue.increment(creditsReward),
+                xp: admin.firestore.FieldValue.increment(xpReward),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            }, { merge: true });
+        }
+        // Record weekly boss attempt
+        transaction.set(weeklyRef, {
+            result: isWin ? 'win' : 'loss',
+            claimed: alreadyClaimed || (isWin && rewardGranted),
+            claimedAt: rewardGranted ? admin.firestore.FieldValue.serverTimestamp() : ((weeklyData === null || weeklyData === void 0 ? void 0 : weeklyData.claimedAt) || null),
+            lastBattleAt: admin.firestore.FieldValue.serverTimestamp(),
+            attempts: admin.firestore.FieldValue.increment(1),
+        }, { merge: true });
+        return {
+            battleId,
+            result: isWin ? 'win' : 'loss',
+            winnerId: battleResult.winnerId,
+            logs: battleResult.logs.slice(0, 20),
+            rewardGranted,
+            rewards: rewardGranted ? { credits: creditsReward, xp: xpReward } : null,
+            alreadyClaimed,
             turnCount: battleResult.turnCount,
         };
     });

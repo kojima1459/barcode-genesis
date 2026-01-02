@@ -30,6 +30,7 @@ import HangarCard from "@/components/HangarCard";
 import { TechCard } from "@/components/ui/TechCard";
 import { BossAlertCard, BossData } from "@/components/BossAlertCard";
 import { MilestoneBossCard } from "@/components/MilestoneBossCard";
+import { WeeklyBossCard } from "@/components/WeeklyBossCard";
 import { cn } from "@/lib/utils";
 import { useLocation, Link } from "wouter";
 import { GlobalHeader } from "@/components/GlobalHeader";
@@ -109,6 +110,21 @@ export default function Home() {
   const [milestoneLoading, setMilestoneLoading] = useState(true);
   const [milestoneError, setMilestoneError] = useState<string | null>(null);
 
+  // Weekly Boss state
+  interface WeeklyBossData {
+    bossId: string;
+    name: string;
+    weekKey: string;
+    stats: { hp: number; attack: number; defense: number; speed: number };
+    reward: { credits: number; xp: number };
+  }
+  const [weeklyBossData, setWeeklyBossData] = useState<WeeklyBossData | null>(null);
+  const [weeklyWeekKey, setWeeklyWeekKey] = useState('');
+  const [weeklyRewardClaimed, setWeeklyRewardClaimed] = useState(false);
+  const [weeklyLastResult, setWeeklyLastResult] = useState<'win' | 'loss' | null>(null);
+  const [weeklyLoading, setWeeklyLoading] = useState(true);
+  const [weeklyError, setWeeklyError] = useState<string | null>(null);
+
   // Load Daily Boss function (extracted for retry)
   const loadBoss = async () => {
     setBossLoading(true);
@@ -148,6 +164,26 @@ export default function Home() {
       setMilestoneError("昇格試験情報を取得できませんでした");
     } finally {
       setMilestoneLoading(false);
+    }
+  };
+
+  // Load Weekly Boss function
+  const loadWeeklyBoss = async () => {
+    setWeeklyLoading(true);
+    setWeeklyError(null);
+    try {
+      const getWeeklyBoss = httpsCallable(functions, "getWeeklyBoss");
+      const result = await getWeeklyBoss();
+      const data = result.data as any;
+      setWeeklyBossData(data.boss);
+      setWeeklyWeekKey(data.weekKey || '');
+      setWeeklyRewardClaimed(data.rewardClaimed || false);
+      setWeeklyLastResult(data.lastResult || null);
+    } catch (error: any) {
+      console.error("Failed to load weekly boss:", error);
+      setWeeklyError("今週のボス情報を取得できませんでした");
+    } finally {
+      setWeeklyLoading(false);
     }
   };
 
@@ -216,6 +252,7 @@ export default function Home() {
     loadRobots();
     loadBoss();
     loadMilestoneBoss();
+    loadWeeklyBoss();
   }, [user]);
 
   const handleScan = async (barcode: string) => {
@@ -414,6 +451,20 @@ export default function Home() {
                   error={bossError}
                   onChallenge={() => setLocation('/boss')}
                   onRetry={loadBoss}
+                />
+              </section>
+
+              {/* 2.55. Weekly Boss Card */}
+              <section>
+                <WeeklyBossCard
+                  boss={weeklyBossData}
+                  weekKey={weeklyWeekKey}
+                  rewardClaimed={weeklyRewardClaimed}
+                  lastResult={weeklyLastResult}
+                  isLoading={weeklyLoading}
+                  error={weeklyError}
+                  onChallenge={() => setLocation('/weekly-boss')}
+                  onRetry={loadWeeklyBoss}
                 />
               </section>
 
