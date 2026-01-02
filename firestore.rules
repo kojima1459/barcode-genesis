@@ -81,5 +81,22 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow write: if false; // Cloud Functionsのみ
     }
+
+    // 課金状態: 本人のみ読み取り可能、書き込みはCloud Functionsのみ
+    match /billing/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if false; // Webhook/Functionsのみ
+    }
+
+    // Webhook処理済みイベント: 読み書きともCloud Functionsのみ
+    match /webhook_events/{eventId} {
+      allow read, write: if false;
+    }
+
+    // 購入履歴: 読み取りのみ（書き込みはCloud Functions）
+    match /purchases/{purchaseId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow write: if false;
+    }
   }
 }

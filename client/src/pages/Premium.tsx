@@ -1,12 +1,13 @@
-import { useState, useEffect } from "react";
-import { Link } from "wouter";
+import { useState, useEffect, useCallback } from "react";
+import { Link, useLocation } from "wouter";
 import { httpsCallable } from "firebase/functions";
-import { ArrowLeft, Loader2, CreditCard, Crown, Coins, Sparkles, Zap, Shield, ChevronDown, Check } from "lucide-react";
+import { doc, getDoc } from "firebase/firestore";
+import { ArrowLeft, Loader2, CreditCard, Crown, Coins, Sparkles, Zap, Shield, ChevronDown, Check, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { functions } from "@/lib/firebase";
+import { functions, db } from "@/lib/firebase";
 import { toast } from "sonner";
 import { Interactive } from "@/components/ui/interactive";
 import { useUserData } from "@/hooks/useUserData";
@@ -28,8 +29,59 @@ export default function Premium() {
     const [loadingPackId, setLoadingPackId] = useState<string | null>(null);
     const [loadingSubscription, setLoadingSubscription] = useState(false);
     const [loadingPortal, setLoadingPortal] = useState(false);
+    const [location] = useLocation();
+
+    // Reflection wait state (webhook may take a few seconds)
+    const [waitingForReflection, setWaitingForReflection] = useState(false);
+    const [pollCount, setPollCount] = useState(0);
+    const MAX_POLL_COUNT = 15; // Max ~30 seconds with exponential backoff
 
     const isPremium = !!userData?.isPremium;
+
+    // Detect ?result=success from Stripe redirect
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const result = params.get('result') || params.get('premium');
+
+        if (result === 'success' || result === 'activated') {
+            // Clear URL params
+            window.history.replaceState({}, '', '/premium');
+
+            if (!isPremium) {
+                setWaitingForReflection(true);
+                setPollCount(0);
+            } else {
+                toast.success('プレミアムが有効になりました！');
+            }
+        }
+    }, []);
+
+    // Polling for reflection (exponential backoff)
+    useEffect(() => {
+        if (!waitingForReflection || !user) return;
+
+        if (isPremium) {
+            setWaitingForReflection(false);
+            toast.success('プレミアムが有効になりました！');
+            return;
+        }
+
+        if (pollCount >= MAX_POLL_COUNT) {
+            setWaitingForReflection(false);
+            toast.error('反映に時間がかかっています。ページを再読み込みしてください。');
+            return;
+        }
+
+        // Just increment poll count on timer - onSnapshot handles actual data refresh
+        const delay = Math.min((pollCount + 1) * 1000, 5000);
+        const timer = setTimeout(() => {
+            setPollCount(prev => prev + 1);
+        }, delay);
+
+        return () => clearTimeout(timer);
+    }, [waitingForReflection, pollCount, isPremium, user]);
+
+
 
     const handleBuyCredits = async (packId: string) => {
         if (!user) {
@@ -140,6 +192,34 @@ export default function Premium() {
                     </p>
                 </div>
             </div>
+
+            {/* Reflection Waiting Banner */}
+            {waitingForReflection && (
+                <div className="bg-cyan-500/10 border-b border-cyan-500/30 px-4 py-3">
+                    <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                            <Loader2 className="h-5 w-5 animate-spin text-cyan-400" />
+                            <div>
+                                <p className="text-sm font-medium text-cyan-300">
+                                    プレミアム反映待ち...
+                                </p>
+                                <p className="text-xs text-cyan-400/70">
+                                    決済完了しました。反映まで数秒お待ちください
+                                </p>
+                            </div>
+                        </div>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => window.location.reload()}
+                            className="text-cyan-400 hover:text-cyan-300"
+                        >
+                            <RefreshCw className="h-4 w-4 mr-1" />
+                            更新
+                        </Button>
+                    </div>
+                </div>
+            )}
 
             <main className="max-w-4xl mx-auto px-4 py-8 space-y-12">
 
