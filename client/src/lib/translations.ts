@@ -582,6 +582,20 @@ export const translations = {
     login_required: "ログインが必要です",
     server_error: "サーバーエラーが発生しました",
     data_load_error: "データの読み込みに失敗しました",
+
+    // Scan Page
+    scan_barcode_already: "今日はそのバーコードはもう素材化済みやで",
+    scan_invalid_barcode: "バーコード形式が不正です",
+    scan_auth_error: "認証エラーです。再度ログインしてください。",
+    scan_server_error: "サーバーエラーが発生しました。時間を置いて再度お試しください。",
+    scan_robot_exists: "このバーコードのロボットは既に持っています。",
+    scan_title: "バーコードをスキャン",
+    scan_instruction: "商品のバーコードをカメラに映してください",
+    scan_again: "もう一度スキャン",
+    scan_limit_title: "GENERATION LIMIT REACHED",
+    scan_limit_upgrade: "アップグレードして制限を解除しませんか？",
+    view_premium: "プレミアムプランを見る",
+    close: "閉じる",
   },
   en: {
     // Common
@@ -982,5 +996,19 @@ export const translations = {
     login_required: "Login Required",
     server_error: "Server Error",
     data_load_error: "Failed to load data",
+
+    // Scan Page
+    scan_barcode_already: "This barcode has already been scanned today",
+    scan_invalid_barcode: "Invalid barcode format",
+    scan_auth_error: "Authentication error. Please log in again.",
+    scan_server_error: "Server error occurred. Please try again later.",
+    scan_robot_exists: "You already have a robot from this barcode.",
+    scan_title: "Scan Barcode",
+    scan_instruction: "Point your camera at a product barcode",
+    scan_again: "Scan Again",
+    scan_limit_title: "GENERATION LIMIT REACHED",
+    scan_limit_upgrade: "Would you like to upgrade to remove this limit?",
+    view_premium: "View Premium Plans",
+    close: "Close",
   }
 };

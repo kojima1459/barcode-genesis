@@ -80,12 +80,12 @@ export default function Scan() {
             } catch (error: any) {
                 const code = getCallableErrorCode(error);
                 if (code === "already-exists") {
-                    toast("今日はそのバーコードはもう素材化済みやで");
+                    toast(t('scan_barcode_already'));
                 } else if (code === "invalid-argument") {
-                    toast.error("バーコード形式が不正です");
+                    toast.error(t('scan_invalid_barcode'));
                     shouldAbort = true;
                 } else if (code === "unauthenticated") {
-                    toast.error("認証エラーです。再度ログインしてください。");
+                    toast.error(t('scan_auth_error'));
                     shouldAbort = true;
                 } else {
                     console.warn("awardScanToken error:", error);
@@ -138,13 +138,13 @@ export default function Scan() {
 
             let userMessage = "Error: " + message;
             if (code === 'internal') {
-                userMessage = 'サーバーエラーが発生しました。時間を置いて再度お試しください。';
+                userMessage = t('scan_server_error');
             } else if (code === 'invalid-argument') {
-                userMessage = 'バーコード形式が不正です。';
+                userMessage = t('scan_invalid_barcode');
             } else if (code === 'unauthenticated') {
-                userMessage = '認証エラーです。再度ログインしてください。';
+                userMessage = t('scan_auth_error');
             } else if (code === 'already-exists') {
-                userMessage = 'このバーコードのロボットは既に持っています。';
+                userMessage = t('scan_robot_exists');
             }
 
             toast.error(userMessage, { duration: 5000 });
@@ -181,9 +181,9 @@ export default function Scan() {
                 {mode === 'scan' && (
                     <div className="w-full space-y-6" id="tutorial-scanner-area">
                         <div className="text-center mb-6">
-                            <h2 className="text-xl font-bold mb-2">バーコードをスキャン</h2>
+                            <h2 className="text-xl font-bold mb-2">{t('scan_title')}</h2>
                             <p className="text-muted-foreground text-sm">
-                                商品のバーコードをカメラに映してください
+                                {t('scan_instruction')}
                             </p>
                         </div>
                         <BarcodeScanner onScanSuccess={handleScan} />
@@ -307,7 +307,7 @@ export default function Scan() {
                                 onClick={() => setMode('scan')}
                                 className="border-white/20"
                             >
-                                もう一度スキャン
+                                {t('scan_again')}
                             </Button>
                             <div className="flex flex-col w-full gap-3">
                                 <ShareCardModal robot={robot} />
@@ -333,22 +333,22 @@ export default function Scan() {
                         <DialogHeader>
                             <DialogTitle className="text-neon-cyan flex items-center gap-2">
                                 <Zap className="h-5 w-5" />
-                                GENERATION LIMIT REACHED
+                                {t('scan_limit_title')}
                             </DialogTitle>
                             <DialogDescription className="text-muted-foreground pt-4">
                                 {limitMessage}
                                 <br /><br />
-                                アップグレードして制限を解除しませんか？
+                                {t('scan_limit_upgrade')}
                             </DialogDescription>
                         </DialogHeader>
                         <DialogFooter className="flex-col gap-2 sm:flex-row">
                             <Link href="/premium">
                                 <Button className="w-full sm:w-auto bg-neon-yellow text-black hover:bg-neon-yellow/80 font-bold" onClick={() => setShowLimitModal(false)}>
-                                    プレミアムプランを見る
+                                    {t('view_premium')}
                                 </Button>
                             </Link>
                             <Button variant="ghost" className="w-full sm:w-auto" onClick={() => setShowLimitModal(false)}>
-                                閉じる
+                                {t('close')}
                             </Button>
                         </DialogFooter>
                     </DialogContent>

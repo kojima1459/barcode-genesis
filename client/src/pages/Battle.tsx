@@ -129,8 +129,9 @@ export default function Battle() {
     hookStartBattle(enemyRobotId);
   };
 
+  const selectedVariant = variants.find(v => v.id === selectedRobotId);
   const myRobot = robots.find(r => r.id === selectedRobotId)
-    || (variants.find(v => v.id === selectedRobotId) ? { ...variants.find(v => v.id === selectedRobotId), name: variants.find(v => v.id === selectedRobotId)?.name || `Variant ${selectedRobotId?.slice(0, 4)}` } as any : null)
+    || (selectedVariant ? { ...selectedVariant, name: selectedVariant.name || `Variant ${selectedRobotId?.slice(0, 4)}` } as RobotData : null)
     || battleResult?.resolvedPlayerRobot;
 
   // Use hook's resolved enemy if battling, otherwise use selection from training list or default logic

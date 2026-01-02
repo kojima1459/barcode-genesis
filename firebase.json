@@ -65,13 +65,6 @@
     ],
     "rewrites": [
       {
-        "source": "/api/scanBarcodeWithVision",
-        "function": {
-          "functionId": "scanBarcodeWithVision",
-          "region": "us-central1"
-        }
-      },
-      {
         "source": "/api/generateRobot",
         "function": {
           "functionId": "generateRobot",

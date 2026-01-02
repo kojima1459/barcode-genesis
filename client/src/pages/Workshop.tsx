@@ -11,7 +11,7 @@ import RobotSVG from "@/components/RobotSVG";
 import { Link } from "wouter";
 import { toast } from "sonner";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { RobotData, VariantData } from "@/types/shared";
+import { RobotData, VariantData, RobotParts } from "@/types/shared";
 import SEO from "@/components/SEO";
 import { useUserData } from "@/hooks/useUserData";
 import { Interactive } from "@/components/ui/interactive";
@@ -221,7 +221,7 @@ export default function Workshop() {
                         weapon: b.parts.weapon,
                         accessory: a.parts.accessory,
                     }),
-            } as any);
+            } as RobotParts);
 
         const colors =
             previewPreset === "A_DOMINANT"
@@ -400,7 +400,7 @@ export default function Workshop() {
                                 <Plus className="h-8 w-8 text-muted-foreground" />
                                 <div className="w-full space-y-2">
                                     <label className="text-xs font-medium mb-1 block text-center">{t('workshop_fusion_preset')}</label>
-                                    <Select value={previewPreset} onValueChange={(v) => setPreviewPreset(v as any)}>
+                                    <Select value={previewPreset} onValueChange={(v) => setPreviewPreset(v as "A_DOMINANT" | "B_DOMINANT" | "HALF" | "ALT")}>
                                         <SelectTrigger><SelectValue placeholder={t('workshop_fusion_preset')} /></SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="HALF">{t('workshop_preset_half')}</SelectItem>
