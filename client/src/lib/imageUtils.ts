@@ -16,10 +16,17 @@ export const IMAGE_MAX_SIZE = 512;
 export const JPEG_QUALITY = 0.8;
 
 /** Maximum allowed file size for source images (bytes) */
-export const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+export const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB (increased for large iPhone photos)
 
-/** Allowed MIME types for image upload */
-export const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+/** Allowed MIME types for image upload (including iPhone formats) */
+export const ALLOWED_IMAGE_TYPES = [
+    'image/jpeg',
+    'image/png',
+    'image/gif',
+    'image/webp',
+    'image/heic',  // iPhone default format
+    'image/heif',  // iPhone alternative format
+];
 
 // ============================================
 // Validation Functions (Issue 2.2: File type validation)
@@ -34,6 +41,11 @@ export interface ImageValidationResult {
  * Validates an image file before processing.
  * Checks file size and MIME type.
  * 
+ * Note: We are lenient with MIME types because:
+ * - iPhone sends HEIC which some browsers convert automatically
+ * - Some browsers report different MIME types for the same format
+ * - The actual validation happens when we try to load the image
+ * 
  * @param file - The file to validate
  * @returns Validation result with error message if invalid
  */
@@ -42,15 +54,15 @@ export function validateImageFile(file: File): ImageValidationResult {
     if (file.size > MAX_FILE_SIZE) {
         return {
             valid: false,
-            error: `Image too large (max ${Math.round(MAX_FILE_SIZE / 1024 / 1024)}MB)`
+            error: `画像が大きすぎます (最大${Math.round(MAX_FILE_SIZE / 1024 / 1024)}MB)`
         };
     }
 
-    // Check MIME type (Issue 2.2: File type validation)
-    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+    // Check basic image MIME type (lenient - accept any image/*)
+    if (!file.type.startsWith('image/')) {
         return {
             valid: false,
-            error: `Invalid file type. Allowed: ${ALLOWED_IMAGE_TYPES.map(t => t.split('/')[1]).join(', ')}`
+            error: `画像ファイルを選択してください`
         };
     }
 
@@ -119,7 +131,7 @@ export function compressImage(file: File): Promise<Blob> {
                 );
             };
 
-            img.onerror = () => reject(new Error('Failed to load image for compression'));
+            img.onerror = () => reject(new Error('画像を読み込めませんでした。iPhoneの場合、設定 > カメラ > フォーマット > 互換性優先 に変更してから再度撮影してください。'));
             img.src = e.target?.result as string;
         };
 
