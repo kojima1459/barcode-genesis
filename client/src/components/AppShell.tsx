@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { getBadgeLabel } from "@/lib/badges";
 import { preloadSfx, unlockSfx } from "@/lib/sfx";
 import BottomNav from "@/components/BottomNav";
+import { APP_VERSION } from "@/version";
 
 function getJstDateKey(): string {
   return new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" });
@@ -190,7 +191,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
                 </Link>
               </div>
               <div className="text-center text-xs text-muted mt-4">
-                © 2024 Barcode Genesis. All rights reserved. v1.0.0
+                © 2024 Barcode Genesis. All rights reserved. v{APP_VERSION}
               </div>
             </div>
           </footer>

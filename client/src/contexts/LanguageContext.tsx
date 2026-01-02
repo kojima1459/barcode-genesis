@@ -1,37 +1,99 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 import { translations, Language } from '@/lib/translations';
+
+/**
+ * LanguageContext - 言語設定管理
+ * 
+ * Phase 2 改善:
+ * - 日本語 ('ja') を常にデフォルトとする
+ * - 翻訳キー欠損時のフォールバックは必ず日本語（英語にフォールバックしない）
+ * - 開発モードでの未翻訳キー警告
+ */
 
 interface LanguageContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
-  t: (key: keyof typeof translations['ja']) => string;
+  t: (key: string, params?: Record<string, string | number>) => string;
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
-export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  // デフォルトは日本語 - localStorageから直接読み込んで競合状態を防ぐ
-  const [language, setLanguage] = useState<Language>(() => {
-    const savedLang = localStorage.getItem('language') as Language;
-    if (savedLang && (savedLang === 'ja' || savedLang === 'en')) {
+// localStorage から言語設定を同期的に取得（初期化時のチラつき防止）
+function getInitialLanguage(): Language {
+  if (typeof window === 'undefined') return 'ja';
+
+  try {
+    const savedLang = localStorage.getItem('language');
+    if (savedLang === 'ja' || savedLang === 'en') {
       return savedLang;
     }
-    return 'ja';
-  });
+  } catch {
+    // localStorage アクセス失敗時は ja にフォールバック
+  }
 
-  // 言語設定を保存
-  const handleSetLanguage = (lang: Language) => {
-    setLanguage(lang);
-    localStorage.setItem('language', lang);
+  return 'ja'; // デフォルトは常に日本語
+}
+
+/**
+ * 翻訳関数の実装
+ * 
+ * フォールバック順序:
+ * 1. 選択言語のテキスト
+ * 2. 日本語のテキスト（英語選択時もjaにフォールバック）
+ * 3. 開発モード: 警告表示 + 【未翻訳:key】
+ * 4. 本番: キー名そのまま
+ */
+function createTranslateFunction(language: Language) {
+  return (key: string, params?: Record<string, string | number>): string => {
+    const langTranslations = translations[language] as Record<string, string>;
+    const jaTranslations = translations.ja as Record<string, string>;
+
+    // 現在の言語で取得を試みる
+    let text = langTranslations[key];
+
+    // 無ければ日本語にフォールバック（英語にフォールバックしない！）
+    if (!text) {
+      text = jaTranslations[key];
+    }
+
+    // それでも無い場合
+    if (!text) {
+      if (import.meta.env.DEV) {
+        console.warn(`[i18n] Missing translation key: "${key}"`);
+        return `【未翻訳:${key}】`;
+      }
+      return key;  // 本番ではキー名を返す
+    }
+
+    // パラメータ置換 (例: {name} -> "太郎")
+    if (params) {
+      for (const [paramKey, paramValue] of Object.entries(params)) {
+        text = text.replace(new RegExp(`\\{${paramKey}\\}`, 'g'), String(paramValue));
+      }
+    }
+
+    return text;
+  };
+}
+
+export function LanguageProvider({ children }: { children: React.ReactNode }) {
+  const [language, setLanguageState] = useState<Language>(getInitialLanguage);
+
+  // 言語設定を保存（localStorage + state）
+  const setLanguage = (lang: Language) => {
+    setLanguageState(lang);
+    try {
+      localStorage.setItem('language', lang);
+    } catch {
+      // localStorage 書き込み失敗を無視
+    }
   };
 
-  // 翻訳関数
-  const t = (key: keyof typeof translations['ja']) => {
-    return translations[language][key] || key;
-  };
+  // 翻訳関数を作成
+  const t = createTranslateFunction(language);
 
   return (
-    <LanguageContext.Provider value={{ language, setLanguage: handleSetLanguage, t }}>
+    <LanguageContext.Provider value={{ language, setLanguage, t }}>
       {children}
     </LanguageContext.Provider>
   );
@@ -43,4 +105,11 @@ export function useLanguage() {
     throw new Error('useLanguage must be used within a LanguageProvider');
   }
   return context;
+}
+
+// 単独で使える翻訳関数（コンテキスト外での使用）
+// 注意: これは言語設定変更に追従しないので、コンポーネント内ではuseLanguage()を使用
+export function translateSync(key: string, params?: Record<string, string | number>): string {
+  const language = getInitialLanguage();
+  return createTranslateFunction(language)(key, params);
 }

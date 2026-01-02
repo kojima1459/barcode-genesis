@@ -26,8 +26,17 @@ const useVersionCheck = () => {
     const storedVersion = localStorage.getItem("app_version");
     if (storedVersion !== APP_VERSION) {
       console.log(`Version mismatch: ${storedVersion} -> ${APP_VERSION}. Clearing cache...`);
-      localStorage.clear(); // Clear all localized state just to be safe
+
+      // 言語設定を保存（クリア後に復元）
+      const savedLanguage = localStorage.getItem('language');
+
+      localStorage.clear();
       localStorage.setItem("app_version", APP_VERSION);
+
+      // 言語設定を復元（英語復活を防ぐ）
+      if (savedLanguage) {
+        localStorage.setItem('language', savedLanguage);
+      }
 
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.getRegistrations().then(function (registrations) {
