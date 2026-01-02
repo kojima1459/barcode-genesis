@@ -51,7 +51,7 @@ export default function BottomNav() {
                                     className={`h-5 w-5 ${isActive ? "neon-text-cyan drop-shadow-[0_0_8px_rgba(62,208,240,0.5)]" : ""}`}
                                     aria-hidden="true"
                                 />
-                                <span className={`text-[11px] font-orbitron tracking-[0.08em] ${isActive ? "text-primary neon-text-cyan" : ""}`}>
+                                <span className={`text-[10px] font-orbitron tracking-[0.02em] ${isActive ? "text-primary neon-text-cyan" : ""}`}>
                                     {item.label}
                                 </span>
                             </div>

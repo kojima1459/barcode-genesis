@@ -407,7 +407,7 @@ export default function Home() {
   const mainRobot = selectActiveRobot(robots, activeUnitId);
 
   return (
-    <div className="min-h-screen bg-black text-white relative font-body pt-[env(safe-area-inset-top)]"
+    <div className="min-h-screen bg-black text-white relative font-body"
       style={{ paddingBottom: "calc(var(--bottom-nav-height) + 1rem)" }}>
       {/* Background Effect */}
       <div className="fixed inset-0 bg-[url('/grid.svg')] opacity-10 pointer-events-none z-0" />
@@ -418,7 +418,7 @@ export default function Home() {
       {/* Mobile: Constrained width, Desktop: Expanded width */}
       <div className="flex-1 w-full max-w-md md:max-w-5xl mx-auto flex flex-col relative z-10">
 
-        <main className="flex-1 w-full px-4 space-y-6 pt-4">
+        <main className="flex-1 w-full px-4 space-y-6 pt-4 mt-[var(--header-height)]">
 
           {/* 1. System Ticker */}
           <div className="w-full bg-black/40 border-y border-white/5 py-1 overflow-hidden">

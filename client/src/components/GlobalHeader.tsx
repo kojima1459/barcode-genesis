@@ -31,7 +31,7 @@ export function GlobalHeader({ className, missions }: GlobalHeaderProps) {
 
     return (
         <header className={cn(
-            "w-full bg-black/60 border-b border-white/5 backdrop-blur-xl flex items-center justify-between px-4 sticky top-0 z-50 overflow-hidden pt-[env(safe-area-inset-top)] h-[var(--header-height)]",
+            "w-full bg-black/60 border-b border-white/5 backdrop-blur-xl flex items-center justify-between px-4 sticky top-0 z-50 overflow-hidden pt-[env(safe-area-inset-top)] min-h-[var(--header-height)]",
             className
         )}>
             {/* Left: Player Status */}
