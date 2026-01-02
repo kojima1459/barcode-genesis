@@ -446,6 +446,11 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
               {Math.floor(progress)}%
             </span>
           </div>
+
+          {/* Share Button */}
+          <div className="mt-4">
+            <ShareCardModal robot={baseRobot} />
+          </div>
         </div>
 
         {/* Origin Section - Robot's Birth Info */}

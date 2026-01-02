@@ -24,20 +24,20 @@ export function SoundProvider({ children }: { children: React.ReactNode }) {
 
   // 音源ファイルのパス定義
   const soundPaths: Record<SoundType, string> = {
-    bgm_menu: '/sounds/bgm_menu.mp3',
-    bgm_battle: '/sounds/bgm_battle.mp3',
-    se_click: '/sounds/se_click.mp3',
-    se_scan: '/sounds/se_scan.mp3',
-    se_attack: '/sounds/se_attack.mp3',
-    se_win: '/sounds/se_win.mp3',
-    se_lose: '/sounds/se_lose.mp3',
-    se_levelup: '/sounds/se_levelup.mp3',
-    se_equip: '/sounds/se_click.mp3',
-    se_reveal: '/sounds/se_levelup.mp3',  // Reuse for now
-    se_rare: '/sounds/se_win.mp3',        // Reuse for now
-    se_hit_heavy: '/sounds/se_attack.mp3', // Reuse for now
-    se_hit_light: '/sounds/se_attack.mp3', // Reuse for now
-    se_miss: '/sounds/se_attack.mp3',      // Reuse for now
+    bgm_menu: '/sfx/bgm_menu.mp3',
+    bgm_battle: '/sfx/bgm_battle.mp3',
+    se_click: '/sfx/ui_click.mp3',
+    se_scan: '/sfx/scan.mp3',
+    se_attack: '/sfx/attack.mp3',
+    se_win: '/sfx/win.mp3',
+    se_lose: '/sfx/lose.mp3',
+    se_levelup: '/sfx/levelup.mp3',
+    se_equip: '/sfx/ui_click.mp3',
+    se_reveal: '/sfx/ui.mp3',
+    se_rare: '/sfx/crit.mp3',
+    se_hit_heavy: '/sfx/hit_heavy.mp3',
+    se_hit_light: '/sfx/hit_light.mp3',
+    se_miss: '/sfx/attack.mp3',
   };
 
   // 初期化時にSEをプリロード
