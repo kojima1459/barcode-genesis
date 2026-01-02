@@ -213,7 +213,7 @@ export default function Profile() {
 
                 <div className="w-32 h-32 rounded-full bg-secondary flex items-center justify-center text-4xl overflow-hidden border-2 border-secondary group-hover:border-primary transition-colors relative">
                   {userData?.photoURL ? (
-                    <img src={userData.photoURL} alt="Profile" className="w-full h-full object-cover" />
+                    <img src={userData.photoURL} alt="Profile" className="w-full h-full object-cover" loading="lazy" />
                   ) : (
                     "👤"
                   )}

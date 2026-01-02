@@ -197,7 +197,7 @@ export default function ShareCardModal({ robot, trigger }: ShareCardModalProps) 
                                 <span className="text-xs text-gray-400">GENERATING CARD...</span>
                             </div>
                         ) : generatedImage ? (
-                            <img src={generatedImage} alt="Robot Card" className="w-full h-full object-contain shadow-2xl" />
+                            <img src={generatedImage} alt="Robot Card" className="w-full h-full object-contain shadow-2xl" loading="lazy" />
                         ) : (
                             <div className="text-xs text-gray-400">Initialize...</div>
                         )}
