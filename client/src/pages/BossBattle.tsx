@@ -11,7 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { db, functions } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
 import { collection, getDocs } from "firebase/firestore";
-import { ArrowLeft, Skull, Loader2, Shield, Zap, Trophy, XCircle, RotateCw } from "lucide-react";
+import { ArrowLeft, Skull, Loader2, Shield, Zap, Trophy, XCircle, RotateCw, ScanBarcode } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -58,6 +58,7 @@ export default function BossBattle() {
     const [loading, setLoading] = useState(true);
     const [bossData, setBossData] = useState<BossData | null>(null);
     const [canChallenge, setCanChallenge] = useState(false);
+    const [hasScannedToday, setHasScannedToday] = useState(false);
     const [robots, setRobots] = useState<RobotData[]>([]);
     const [variants, setVariants] = useState<VariantData[]>([]);
     const [selectedRobotId, setSelectedRobotId] = useState<string | null>(null);
@@ -75,9 +76,10 @@ export default function BossBattle() {
             // Load boss data
             const getDailyBoss = httpsCallable(functions, "getDailyBoss");
             const bossResult = await getDailyBoss();
-            const bossResponse = bossResult.data as { boss: BossData; canChallenge: boolean };
+            const bossResponse = bossResult.data as { boss: BossData; canChallenge: boolean; hasScannedToday: boolean };
             setBossData(bossResponse.boss);
             setCanChallenge(bossResponse.canChallenge);
+            setHasScannedToday(bossResponse.hasScannedToday);
 
             // Load robots
             const robotsSnap = await getDocs(collection(db, "users", user.uid, "robots"));
@@ -143,6 +145,10 @@ export default function BossBattle() {
             if (error.code === 'functions/failed-precondition' && error.message === 'already-challenged-today') {
                 setCanChallenge(false);
                 toast.error(t('boss_completed'));
+            } else if (error.code === 'functions/failed-precondition' && error.message === 'scan-required-today') {
+                setHasScannedToday(false);
+                setCanChallenge(false);
+                toast.error('今日のボスに挑むには、先に1回スキャンしよう');
             } else {
                 toast.error("バトルに失敗しました");
             }
@@ -430,6 +436,21 @@ export default function BossBattle() {
                     </Interactive>
                 </div>
 
+                {/* Scan Required Notice */}
+                {!hasScannedToday && (
+                    <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 text-center">
+                        <p className="text-yellow-400 text-sm font-medium mb-3">
+                            今日のボスに挑むには、先に1回スキャンしよう
+                        </p>
+                        <Link href="/scan">
+                            <Button className="bg-yellow-500 hover:bg-yellow-600 text-black">
+                                <ScanBarcode className="w-4 h-4 mr-2" />
+                                スキャンする
+                            </Button>
+                        </Link>
+                    </div>
+                )}
+
                 {/* Challenge Button */}
                 <Button
                     size="lg"
@@ -452,8 +473,10 @@ export default function BossBattle() {
                             <Skull className="w-5 h-5 mr-2" />
                             {t('boss_challenge')}
                         </>
-                    ) : (
+                    ) : hasScannedToday ? (
                         t('boss_completed')
+                    ) : (
+                        '🔒 スキャンして解放'
                     )}
                 </Button>
             </main>

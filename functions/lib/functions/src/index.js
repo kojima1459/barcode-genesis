@@ -2456,10 +2456,15 @@ exports.getDailyBoss = functions
     const userData = userDoc.data() || {};
     const lastDateKey = userData.dailyBossLastDateKey || '';
     const attempts = lastDateKey === todayKey ? (userData.dailyBossAttempts || 0) : 0;
-    const canChallenge = attempts < 1;
+    // Check if user has scanned today
+    const scanDailyDoc = await db.collection('users').doc(uid).collection('scanDaily').doc(todayKey).get();
+    const hasScannedToday = scanDailyDoc.exists;
+    // canChallenge requires: not attempted today AND scanned today
+    const canChallenge = attempts < 1 && hasScannedToday;
     return {
         boss,
         canChallenge,
+        hasScannedToday,
         attempts,
         todayKey,
     };
@@ -2506,6 +2511,12 @@ exports.executeBossBattle = functions
         const attempts = lastDateKey === todayKey ? (userData.dailyBossAttempts || 0) : 0;
         if (attempts >= 1) {
             throw new functions.https.HttpsError('failed-precondition', 'already-challenged-today');
+        }
+        // Check if user has scanned today (server-side validation to prevent bypass)
+        const scanDailyRef = userRef.collection('scanDaily').doc(todayKey);
+        const scanDailySnap = await transaction.get(scanDailyRef);
+        if (!scanDailySnap.exists) {
+            throw new functions.https.HttpsError('failed-precondition', 'scan-required-today');
         }
         // Get player's robot
         let playerRobot;

@@ -1,7 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { Skull, Shield, Zap, RefreshCw, Flame, Loader2, AlertCircle } from "lucide-react";
+import { Skull, Shield, Zap, RefreshCw, Flame, Loader2, AlertCircle, ScanBarcode } from "lucide-react";
+import { Link } from "wouter";
 import RobotSVG from "@/components/RobotSVG";
 import { TechCard } from "@/components/ui/TechCard";
 import { cn } from "@/lib/utils";
@@ -31,6 +32,7 @@ export interface BossData {
 interface BossAlertCardProps {
     boss: BossData | null;
     canChallenge: boolean;
+    hasScannedToday?: boolean;
     isLoading?: boolean;
     error?: string | null;
     onChallenge: () => void;
@@ -53,7 +55,7 @@ const BOSS_TYPE_COLORS: Record<BossType, string> = {
     BERSERK: "text-red-400",
 };
 
-export function BossAlertCard({ boss, canChallenge, isLoading, error, onChallenge, onRetry }: BossAlertCardProps) {
+export function BossAlertCard({ boss, canChallenge, hasScannedToday = true, isLoading, error, onChallenge, onRetry }: BossAlertCardProps) {
     const { t } = useLanguage();
 
     if (isLoading) {
@@ -145,26 +147,38 @@ export function BossAlertCard({ boss, canChallenge, isLoading, error, onChalleng
                         <div>SPD: <span className="text-white">{boss.stats.speed}</span></div>
                     </div>
 
-                    {/* Challenge Button */}
-                    <Button
-                        size="sm"
-                        variant={canChallenge ? "default" : "secondary"}
-                        className={cn(
-                            "w-full h-9",
-                            canChallenge && "bg-red-500 hover:bg-red-600 text-white shadow-[0_0_15px_rgba(239,68,68,0.3)]"
-                        )}
-                        onClick={onChallenge}
-                        disabled={!canChallenge}
-                    >
-                        {canChallenge ? (
-                            <>
-                                <Skull className="w-4 h-4 mr-2" />
-                                {t('boss_challenge')}
-                            </>
-                        ) : (
-                            t('boss_completed')
-                        )}
-                    </Button>
+                    {/* Challenge Button or Scan CTA */}
+                    {!hasScannedToday ? (
+                        <Link href="/scan">
+                            <Button
+                                size="sm"
+                                className="w-full h-9 bg-yellow-500 hover:bg-yellow-600 text-black"
+                            >
+                                <ScanBarcode className="w-4 h-4 mr-2" />
+                                スキャンして解放
+                            </Button>
+                        </Link>
+                    ) : (
+                        <Button
+                            size="sm"
+                            variant={canChallenge ? "default" : "secondary"}
+                            className={cn(
+                                "w-full h-9",
+                                canChallenge && "bg-red-500 hover:bg-red-600 text-white shadow-[0_0_15px_rgba(239,68,68,0.3)]"
+                            )}
+                            onClick={onChallenge}
+                            disabled={!canChallenge}
+                        >
+                            {canChallenge ? (
+                                <>
+                                    <Skull className="w-4 h-4 mr-2" />
+                                    {t('boss_challenge')}
+                                </>
+                            ) : (
+                                t('boss_completed')
+                            )}
+                        </Button>
+                    )}
                 </div>
             </div>
         </TechCard>

@@ -78,6 +78,7 @@ export default function Home() {
   // Daily Boss state
   const [bossData, setBossData] = useState<BossData | null>(null);
   const [canChallengeBoss, setCanChallengeBoss] = useState(false);
+  const [hasScannedToday, setHasScannedToday] = useState(false);
   const [bossLoading, setBossLoading] = useState(true);
   const [bossError, setBossError] = useState<string | null>(null);
   const [, setLocation] = useLocation();
@@ -89,9 +90,10 @@ export default function Home() {
     try {
       const getDailyBoss = httpsCallable(functions, "getDailyBoss");
       const result = await getDailyBoss();
-      const data = result.data as { boss: BossData; canChallenge: boolean };
+      const data = result.data as { boss: BossData; canChallenge: boolean; hasScannedToday: boolean };
       setBossData(data.boss);
       setCanChallengeBoss(data.canChallenge);
+      setHasScannedToday(data.hasScannedToday);
     } catch (error: any) {
       console.error("Failed to load daily boss:", error);
       const code = error?.code || '';
@@ -364,6 +366,7 @@ export default function Home() {
                 <BossAlertCard
                   boss={bossData}
                   canChallenge={canChallengeBoss}
+                  hasScannedToday={hasScannedToday}
                   isLoading={bossLoading}
                   error={bossError}
                   onChallenge={() => setLocation('/boss')}
