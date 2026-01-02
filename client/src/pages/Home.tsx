@@ -8,7 +8,7 @@ import { db, functions } from "@/lib/firebase";
 import { callGenerateRobot } from "@/lib/functions";
 import { httpsCallable } from "firebase/functions";
 import { collection, getDocs } from "firebase/firestore";
-import { Factory, Loader2, Trophy, Zap, ScanBarcode, Swords, ShoppingCart, Activity, Users } from "lucide-react";
+import { Factory, Loader2, Trophy, Zap, ScanBarcode, Swords, ShoppingCart, Activity, Users, Crown } from "lucide-react";
 import RobotSVG from "@/components/RobotSVG";
 import { toast } from "sonner";
 import { Link } from "wouter";
@@ -398,7 +398,7 @@ export default function Home() {
       {/* Mobile: Constrained width, Desktop: Expanded width */}
       <div className="flex-1 w-full max-w-md md:max-w-5xl mx-auto flex flex-col relative z-10">
 
-        <main className="flex-1 w-full px-4 space-y-6 pt-4 mt-[var(--header-height)]">
+        <main className="flex-1 w-full px-4 space-y-6 pt-4">
 
           {/* 1. System Ticker */}
           <div className="w-full bg-black/40 border-y border-white/5 py-1 overflow-hidden">
@@ -636,6 +636,17 @@ export default function Home() {
                     <div>
                       <div className="text-xs font-bold text-white">{t('menu_shop')}</div>
                       <div className="text-[10px] text-muted-foreground">{t('menu_supplies')}</div>
+                    </div>
+                  </TechCard>
+                </Link>
+                <Link href="/premium">
+                  <TechCard className="p-3 flex items-center gap-3 cursor-pointer group hover:bg-white/5 transition-colors" variant="outline" intensity="low">
+                    <div className="p-2 rounded bg-surface2 text-primary group-hover:text-white transition-colors">
+                      <Crown className="w-4 h-4 text-yellow-500" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-white">{t('premium_subscription')}</div>
+                      <div className="text-[10px] text-muted-foreground">{t('view_premium')}</div>
                     </div>
                   </TechCard>
                 </Link>
