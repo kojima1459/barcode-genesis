@@ -27,6 +27,7 @@ export default function BottomNav() {
             className="fixed bottom-0 left-0 right-0 z-50 p-4 pointer-events-none md:hidden"
             role="navigation"
             aria-label="メインナビゲーション"
+            style={{ willChange: 'transform', transform: 'translateZ(0)' }}
         >
             <div
                 className="glass-panel rounded-2xl flex justify-around items-center p-3 pointer-events-auto"

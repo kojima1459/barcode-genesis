@@ -136,8 +136,20 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
+          // Core vendor chunks - loaded on every page
           vendor: ['react', 'react-dom'],
           firebase: ['firebase/app', 'firebase/firestore', 'firebase/auth', 'firebase/functions'],
+          // Heavy libraries - lazy loaded only when needed
+          'framer-motion': ['framer-motion'],
+          'quagga': ['@ericblade/quagga2'],
+          // UI libraries
+          'radix-ui': [
+            '@radix-ui/react-dialog',
+            '@radix-ui/react-tooltip',
+            '@radix-ui/react-tabs',
+            '@radix-ui/react-select',
+            '@radix-ui/react-slot'
+          ],
         }
       }
     },
