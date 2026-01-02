@@ -24,7 +24,11 @@ const plugins = [
       display: 'standalone',
       orientation: 'portrait',
       start_url: '/',
+      scope: '/',
       id: '/',
+      lang: 'ja',
+      dir: 'ltr',
+      prefer_related_applications: false,
       categories: ['games', 'entertainment'],
       icons: [
         {
@@ -42,6 +46,22 @@ const plugins = [
           sizes: '512x512',
           type: 'image/png',
           purpose: 'maskable'
+        }
+      ],
+      shortcuts: [
+        {
+          name: 'スキャン',
+          short_name: 'Scan',
+          description: 'バーコードをスキャンしてロボットを生成',
+          url: '/scan',
+          icons: [{ src: '/icon-192.png', sizes: '192x192' }]
+        },
+        {
+          name: 'バトル',
+          short_name: 'Battle',
+          description: 'ロボットを戦わせよう',
+          url: '/battle',
+          icons: [{ src: '/icon-192.png', sizes: '192x192' }]
         }
       ],
       screenshots: [
