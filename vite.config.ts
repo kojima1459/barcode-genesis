@@ -133,49 +133,19 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
-    target: 'es2020',
     rollupOptions: {
       output: {
-        manualChunks: (id) => {
-          // Firebase in its own chunk
-          if (id.includes('firebase')) {
-            return 'firebase';
-          }
-          // React in its own chunk
-          if (id.includes('react') || id.includes('react-dom')) {
-            return 'react';
-          }
-          // Framer motion separate
-          if (id.includes('framer-motion')) {
-            return 'framer';
-          }
-          // Lucide icons separate
-          if (id.includes('lucide-react')) {
-            return 'icons';
-          }
-          // UI components
-          if (id.includes('@radix-ui') || id.includes('sonner')) {
-            return 'ui';
-          }
-          // Scanner library
-          if (id.includes('quagga') || id.includes('html-to-image')) {
-            return 'scanner';
-          }
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          firebase: ['firebase/app', 'firebase/firestore', 'firebase/auth', 'firebase/functions'],
         }
       }
     },
-    chunkSizeWarningLimit: 500,
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: true,
-        drop_debugger: true
-      }
-    }
+    chunkSizeWarningLimit: 1000,
   },
   server: {
     port: 5173,
-    strictPort: true, // Keep the dev server on the spec port
+    strictPort: true,
     host: true,
     allowedHosts: [
       ".manuspre.computer",
@@ -192,4 +162,3 @@ export default defineConfig({
     },
   },
 });
-
