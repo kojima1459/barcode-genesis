@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useRef } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { User, onAuthStateChanged, signInWithPopup, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
 import { getAuth, googleProvider } from "@/lib/firebase";
 
@@ -20,13 +20,8 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [authStatus, setAuthStatus] = useState<AuthStatus>('loading');
-  const hasInitialized = useRef(false);
 
   useEffect(() => {
-    // Prevent double subscription in StrictMode
-    if (hasInitialized.current) return;
-    hasInitialized.current = true;
-
     // CRITICAL: Use getAuth() to get actual Auth instance, not Proxy
     const authInstance = getAuth();
 
@@ -46,6 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
+    // Cleanup properly unsubscribes - StrictMode double-mount is handled by Firebase
     return () => {
       console.log('[AuthContext] Cleaning up listener');
       unsubscribe();
