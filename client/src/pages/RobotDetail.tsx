@@ -8,7 +8,8 @@ import RobotSVG from "@/components/RobotSVG";
 import { useAuth } from "@/contexts/AuthContext";
 import { getItemLabel } from "@/lib/items";
 import { toast } from "sonner";
-import { RobotData } from "@/types/shared";
+import { RobotData, VariantData } from "@/types/shared";
+import { useUserData } from "@/hooks/useUserData";
 import { useSound } from "@/contexts/SoundContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import SEO from "@/components/SEO";
@@ -95,6 +96,13 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
   const [isEvolutionModalOpen, setIsEvolutionModalOpen] = useState(false);
   const [Recharts, setRecharts] = useState<null | typeof import("recharts")>(null);
 
+  // Variant creation state
+  const [variantPartnerId, setVariantPartnerId] = useState("");
+  const [variantName, setVariantName] = useState("");
+  const [isCreatingVariant, setIsCreatingVariant] = useState(false);
+  const [variants, setVariants] = useState<VariantData[]>([]);
+  const { workshopLines: userLimit } = useUserData();
+
   // Battle history state
   const [battleHistory, setBattleHistory] = useState<Array<{
     id: string;
@@ -157,6 +165,15 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
         setBaseRobot({ id: baseSnap.id, ...baseSnap.data() } as RobotData);
         setRobots(robotsData);
         setInventory(inventoryData);
+
+        // Fetch variants for capacity check
+        try {
+          const variantsQuery = query(collection(db, "users", user.uid, "variants"), orderBy("createdAt", "desc"));
+          const variantSnap = await getDocs(variantsQuery);
+          setVariants(variantSnap.docs.map(d => ({ id: d.id, ...d.data() } as VariantData)));
+        } catch (variantError) {
+          console.warn("Could not fetch variants:", variantError);
+        }
 
         // Fetch battle history (from user's battle_logs subcollection if exists)
         try {
@@ -394,6 +411,39 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
       setCosmeticError(message);
     } finally {
       setIsApplyingCosmetic(false);
+    }
+  };
+
+  // Variant creation handler
+  const handleCreateVariant = async () => {
+    if (!baseRobot || !variantPartnerId) return;
+    if (variants.length >= userLimit) {
+      toast.error(t('robot_detail_variant_full'));
+      return;
+    }
+    setIsCreatingVariant(true);
+    try {
+      const createFn = await getCallable('createVariant');
+      await createFn({ robotIdA: baseRobot.id, robotIdB: variantPartnerId, name: variantName });
+      toast.success(t('robot_detail_variant_success'));
+      setVariantPartnerId("");
+      setVariantName("");
+      // Reload variants
+      const { collection, getDocs, query: firestoreQuery, orderBy } = await import("firebase/firestore");
+      const { getDb } = await import("@/lib/firebase");
+      const variantsQuery = firestoreQuery(collection(getDb(), "users", user!.uid, "variants"), orderBy("createdAt", "desc"));
+      const variantSnap = await getDocs(variantsQuery);
+      setVariants(variantSnap.docs.map(d => ({ id: d.id, ...d.data() } as VariantData)));
+    } catch (e: any) {
+      console.error("Variant creation failed:", e);
+      const code = e?.code || "";
+      if (code.includes("resource-exhausted")) {
+        toast.error(t('robot_detail_variant_full'));
+      } else {
+        toast.error(e?.message || "Failed to create variant");
+      }
+    } finally {
+      setIsCreatingVariant(false);
     }
   };
 
@@ -708,6 +758,51 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
               setTimeout(() => window.location.reload(), 2000);
             }}
           />
+        </section>
+
+        {/* Variant Creation Section */}
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <Cpu className="w-5 h-5 text-neon-purple" />
+            {t('robot_detail_variant_title')}
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            {t('robot_detail_variant_desc')}
+          </p>
+          <div className="text-xs text-muted-foreground">
+            {t('robot_detail_capacity')}: {variants.length} / {userLimit}
+          </div>
+          {variants.length >= userLimit ? (
+            <p className="text-sm text-destructive">{t('robot_detail_variant_full')}</p>
+          ) : (
+            <div className="flex flex-col gap-2 max-w-md">
+              <select
+                value={variantPartnerId}
+                onChange={(e) => setVariantPartnerId(e.target.value)}
+                className="border rounded px-2 py-1 bg-background text-sm"
+              >
+                <option value="">{t('robot_detail_select_partner')}</option>
+                {materialRobots.map((r) => (
+                  <option key={r.id} value={r.id}>{r.name}</option>
+                ))}
+              </select>
+              <input
+                type="text"
+                placeholder={t('robot_detail_variant_name')}
+                value={variantName}
+                onChange={(e) => setVariantName(e.target.value)}
+                maxLength={20}
+                className="border rounded px-2 py-1 bg-background text-sm"
+              />
+              <Button
+                onClick={handleCreateVariant}
+                disabled={!variantPartnerId || isCreatingVariant}
+              >
+                {isCreatingVariant && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                {t('robot_detail_create_variant')}
+              </Button>
+            </div>
+          )}
         </section>
 
         <section className="space-y-3">

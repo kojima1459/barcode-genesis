@@ -648,6 +648,16 @@ export const translations = {
     howto_synthesis_xp: "不要なロボを素材にしてXPを獲得。バトルせず効率的にレベルアップ。",
     howto_training_title: "訓練モード",
     howto_training_warn: "⚠️ 訓練は自分のロボ同士で練習するモードです。XP・クレジットは獲得できません。",
+
+    // RobotDetail: Variant Creation
+    robot_detail_variant_title: "バリアント作成",
+    robot_detail_variant_desc: "このロボと別のロボを組み合わせて、新しい見た目を作成します。親は消費されません。",
+    robot_detail_select_partner: "パートナーを選択",
+    robot_detail_variant_name: "バリアント名（任意）",
+    robot_detail_create_variant: "バリアント作成",
+    robot_detail_variant_success: "バリアントを作成しました！",
+    robot_detail_variant_full: "工房が満杯です。レベルを上げて上限を解放してください。",
+    robot_detail_capacity: "工房容量",
   },
   en: {
     // Common
@@ -1104,5 +1114,15 @@ export const translations = {
     howto_synthesis_xp: "Use spare robots as materials to gain XP. Efficient leveling without battles.",
     howto_training_title: "Training Mode",
     howto_training_warn: "⚠️ Training is practice between your own robots. NO XP or credits are awarded.",
+
+    // RobotDetail: Variant Creation
+    robot_detail_variant_title: "Create Variant",
+    robot_detail_variant_desc: "Combine this robot with another to create a new look. Parents are NOT consumed.",
+    robot_detail_select_partner: "Select Partner",
+    robot_detail_variant_name: "Variant Name (optional)",
+    robot_detail_create_variant: "Create Variant",
+    robot_detail_variant_success: "Variant created!",
+    robot_detail_variant_full: "Workshop is full. Level up to expand capacity.",
+    robot_detail_capacity: "Workshop Capacity",
   }
 };
