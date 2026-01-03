@@ -180,6 +180,16 @@ export interface BattleLog {
     specialApplied?: boolean;
     specialType?: PhaseBSpecialType;
     specialMessage?: string;
+    specialTriggered?: boolean;  // Added for battleFx.ts
+    finisherApplied?: boolean;   // Added for battleFx.ts
+
+    // Boss Battle specific
+    bossShieldBroken?: boolean;  // Added for battleFx.ts
+
+    // Stance System (battleLogToEvents.ts)
+    stanceAttacker?: string;
+    stanceDefender?: string;
+    stanceOutcome?: 'WIN' | 'LOSE' | 'DRAW';
 
     // Phase B: Level Bonus (for transparency)
     levelBonus?: {

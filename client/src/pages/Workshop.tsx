@@ -474,7 +474,7 @@ export default function Workshop() {
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            handleDeleteVariant(v.id);
+                                            handleDeleteVariant(v.id ?? '');
                                         }}
                                         disabled={deletingId === v.id}
                                         className="absolute top-2 right-2 z-10 p-1.5 rounded-lg bg-red-500/20 border border-red-500/30 opacity-0 group-hover:opacity-100 hover:bg-red-500/40 transition-all disabled:opacity-50"

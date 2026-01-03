@@ -6,9 +6,11 @@ interface TechCardProps {
     className?: string;
     header?: ReactNode;
     footer?: ReactNode;
+    variant?: string;
+    intensity?: string;
 }
 
-export function TechCard({ children, className, header, footer }: TechCardProps) {
+export function TechCard({ children, className, header, footer, variant: _variant, intensity: _intensity }: TechCardProps) {
     return (
         <div className={cn(
             "glass-panel border-white/10 overflow-hidden relative group transition-all duration-300",
