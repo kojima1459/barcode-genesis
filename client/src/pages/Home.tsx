@@ -8,7 +8,7 @@ import { getDb, functions } from "@/lib/firebase";
 import { callGenerateRobot } from "@/lib/functions";
 import { httpsCallable } from "firebase/functions";
 import { collection, getDocs } from "firebase/firestore";
-import { Factory, Loader2, Trophy, Zap, ScanBarcode, Swords, ShoppingCart, Activity, Users, Crown, BookOpen } from "lucide-react";
+import { Factory, Loader2, Trophy, Zap, ScanBarcode, Swords, ShoppingCart, Activity, Users, Crown, BookOpen, Layers } from "lucide-react";
 import RobotSVG from "@/components/RobotSVG";
 import { toast } from "sonner";
 import { Link, useLocation } from "wouter";
