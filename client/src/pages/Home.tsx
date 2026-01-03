@@ -484,43 +484,97 @@ export default function Home() {
                 </Link>
               </section>
 
-              {/* 3. Primary Objectives (Grid) */}
-              <section className="space-y-2">
+              <section className="space-y-3">
                 <h2 className="text-xs font-bold text-muted-foreground tracking-widest flex items-center gap-2">
                   <Activity className="w-3 h-3" />
                   OPERATIONS
                 </h2>
-                <div className="grid grid-cols-3 gap-3 md:gap-4">
-                  <Link href="/scan">
-                    <Button
-                      id="tutorial-generate-btn"
-                      onClick={() => completeStep('HOME_GENERATE')}
-                      className="h-28 md:h-32 w-full flex flex-col items-center justify-center gap-2 glass-panel border border-neon-cyan/30 hover:bg-neon-cyan/10 hover:border-neon-cyan transition-all group shadow-[0_0_15px_rgba(0,0,0,0.3)] bg-surface1/80 active:scale-95 duration-200"
-                    >
-                      <div className="p-3 rounded-full bg-surface2 group-hover:bg-neon-cyan/20 transition-colors">
-                        <ScanBarcode className="w-6 h-6 text-neon-cyan" />
+
+                {/* Main Action Grid */}
+                <div className="grid grid-cols-2 gap-3">
+
+                  {/* SCAN - Full Width */}
+                  <Link href="/scan" className="col-span-2">
+                    <div className="relative h-24 bg-linear-to-r from-cyan-900/40 to-black border-l-4 border-l-cyan-500 border-y border-r border-white/10 rounded-r-lg flex items-center px-6 overflow-hidden group hover:bg-cyan-900/60 transition-all active:scale-[0.99] cursor-pointer">
+                      {/* Background Icon */}
+                      <ScanBarcode className="absolute -right-4 -bottom-4 w-32 h-32 text-cyan-500/10 group-hover:text-cyan-500/20 group-hover:scale-110 transition-all duration-500 rotate-[-10deg]" />
+
+                      <div className="relative z-10 flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-lg bg-cyan-500/20 flex items-center justify-center border border-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.3)] group-hover:shadow-[0_0_25px_rgba(6,182,212,0.5)] transition-all">
+                          <ScanBarcode className="w-6 h-6 text-cyan-400 group-hover:text-white transition-colors" />
+                        </div>
+                        <div>
+                          <div className="text-2xl font-black italic tracking-tighter text-white group-hover:text-cyan-400 transition-colors uppercase font-orbitron">{t('menu_scan')}</div>
+                          <div className="text-[10px] text-cyan-300/70 font-mono tracking-wider">INITIATE BARCODE SCAN</div>
+                        </div>
                       </div>
-                      <span className="font-bold text-xs text-white tracking-wider group-hover:text-neon-cyan">{t('menu_scan')}</span>
-                    </Button>
+                    </div>
                   </Link>
 
+                  {/* BATTLE */}
                   <Link href="/battle">
-                    <Button className="h-28 md:h-32 w-full flex flex-col items-center justify-center gap-2 glass-panel border border-neon-pink/30 hover:bg-neon-pink/10 hover:border-neon-pink transition-all group shadow-[0_0_15px_rgba(0,0,0,0.3)] bg-surface1/80 active:scale-95 duration-200">
-                      <div className="p-3 rounded-full bg-surface2 group-hover:bg-neon-pink/20 transition-colors">
-                        <Swords className="w-6 h-6 text-neon-pink" />
+                    <div className="relative h-20 bg-linear-to-br from-pink-900/40 to-black border-l-4 border-l-pink-500 border-y border-r border-white/10 rounded-r-lg flex items-center px-4 overflow-hidden group hover:bg-pink-900/60 transition-all active:scale-[0.98] cursor-pointer">
+                      <Swords className="absolute -right-2 -bottom-2 w-24 h-24 text-pink-500/10 group-hover:text-pink-500/20 group-hover:scale-110 transition-transform duration-500" />
+                      <div className="relative z-10 flex items-center gap-3">
+                        <div className="w-10 h-10 rounded bg-pink-500/20 flex items-center justify-center border border-pink-500/50">
+                          <Swords className="w-5 h-5 text-pink-400" />
+                        </div>
+                        <div>
+                          <div className="text-lg font-bold italic text-white group-hover:text-pink-400 transition-colors font-orbitron">{t('menu_battle')}</div>
+                          <div className="text-[9px] text-pink-300/70 font-mono">START COMBAT</div>
+                        </div>
                       </div>
-                      <span className="font-bold text-xs text-white tracking-wider group-hover:text-neon-pink">{t('menu_battle')}</span>
-                    </Button>
+                    </div>
                   </Link>
 
-                  <Link href="/workshop">
-                    <Button className="h-28 md:h-32 w-full flex flex-col items-center justify-center gap-2 glass-panel border border-orange-500/30 hover:bg-orange-500/10 hover:border-orange-500 transition-all group shadow-[0_0_15px_rgba(0,0,0,0.3)] bg-surface1/80 active:scale-95 duration-200">
-                      <div className="p-3 rounded-full bg-surface2 group-hover:bg-orange-500/20 transition-colors">
-                        <Factory className="w-6 h-6 text-orange-500" />
+                  {/* UNITS (DEX) */}
+                  <Link href="/dex">
+                    <div className="relative h-20 bg-linear-to-br from-green-900/40 to-black border-l-4 border-l-green-500 border-y border-r border-white/10 rounded-r-lg flex items-center px-4 overflow-hidden group hover:bg-green-900/60 transition-all active:scale-[0.98] cursor-pointer">
+                      <Layers className="absolute -right-2 -bottom-2 w-24 h-24 text-green-500/10 group-hover:text-green-500/20 group-hover:scale-110 transition-transform duration-500" />
+                      <div className="relative z-10 flex items-center gap-3">
+                        <div className="w-10 h-10 rounded bg-green-500/20 flex items-center justify-center border border-green-500/50">
+                          <Layers className="w-5 h-5 text-green-400" />
+                        </div>
+                        <div>
+                          <div className="text-lg font-bold italic text-white group-hover:text-green-400 transition-colors font-orbitron">{t('menu_units')}</div>
+                          <div className="text-[9px] text-green-300/70 font-mono">MANAGE FLEET</div>
+                        </div>
                       </div>
-                      <span className="font-bold text-xs text-white tracking-wider group-hover:text-orange-500">{t('menu_craft')}</span>
-                    </Button>
+                    </div>
                   </Link>
+
+                  {/* WORKSHOP */}
+                  <Link href="/workshop">
+                    <div className="relative h-20 bg-linear-to-br from-orange-900/40 to-black border-l-4 border-l-orange-500 border-y border-r border-white/10 rounded-r-lg flex items-center px-4 overflow-hidden group hover:bg-orange-900/60 transition-all active:scale-[0.98] cursor-pointer">
+                      <Factory className="absolute -right-2 -bottom-2 w-24 h-24 text-orange-500/10 group-hover:text-orange-500/20 group-hover:scale-110 transition-transform duration-500" />
+                      <div className="relative z-10 flex items-center gap-3">
+                        <div className="w-10 h-10 rounded bg-orange-500/20 flex items-center justify-center border border-orange-500/50">
+                          <Factory className="w-5 h-5 text-orange-400" />
+                        </div>
+                        <div>
+                          <div className="text-lg font-bold italic text-white group-hover:text-orange-400 transition-colors font-orbitron">{t('menu_craft')}</div>
+                          <div className="text-[9px] text-orange-300/70 font-mono">ENHANCE</div>
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+
+                  {/* SHOP */}
+                  <Link href="/shop">
+                    <div className="relative h-20 bg-linear-to-br from-yellow-900/40 to-black border-l-4 border-l-yellow-500 border-y border-r border-white/10 rounded-r-lg flex items-center px-4 overflow-hidden group hover:bg-yellow-900/60 transition-all active:scale-[0.98] cursor-pointer">
+                      <ShoppingCart className="absolute -right-2 -bottom-2 w-24 h-24 text-yellow-500/10 group-hover:text-yellow-500/20 group-hover:scale-110 transition-transform duration-500" />
+                      <div className="relative z-10 flex items-center gap-3">
+                        <div className="w-10 h-10 rounded bg-yellow-500/20 flex items-center justify-center border border-yellow-500/50">
+                          <ShoppingCart className="w-5 h-5 text-yellow-400" />
+                        </div>
+                        <div>
+                          <div className="text-lg font-bold italic text-white group-hover:text-yellow-400 transition-colors font-orbitron">{t('menu_shop')}</div>
+                          <div className="text-[9px] text-yellow-300/70 font-mono">SUPPLIES</div>
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+
                 </div>
               </section>
 
