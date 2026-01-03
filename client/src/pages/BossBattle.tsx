@@ -48,7 +48,7 @@ interface BossBattleResult {
     turnCount?: number;
 }
 
-export default function BossBattle() {
+export default function BossBattle({ modeOverride }: { modeOverride?: "weekly" | "daily" }) {
     const { t } = useLanguage();
     const { playSE } = useSound();
     const { user } = useAuth();
@@ -70,7 +70,7 @@ export default function BossBattle() {
 
     const search = location.includes("?") ? location.split("?")[1] : "";
     const query = new URLSearchParams(search);
-    const mode = query.get("mode");
+    const mode = modeOverride || query.get("mode");
 
     const loadData = useCallback(async () => {
         if (!user) return;

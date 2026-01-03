@@ -442,7 +442,7 @@ export default function Home() {
                   isLoading={weeklyLoading}
                   error={weeklyError}
                   onChallenge={() => {
-                    setLocation("/boss?mode=weekly");
+                    setLocation("/weekly-boss");
                   }}
                   onRetry={loadWeeklyBoss}
                 />

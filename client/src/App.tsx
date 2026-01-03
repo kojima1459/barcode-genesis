@@ -155,7 +155,7 @@ function Router() {
               <ProtectedRoute component={withShell(Battle)} />
             </Route>
             <Route path="/weekly-boss">
-              <ProtectedRoute component={withShell(BossBattle)} />
+              <ProtectedRoute component={withShell(() => <BossBattle modeOverride="weekly" />)} />
             </Route>
             <Route path="/boss">
               <ProtectedRoute component={withShell(BossBattle)} />
