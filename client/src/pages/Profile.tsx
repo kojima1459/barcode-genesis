@@ -185,7 +185,7 @@ export default function Profile() {
 
       <main className="flex-1 max-w-4xl mx-auto w-full p-4 relative z-10 space-y-8">
         <div className="flex items-center justify-between mb-8">
-          <h1 className="text-2xl font-bold font-orbitron text-primary">{t('profile_title')}</h1>
+          <h1 className="text-2xl font-orbitron font-semibold text-primary">{t('profile_title')}</h1>
         </div>
 
         {/* User Info Card */}

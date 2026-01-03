@@ -21,7 +21,7 @@ export function TechCard({ children, className, header, footer, variant: _varian
             <div className="absolute top-0 left-0 w-full h-px bg-linear-to-r from-transparent via-primary/20 to-transparent transform -translate-y-full group-hover:translate-y-[400px] transition-transform duration-1000 ease-in-out pointer-events-none" />
 
             {header && (
-                <div className="px-5 py-3 border-b border-white/10 bg-white/5 font-orbitron text-sm font-bold tracking-wider">
+                <div className="px-5 py-3 border-b border-white/10 bg-white/5 font-orbitron text-sm font-semibold tracking-wider">
                     {header}
                 </div>
             )}

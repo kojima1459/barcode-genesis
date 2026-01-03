@@ -49,7 +49,7 @@ class ErrorBoundary extends Component<Props, State> {
               />
             </div>
 
-            <h2 className="text-2xl font-bold mb-2 text-white font-orbitron tracking-wider">
+            <h2 className="text-2xl font-semibold mb-2 text-white font-orbitron tracking-wider">
               SYSTEM ERROR
             </h2>
             <p className="text-sm text-gray-400 mb-6">

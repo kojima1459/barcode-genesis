@@ -182,7 +182,7 @@ export default function Premium() {
                         <div className="p-2 rounded bg-yellow-500/10 border border-yellow-500/20 text-yellow-500">
                             <Crown className="w-6 h-6" />
                         </div>
-                        <h1 className="text-2xl md:text-3xl font-orbitron font-bold tracking-wide text-white">
+                        <h1 className="text-2xl md:text-3xl font-orbitron font-semibold tracking-wide text-white">
                             {t('system_upgrade')}
                         </h1>
                     </div>
@@ -227,7 +227,7 @@ export default function Premium() {
                     <div className="text-center">
                         <h3 className="font-orbitron text-lg text-muted-foreground mb-4">{t('maintenance_cost')}</h3>
                         <div className="flex items-end justify-center gap-1 mb-6">
-                            <span className="text-4xl font-bold font-orbitron text-white">¥390</span>
+                            <span className="text-4xl font-orbitron font-semibold text-white">¥390</span>
                             <span className="text-muted-foreground mb-1">/ {t('month')}</span>
                         </div>
                         {isPremium ? (
@@ -304,7 +304,7 @@ export default function Premium() {
 
                 {/* Resource Supply (Credits) */}
                 <section className="pb-8">
-                    <h2 className="text-xl font-orbitron font-bold mb-4 flex items-center gap-2 text-muted-foreground">
+                    <h2 className="text-xl font-orbitron font-semibold mb-4 flex items-center gap-2 text-muted-foreground">
                         <Coins className="h-5 w-5" />
                         {t('resource_supply')}
                     </h2>

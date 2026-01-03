@@ -456,7 +456,7 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
 
         {/* Origin Section - Robot's Birth Info */}
         <div className="glass-panel p-6 rounded-xl border border-white/5">
-          <h3 className="text-sm font-bold text-neon-magenta mb-4 font-orbitron tracking-widest flex items-center gap-2">
+          <h3 className="text-sm text-neon-magenta mb-4 font-orbitron font-semibold tracking-widest flex items-center gap-2">
             <Cpu className="w-4 h-4" /> ORIGIN DATA
           </h3>
           <div className="grid grid-cols-2 gap-4 text-sm">
@@ -491,7 +491,7 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
         {/* Battle History */}
         {battleHistory.length > 0 && (
           <div className="glass-panel p-6 rounded-xl border border-white/5">
-            <h3 className="text-sm font-bold text-neon-yellow mb-4 font-orbitron tracking-widest flex items-center gap-2">
+            <h3 className="text-sm text-neon-yellow mb-4 font-orbitron font-semibold tracking-widest flex items-center gap-2">
               <Trophy className="w-4 h-4" /> BATTLE RECORD
             </h3>
             <div className="space-y-2">
@@ -522,7 +522,7 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
 
         {/* Status Visualization */}
         <div className="glass-panel p-6 rounded-xl border border-white/5 relative overflow-hidden">
-          <h3 className="text-sm font-bold text-neon-cyan mb-4 font-orbitron tracking-widest absolute top-4 left-6 z-10">STATUS ANALYSIS</h3>
+          <h3 className="text-sm text-neon-cyan mb-4 font-orbitron font-semibold tracking-widest absolute top-4 left-6 z-10">STATUS ANALYSIS</h3>
           <div className="h-[250px] w-full relative z-0">
             <ResponsiveContainer width="100%" height="100%">
               <RadarChart cx="50%" cy="50%" outerRadius="70%" data={[
@@ -552,25 +552,25 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
           {/* Simple Status Cards with Neon Styled Borders */}
           <Interactive className="glass-panel p-4 rounded-xl border-l-4 border-l-red-500 h-auto">
             <div className="text-xs text-muted-foreground uppercase tracking-wider">Attack</div>
-            <div className="text-2xl font-bold font-orbitron">
+            <div className="text-2xl font-orbitron font-semibold">
               <ScrambleText text={String(baseRobot.baseAttack)} delay={300} />
             </div>
           </Interactive>
           <Interactive className="glass-panel p-4 rounded-xl border-l-4 border-l-blue-500 h-auto">
             <div className="text-xs text-muted-foreground uppercase tracking-wider">Defense</div>
-            <div className="text-2xl font-bold font-orbitron">
+            <div className="text-2xl font-orbitron font-semibold">
               <ScrambleText text={String(baseRobot.baseDefense)} delay={400} />
             </div>
           </Interactive>
           <Interactive className="glass-panel p-4 rounded-xl border-l-4 border-l-green-500 h-auto">
             <div className="text-xs text-muted-foreground uppercase tracking-wider">Speed</div>
-            <div className="text-2xl font-bold font-orbitron">
+            <div className="text-2xl font-orbitron font-semibold">
               <ScrambleText text={String(baseRobot.baseSpeed)} delay={500} />
             </div>
           </Interactive>
           <Interactive className="glass-panel p-4 rounded-xl border-l-4 border-l-yellow-500 h-auto">
             <div className="text-xs text-muted-foreground uppercase tracking-wider">HP</div>
-            <div className="text-2xl font-bold font-orbitron">
+            <div className="text-2xl font-orbitron font-semibold">
               <ScrambleText text={String(baseRobot.baseHp)} delay={200} />
             </div>
           </Interactive>
@@ -579,7 +579,7 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
         {/* Skills Section (Placeholder for improved skill listing) */}
         {baseRobot.skills && baseRobot.skills.length > 0 && (
           <div className="glass-panel p-4 rounded-xl">
-            <h3 className="text-sm font-bold text-neon-purple mb-4 font-orbitron">ACTIVE SKILLS</h3>
+            <h3 className="text-sm text-neon-purple mb-4 font-orbitron font-semibold">ACTIVE SKILLS</h3>
             <div className="space-y-2">
               {baseRobot.skills.map((skill, i) => (
                 <div key={i} className="p-3 bg-white/5 rounded border border-white/5 flex items-center gap-3">

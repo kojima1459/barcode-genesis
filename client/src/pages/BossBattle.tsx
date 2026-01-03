@@ -220,7 +220,7 @@ export default function BossBattle() {
                             <Skull className="w-5 h-5 mr-2" />
                             {isWin ? t('boss_victory') : t('boss_defeat')}
                         </Badge>
-                        <h2 className="text-2xl font-orbitron font-bold text-white">
+                        <h2 className="text-2xl font-orbitron font-semibold text-white">
                             vs {bossData.name}
                         </h2>
                         {battleResult.bossShieldBroken && (
@@ -320,7 +320,7 @@ export default function BossBattle() {
 
                             {/* Boss Info */}
                             <div className="flex-1">
-                                <h2 className="text-2xl font-orbitron font-bold text-white mb-2">
+                                <h2 className="text-2xl font-orbitron font-semibold text-white mb-2">
                                     {bossData.name}
                                 </h2>
                                 <Badge className={cn("mb-3", BOSS_TYPE_COLORS[bossData.type])}>

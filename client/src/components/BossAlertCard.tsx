@@ -108,7 +108,7 @@ export const BossAlertCard = memo(function BossAlertCard({ boss, canChallenge, h
 
                 {/* Boss Info */}
                 <div className="flex-1 min-w-0">
-                    <h3 className="font-orbitron font-bold text-lg text-white truncate">
+                    <h3 className="font-orbitron font-semibold text-lg text-white truncate">
                         {boss.name}
                     </h3>
 

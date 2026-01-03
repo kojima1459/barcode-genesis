@@ -145,11 +145,11 @@ const RobotCard = React.forwardRef<HTMLDivElement, RobotCardProps>(({ robot, use
 
                         {/* Rarity Indicator */}
                         <div className="flex flex-col items-end">
-                            <div className="text-5xl font-bold font-orbitron opacity-20 absolute -top-4 -right-4 pointer-events-none"
+                            <div className="text-5xl font-orbitron font-semibold opacity-20 absolute -top-4 -right-4 pointer-events-none"
                                 style={{ color: mainColor }}>
                                 {robot.rarity || 1}
                             </div>
-                            <div className="text-lg font-bold font-orbitron mb-1" style={{ color: mainColor }}>
+                            <div className="text-lg font-orbitron font-semibold mb-1" style={{ color: mainColor }}>
                                 <ScrambleText text={robot.rarityName || "UNKNOWN"} delay={300} instant={staticMode} />
                             </div>
                             <div className="flex gap-1.5">
@@ -204,7 +204,7 @@ const RobotCard = React.forwardRef<HTMLDivElement, RobotCardProps>(({ robot, use
                     >
                         <div className="w-px h-12 bg-linear-to-b from-transparent to-white/40" />
                         <div className="p-2 rounded-full border border-white/20 glass flex items-center justify-center">
-                            <span className="text-sm font-orbitron font-bold" style={{ color: mainColor }}>
+                            <span className="text-sm font-orbitron font-semibold" style={{ color: mainColor }}>
                                 {RARITY_NAMES[robot.rarity || 1] || 'N'}
                             </span>
                         </div>
@@ -221,7 +221,7 @@ const RobotCard = React.forwardRef<HTMLDivElement, RobotCardProps>(({ robot, use
                             <div className="glass-panel rounded-xl p-4 flex flex-col items-center group relative overflow-hidden transition-all hover:scale-105">
                                 <StatIconHP className="w-8 h-8 text-green-400/80 mb-2 drop-shadow-[0_0_8px_rgba(74,222,128,0.3)]" />
                                 <span className="text-[9px] text-white/40 font-orbitron tracking-widest mb-1">DURABILITY</span>
-                                <span className="text-2xl font-bold text-white font-orbitron tabular-nums">
+                                <span className="text-2xl font-orbitron font-semibold text-white tabular-nums">
                                     <ScrambleText text={String(robot.baseHp)} delay={800} instant={staticMode} />
                                 </span>
                             </div>
@@ -230,7 +230,7 @@ const RobotCard = React.forwardRef<HTMLDivElement, RobotCardProps>(({ robot, use
                             <div className="glass-panel rounded-xl p-4 flex flex-col items-center group relative overflow-hidden transition-all hover:scale-105">
                                 <StatIconATK className="w-8 h-8 text-red-400/80 mb-2 drop-shadow-[0_0_8px_rgba(248,113,113,0.3)]" />
                                 <span className="text-[9px] text-white/40 font-orbitron tracking-widest mb-1">OFFENSE</span>
-                                <span className="text-2xl font-bold text-white font-orbitron tabular-nums">
+                                <span className="text-2xl font-orbitron font-semibold text-white tabular-nums">
                                     <ScrambleText text={String(robot.baseAttack)} delay={900} instant={staticMode} />
                                 </span>
                             </div>
@@ -239,7 +239,7 @@ const RobotCard = React.forwardRef<HTMLDivElement, RobotCardProps>(({ robot, use
                             <div className="glass-panel rounded-xl p-4 flex flex-col items-center group relative overflow-hidden transition-all hover:scale-105">
                                 <StatIconDEF className="w-8 h-8 text-blue-400/80 mb-2 drop-shadow-[0_0_8px_rgba(96,165,250,0.3)]" />
                                 <span className="text-[10px] text-white/40 font-orbitron tracking-widest mb-1">DEFENSE</span>
-                                <span className="text-2xl font-bold text-white font-orbitron tabular-nums">
+                                <span className="text-2xl font-orbitron font-semibold text-white tabular-nums">
                                     <ScrambleText text={String(robot.baseDefense)} delay={1000} instant={staticMode} />
                                 </span>
                             </div>

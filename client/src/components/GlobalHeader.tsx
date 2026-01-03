@@ -49,7 +49,7 @@ export function GlobalHeader({ className, missions }: GlobalHeaderProps) {
                     </div>
                     <div className="flex flex-col">
                         <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-orbitron text-neon-cyan tracking-[0.2em] font-bold group-hover:neon-text-cyan transition-all">
+                            <span className="text-[10px] font-orbitron text-neon-cyan tracking-[0.2em] font-semibold group-hover:neon-text-cyan transition-all">
                                 {rankLabel}
                             </span>
                             <div className="w-1 h-1 rounded-full bg-white/20" />

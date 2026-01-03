@@ -15,7 +15,7 @@ export default function Guide() {
                             戻る
                         </Button>
                     </Link>
-                    <h1 className="text-2xl font-bold text-primary font-orbitron">あそびかた</h1>
+                    <h1 className="text-2xl font-orbitron font-semibold text-primary">あそびかた</h1>
                 </header>
 
                 <section className="space-y-6">

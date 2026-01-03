@@ -33,7 +33,7 @@ function HangarCard({ robot, loading, className }: HangarCardProps) {
                         <Wrench className="w-8 h-8 text-muted-foreground" />
                     </div>
                     <div>
-                        <h3 className="text-xl font-orbitron font-bold text-muted-foreground tracking-widest">HANGAR EMPTY</h3>
+                        <h3 className="text-xl font-orbitron font-semibold text-muted-foreground tracking-widest">HANGAR EMPTY</h3>
                         <p className="text-sm text-muted-foreground/60 mt-2 font-mono">NO ACTIVE UNITS DETECTED</p>
                     </div>
                     <Link href="/scan">
@@ -94,7 +94,7 @@ function HangarCard({ robot, loading, className }: HangarCardProps) {
                     {/* Mobile Layout: Stacked */}
                     <div className="md:hidden flex flex-col items-center text-center space-y-1">
                         <div className="text-xs font-mono text-neon-cyan tracking-wider opacity-80">ACTIVE UNIT</div>
-                        <h2 className="text-2xl font-bold text-white font-orbitron tracking-wide text-shadow-glow">{robot.name}</h2>
+                        <h2 className="text-2xl font-orbitron font-semibold text-white tracking-wide text-shadow-glow">{robot.name}</h2>
                         <div className="flex items-center gap-3 text-xs text-muted-foreground font-mono pt-1">
                             <span>LV.{robot.level || 1}</span>
                             <span className="w-1 h-3 bg-white/20" />
@@ -109,7 +109,7 @@ function HangarCard({ robot, loading, className }: HangarCardProps) {
                                 <Activity className="w-4 h-4" />
                                 <span className="text-[10px] font-bold tracking-widest">DIAGNOSTICS OK</span>
                             </div>
-                            <h2 className="text-xl font-bold text-white font-orbitron truncate max-w-[200px]">{robot.name}</h2>
+                            <h2 className="text-xl font-orbitron font-semibold text-white truncate max-w-[200px]">{robot.name}</h2>
                             <div className="h-px w-full bg-white/10 my-2" />
                             <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs font-mono text-muted-foreground">
                                 <span>LVL</span> <span className="text-white text-right">{robot.level || 1}</span>

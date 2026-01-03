@@ -74,7 +74,7 @@ export default function TutorialModal() {
               </div>
 
               <DialogHeader className="mb-4 space-y-4">
-                <DialogTitle className="text-center text-3xl font-bold font-orbitron tracking-wider bg-clip-text text-transparent bg-linear-to-r from-white via-cyan-200 to-white">
+                <DialogTitle className="text-center text-3xl font-orbitron font-semibold tracking-wider bg-clip-text text-transparent bg-linear-to-r from-white via-cyan-200 to-white">
                   {step === 0 && t('tutorial_welcome_title')}
                   {step === 1 && t('tutorial_step1_title')}
                   {step === 2 && t('tutorial_step2_title')}
