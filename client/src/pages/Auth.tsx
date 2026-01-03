@@ -2,29 +2,45 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Loader2, ShieldCheck, Cpu, Terminal, ChevronDown } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 
 export default function Auth() {
-  const { signInWithGoogle, signInWithEmail, signUpWithEmail, user } = useAuth();
+  const { signInWithGoogle, signInWithEmail, signUpWithEmail, user, loading, authStatus } = useAuth();
   const { t } = useLanguage();
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [, setLocation] = useLocation();
 
+  // Redirect to home when user becomes authenticated
+  useEffect(() => {
+    if (user && authStatus === 'authed') {
+      console.log('[Auth] User authenticated, redirecting to /');
+      setLocation("/");
+    }
+  }, [user, authStatus, setLocation]);
+
+  // If still loading auth state, show loading
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#0b1118]">
+        <Loader2 className="h-8 w-8 animate-spin text-cyan-400" />
+      </div>
+    );
+  }
+
   const handleLogin = async () => {
     setIsLoading(true);
     try {
       await signInWithGoogle();
-      setLocation("/");
+      // Don't setLocation here - useEffect above will handle redirect when user state changes
     } catch (error) {
       console.error("Login failed:", error);
       toast.error("Authentication failed. Please try again.");
-    } finally {
       setIsLoading(false);
     }
   };
@@ -41,7 +57,7 @@ export default function Auth() {
       } else {
         await signInWithEmail(email, password);
       }
-      setLocation("/");
+      // Don't setLocation here - useEffect above will handle redirect when user state changes
     } catch (error: any) {
       console.error("Auth failed:", error);
       let message = "Authentication failed.";
@@ -49,8 +65,6 @@ export default function Auth() {
       if (error.code === 'auth/email-already-in-use') message = "Email already registered.";
       if (error.code === 'auth/weak-password') message = "Password is too weak.";
       toast.error(message);
-    } finally {
-      setIsLoading(false);
     }
   };
 
