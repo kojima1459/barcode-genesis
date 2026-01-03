@@ -1,14 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { collection, getDocs, orderBy, query, doc, updateDoc, serverTimestamp } from "firebase/firestore";
-import { Loader2, Swords, Factory, ChevronDown, ChevronRight, ScanBarcode, Star } from "lucide-react";
+import { Loader2, Swords, Factory, ChevronDown, ChevronRight, ScanBarcode, Star, HelpCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserData } from "@/hooks/useUserData";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { GlobalHeader } from "@/components/GlobalHeader";
-import { HelpCircle } from "lucide-react";
 import { getDb } from "@/lib/firebase";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";

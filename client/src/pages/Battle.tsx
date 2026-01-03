@@ -3,15 +3,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
 import { getDb, functions } from "@/lib/firebase";
-import { collection, getDoc, getDocs, query, orderBy, onSnapshot } from "firebase/firestore";
+import { collection, getDoc, getDocs, query, orderBy, onSnapshot, doc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
-import { ArrowLeft, Loader2, Sword, Wifi, Users, X } from "lucide-react";
+import { ArrowLeft, Loader2, Sword, Wifi, Users, X, Zap, Shield, Heart } from "lucide-react";
 import RobotSVG from "@/components/RobotSVG";
 import { ElementalBurst, SkillCutIn } from "@/components/BattleEffects";
 import { Link } from "wouter";
 import { toast } from "sonner";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { RobotData, VariantData, BattleResult, MatchBattleResponse } from "@/types/shared";
+import { RobotData, VariantData, BattleResult, MatchBattleResponse, BattleItemType } from "@/types/shared";
 import ShareButton from "@/components/ShareButton";
 import AdBanner from "@/components/AdBanner";
 import { useSound } from "@/contexts/SoundContext";
@@ -32,7 +32,6 @@ import {
 import { getItemLabel } from "@/lib/items";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { Zap, Shield, Heart } from "lucide-react";
 import { useRobotFx } from "@/hooks/useRobotFx";
 import { AnimatedHPBar } from "@/components/AnimatedHPBar";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -40,8 +39,6 @@ import Interactive from "@/components/ui/interactive";
 import { SystemSkeleton } from "@/components/ui/SystemSkeleton";
 import { CountUp } from "@/components/ui/CountUp";
 import { simulateBattle as simulateTrainingBattle, getTrainingBattleId, normalizeTrainingInput, toBattleRobotData } from "@/lib/battleEngine";
-import { doc } from "firebase/firestore"; // Added doc
-import { BattleItemType } from "@/types/shared"; // Added BattleItemType
 import { levelFromXp } from "@/lib/level";
 import BattleReplay from "@/components/BattleReplay";
 import { useBattleLogic } from "@/hooks/useBattleLogic";

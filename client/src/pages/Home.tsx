@@ -8,10 +8,10 @@ import { getDb, functions } from "@/lib/firebase";
 import { callGenerateRobot } from "@/lib/functions";
 import { httpsCallable } from "firebase/functions";
 import { collection, getDocs } from "firebase/firestore";
-import { Factory, Loader2, Trophy, Zap, ScanBarcode, Swords, ShoppingCart, Activity, Users, Crown } from "lucide-react";
+import { Factory, Loader2, Trophy, Zap, ScanBarcode, Swords, ShoppingCart, Activity, Users, Crown, BookOpen } from "lucide-react";
 import RobotSVG from "@/components/RobotSVG";
 import { toast } from "sonner";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useLanguage } from "@/contexts/LanguageContext";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { useNotification } from "@/hooks/useNotification";
@@ -32,7 +32,6 @@ import { BossAlertCard } from "@/components/BossAlertCard";
 import { MilestoneBossCard } from "@/components/MilestoneBossCard";
 import { WeeklyBossCard } from "@/components/WeeklyBossCard";
 import { cn } from "@/lib/utils";
-import { useLocation } from "wouter";
 import {
   DailyBossData,
   DailyBossResponse,
@@ -41,7 +40,6 @@ import {
   WeeklyBossResponse
 } from "@/types/boss";
 import { GlobalHeader } from "@/components/GlobalHeader";
-import { BookOpen } from "lucide-react";
 
 
 interface Mission {
