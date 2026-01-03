@@ -69,8 +69,8 @@ export function generateEpithet(role: RobotRole, rarity: RobotRarity, seed: numb
         return LEGENDARY_EPITHETS[index];
     }
 
-    // Otherwise use role-based epithets
-    const epithets = EPITHETS_BY_ROLE[role];
+    // Otherwise use role-based epithets (fallback to 'balanced' if role is invalid)
+    const epithets = EPITHETS_BY_ROLE[role] ?? EPITHETS_BY_ROLE['balanced'];
     const index = Math.floor((seed / 1000) % epithets.length);
     return epithets[index];
 }

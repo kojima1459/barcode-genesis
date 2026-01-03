@@ -114,9 +114,13 @@ function AdBannerComponent() {
   useEffect(() => {
     return () => {
       unmountedRef.current = true;
-      if (bannerRef.current) {
-        while (bannerRef.current.firstChild) {
-          safeRemove(bannerRef.current.firstChild);
+      const container = bannerRef.current;
+      if (container && container.isConnected) {
+        try {
+          // Clear children safely
+          container.innerHTML = '';
+        } catch {
+          // Ignore cleanup errors during unmount
         }
       }
     };
