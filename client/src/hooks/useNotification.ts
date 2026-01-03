@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getToken, onMessage } from 'firebase/messaging';
-import { messaging, getDb } from '@/lib/firebase';
+import { getMessaging, getDb } from '@/lib/firebase';
 import { doc, setDoc, arrayUnion } from 'firebase/firestore';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -26,7 +26,12 @@ export const useNotification = () => {
             setPermission(permission);
 
             if (permission === 'granted') {
-                const token = await getToken(messaging, {
+                const msg = getMessaging();
+                if (!msg) {
+                    toast.error("Messaging not supported in this browser");
+                    return;
+                }
+                const token = await getToken(msg, {
                     vapidKey: 'BM_yRswvlq2WqvqQ9g9Qv6XyqLgQ8gQ8gQ8gQ8gQ8gQ8gQ8gQ8g' // Replace with actual Vapid Key if needed, or remove for auto-fetch
                 });
 

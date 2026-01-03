@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useSound } from "@/contexts/SoundContext";
-import { getDb, storage } from "@/lib/firebase";
+import { getDb, getStorage } from "@/lib/firebase";
 // [REFACTOR 1.3] Removed unused import: getDoc
 import { doc, updateDoc, collection, getDocs, query, orderBy } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -118,7 +118,7 @@ export default function Profile() {
       const compressedBlob = await compressImage(file);
       // [REFACTOR 3.3] Removed console.log in production - compression info
 
-      const storageRef = ref(storage, `users/${user.uid}/avatar`);
+      const storageRef = ref(getStorage(), `users/${user.uid}/avatar`);
       await uploadBytes(storageRef, compressedBlob);
       const downloadURL = await getDownloadURL(storageRef);
 

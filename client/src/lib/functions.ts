@@ -1,4 +1,4 @@
-import { auth } from "./firebase";
+import { getAuth } from "./firebase";
 
 // 型定義
 interface GenerateRobotRequest {
@@ -11,7 +11,7 @@ interface GenerateRobotResponse {
 }
 
 export async function callGenerateRobot(barcode: string) {
-    const idToken = await auth.currentUser?.getIdToken();
+    const idToken = await getAuth().currentUser?.getIdToken();
 
     try {
         const response = await fetch('/api/generateRobot', {
