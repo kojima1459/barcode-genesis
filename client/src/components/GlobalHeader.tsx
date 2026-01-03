@@ -93,7 +93,7 @@ export function GlobalHeader({ className, missions }: GlobalHeaderProps) {
                 </div>
             </header>
             {/* Spacer to prevent content overlap */}
-            <div className="h-[var(--header-height)] w-full shrink-0" />
+            <div className="w-full shrink-0" style={{ height: "calc(var(--header-height) + env(safe-area-inset-top))" }} />
         </>
     );
 }
