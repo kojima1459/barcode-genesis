@@ -22,28 +22,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [authStatus, setAuthStatus] = useState<AuthStatus>('loading');
 
   useEffect(() => {
-    // CRITICAL: Use getAuth() to get actual Auth instance, not Proxy
-    const authInstance = getAuth();
-
-    console.log('[AuthContext] Setting up onAuthStateChanged listener...');
-
-    const unsubscribe = onAuthStateChanged(authInstance, (firebaseUser) => {
-      console.log('[AuthContext] onAuthStateChanged fired:', firebaseUser?.uid ?? 'null (guest)');
-
+    console.log("[AuthContext] Setting up onAuthStateChanged listener...");
+    const unsubscribe = onAuthStateChanged(getAuth(), (firebaseUser) => {
+      console.log("[AuthContext] onAuthStateChanged fired:", firebaseUser ? `User authenticated - ${firebaseUser.email}` : "No user authenticated");
       if (firebaseUser) {
         setUser(firebaseUser);
         setAuthStatus('authed');
-        console.log('[AuthContext] User authenticated:', firebaseUser.email);
       } else {
         setUser(null);
         setAuthStatus('guest');
-        console.log('[AuthContext] No user - guest mode');
       }
     });
 
-    // Cleanup properly unsubscribes - StrictMode double-mount is handled by Firebase
     return () => {
-      console.log('[AuthContext] Cleaning up listener');
+      console.log("[AuthContext] Cleaning up listener");
       unsubscribe();
     };
   }, []);

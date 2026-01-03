@@ -34,6 +34,24 @@
         ]
       },
       {
+        "source": "sw.js",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "workbox-*.js",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
         "source": "**",
         "headers": [
           {
@@ -63,7 +81,7 @@
         ]
       },
       {
-        "source": "**/*.@(jpg|jpeg|gif|png|svg|webp|js|css|woff2|webmanifest|ico|mp3)",
+        "source": "**/!(sw|workbox-*).@(jpg|jpeg|gif|png|svg|webp|js|css|woff2|webmanifest|ico|mp3)",
         "headers": [
           {
             "key": "Cache-Control",

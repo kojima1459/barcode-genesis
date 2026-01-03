@@ -206,13 +206,13 @@ function App() {
   return (
     <ErrorBoundary>
       <LanguageProvider>
-        <HelmetProvider>
-          <SoundProvider>
-            <GlobalSoundManager />
-            <ThemeProvider defaultTheme="dark" switchable>
-              <HapticProvider>
-                <TooltipProvider delayDuration={0}>
-                  <AuthProvider>
+        <AuthProvider>
+          <HelmetProvider>
+            <SoundProvider>
+              <GlobalSoundManager />
+              <ThemeProvider defaultTheme="dark" switchable>
+                <HapticProvider>
+                  <TooltipProvider delayDuration={0}>
                     <UserDataProvider>
                       <TutorialProvider>
                         <div className="min-h-screen bg-background text-foreground font-sans selection:bg-neon-cyan/30">
@@ -223,12 +223,12 @@ function App() {
                         </div>
                       </TutorialProvider>
                     </UserDataProvider>
-                  </AuthProvider>
-                </TooltipProvider>
-              </HapticProvider>
-            </ThemeProvider>
-          </SoundProvider>
-        </HelmetProvider>
+                  </TooltipProvider>
+                </HapticProvider>
+              </ThemeProvider>
+            </SoundProvider>
+          </HelmetProvider>
+        </AuthProvider>
       </LanguageProvider>
     </ErrorBoundary>
   );

@@ -16,13 +16,13 @@ export default function Auth() {
   const [password, setPassword] = useState("");
   const [, setLocation] = useLocation();
 
-  // Redirect to home when user becomes authenticated
+  // Redirect if already logged in or after successful login
   useEffect(() => {
-    if (user && authStatus === 'authed') {
-      console.log('[Auth] User authenticated, redirecting to /');
-      setLocation("/");
+    if (authStatus === 'authed' && user) {
+      console.log("[Auth] User authenticated, performing hard redirect to HOME...");
+      window.location.href = "/";
     }
-  }, [user, authStatus, setLocation]);
+  }, [user, authStatus]);
 
   // If still loading auth state, show loading
   if (loading) {
