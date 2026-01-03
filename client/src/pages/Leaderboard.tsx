@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { db } from "@/lib/firebase";
+import { getDb } from "@/lib/firebase";
 import { collectionGroup, getDocs, query, orderBy, limit } from "firebase/firestore";
 import { ArrowLeft, Trophy, Medal, Crown } from "lucide-react";
 import { SystemSkeleton } from "@/components/ui/SystemSkeleton";
@@ -31,7 +31,7 @@ export default function Leaderboard() {
       try {
         // Query all robots ordered by wins descending
         const q = query(
-          collectionGroup(db, "robots"),
+          collectionGroup(getDb(), "robots"),
           orderBy("wins", "desc"),
           limit(20)
         );
@@ -110,7 +110,7 @@ export default function Leaderboard() {
                 {topRobots.map((robot, index) => (
                   <Interactive
                     key={robot.id}
-                    className={`flex items-center p-4 rounded-lg border h-auto ${index < 3 ? 'bg-secondary/10 border-primary/20' : 'bg-card'}`}
+                    className={`flex items - center p - 4 rounded - lg border h - auto ${index < 3 ? 'bg-secondary/10 border-primary/20' : 'bg-card'} `}
                   >
                     <div className="flex items-center justify-center w-12 mr-4">
                       {getRankIcon(index)}

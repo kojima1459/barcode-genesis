@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { db } from '@/lib/firebase';
+import { getDb } from '@/lib/firebase';
 import { collection, getDocs } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -33,7 +33,7 @@ export default function Achievements() {
             if (!user) return;
             try {
                 const querySnapshot = await getDocs(
-                    collection(db, 'users', user.uid, 'achievements')
+                    collection(getDb(), 'users', user.uid, 'achievements')
                 );
                 const data = querySnapshot.docs.map(doc => ({
                     ...doc.data(),

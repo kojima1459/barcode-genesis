@@ -3,7 +3,7 @@
  */
 
 import { BingoCell, checkBingoCondition, getJSTDateKey } from '../../../shared/bingoConditions';
-import { db } from './firebase';
+import { getDb } from './firebase';
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp, arrayUnion } from 'firebase/firestore';
 
 export interface DailyBingoState {
@@ -20,7 +20,7 @@ export interface DailyBingoState {
  */
 export async function getTodayBingoState(userId: string): Promise<DailyBingoState | null> {
     const dateKey = getJSTDateKey();
-    const bingoRef = doc(db, 'users', userId, 'dailyBingo', dateKey);
+    const bingoRef = doc(getDb(), 'users', userId, 'dailyBingo', dateKey);
 
     const snapshot = await getDoc(bingoRef);
     if (snapshot.exists()) {
@@ -53,7 +53,7 @@ export async function checkAndUpdateBingo(
     }
 
     const dateKey = getJSTDateKey();
-    const bingoRef = doc(db, 'users', userId, 'dailyBingo', dateKey);
+    const bingoRef = doc(getDb(), 'users', userId, 'dailyBingo', dateKey);
     const totalCompleted = updatedConditions.filter(c => c.completed).length;
 
     await updateDoc(bingoRef, {

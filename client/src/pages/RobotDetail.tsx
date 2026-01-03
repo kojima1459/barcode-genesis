@@ -9,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import RobotSVG from "@/components/RobotSVG";
 import { useAuth } from "@/contexts/AuthContext";
-import { db, functions } from "@/lib/firebase";
+import { getDb, functions } from "@/lib/firebase";
 import { getItemLabel } from "@/lib/items";
 import { toast } from "sonner";
 import { RobotData } from "@/types/shared";
@@ -104,19 +104,19 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
     const loadRobots = async () => {
       setLoading(true);
       try {
-        const baseRef = doc(db, "users", user.uid, "robots", robotId);
+        const baseRef = doc(getDb(), "users", user.uid, "robots", robotId);
         const baseSnap = await getDoc(baseRef);
         if (!baseSnap.exists()) {
           setBaseRobot(null);
           return;
         }
 
-        const robotsRef = collection(db, "users", user.uid, "robots");
+        const robotsRef = collection(getDb(), "users", user.uid, "robots");
         const robotsQuery = query(robotsRef, orderBy("createdAt", "desc"));
         const robotsSnap = await getDocs(robotsQuery);
         const robotsData = robotsSnap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as RobotData));
 
-        const inventorySnap = await getDocs(collection(db, "users", user.uid, "inventory"));
+        const inventorySnap = await getDocs(collection(getDb(), "users", user.uid, "inventory"));
         const inventoryData: InventoryMap = {};
         inventorySnap.forEach((itemDoc) => {
           const data = itemDoc.data();
@@ -131,7 +131,7 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
 
         // Fetch battle history (from user's battle_logs subcollection if exists)
         try {
-          const battleLogsRef = collection(db, "users", user.uid, "battle_logs");
+          const battleLogsRef = collection(getDb(), "users", user.uid, "battle_logs");
           const battleLogsQuery = query(battleLogsRef, orderBy("createdAt", "desc"));
           const battleLogsSnap = await getDocs(battleLogsQuery);
           const relevantBattles: Array<{ id: string; opponentName: string; won: boolean; date: Date }> = [];

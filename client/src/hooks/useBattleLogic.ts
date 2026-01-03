@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { httpsCallable } from "firebase/functions";
 import { doc, getDoc } from "firebase/firestore";
 import { toast } from "sonner";
-import { db, functions } from "@/lib/firebase";
+import { getDb, functions } from "@/lib/firebase";
 import { RobotData, BattleResult, BattleLog, MatchBattleResponse, BattleItemType } from "@/types/shared";
 import { toBattleRobotData, normalizeTrainingInput, simulateBattle as simulateTrainingBattle, getTrainingBattleId } from "@/lib/battleEngine";
 import { useSound } from "@/contexts/SoundContext";
@@ -165,7 +165,7 @@ export function useBattleLogic({
                 // Fetch Opponent
                 let loadedOpponent: RobotData | null = null;
                 try {
-                    const snap = await getDoc(doc(db, "battles", data.battleId));
+                    const snap = await getDoc(doc(getDb(), "battles", data.battleId));
                     if (snap.exists()) {
                         const d = snap.data() as any;
                         if (d.opponentRobotSnapshot) {

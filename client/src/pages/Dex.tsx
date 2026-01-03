@@ -9,7 +9,7 @@ import { useUserData } from "@/hooks/useUserData";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { GlobalHeader } from "@/components/GlobalHeader";
 import { HelpCircle } from "lucide-react";
-import { db } from "@/lib/firebase";
+import { getDb } from "@/lib/firebase";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -275,7 +275,7 @@ export default function Dex() {
       // Load robots
       setLoadingRobots(true);
       try {
-        const qRobots = query(collection(db, "users", user.uid, "robots"), orderBy("createdAt", "desc"));
+        const qRobots = query(collection(getDb(), "users", user.uid, "robots"), orderBy("createdAt", "desc"));
         const robotSnap = await getDocs(qRobots);
         setRobots(robotSnap.docs.map((d) => ({ id: d.id, ...d.data() } as RobotData)));
       } catch (err) {
@@ -287,7 +287,7 @@ export default function Dex() {
       // Load variants
       setLoadingVariants(true);
       try {
-        const qVariants = query(collection(db, "users", user.uid, "variants"), orderBy("createdAt", "desc"));
+        const qVariants = query(collection(getDb(), "users", user.uid, "variants"), orderBy("createdAt", "desc"));
         const variantSnap = await getDocs(qVariants);
         setVariants(variantSnap.docs.map((d) => ({ id: d.id, ...d.data() } as VariantData)));
       } catch (err) {
@@ -364,7 +364,7 @@ export default function Dex() {
   const handleSetActiveUnit = async (robotId: string) => {
     if (!user) return;
     try {
-      await updateDoc(doc(db, "users", user.uid), {
+      await updateDoc(doc(getDb(), "users", user.uid), {
         activeUnitId: robotId,
         updatedAt: serverTimestamp(),
       });

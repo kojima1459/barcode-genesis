@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getToken, onMessage } from 'firebase/messaging';
-import { messaging, db } from '@/lib/firebase';
+import { messaging, getDb } from '@/lib/firebase';
 import { doc, setDoc, arrayUnion } from 'firebase/firestore';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -42,7 +42,7 @@ export const useNotification = () => {
     };
 
     const saveTokenToDatabase = async (token: string, uid: string) => {
-        const tokenRef = doc(db, 'users', uid, 'fcmTokens', token);
+        const tokenRef = doc(getDb(), 'users', uid, 'fcmTokens', token);
         await setDoc(tokenRef, {
             token,
             createdAt: new Date(),

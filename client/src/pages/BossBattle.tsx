@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
-import { db, functions } from "@/lib/firebase";
+import { getDb, functions } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
 import { collection, getDocs } from "firebase/firestore";
 import { ArrowLeft, Skull, Loader2, Shield, Zap, Trophy, XCircle, RotateCw, ScanBarcode } from "lucide-react";
@@ -82,12 +82,12 @@ export default function BossBattle() {
             setHasScannedToday(bossResponse.hasScannedToday);
 
             // Load robots
-            const robotsSnap = await getDocs(collection(db, "users", user.uid, "robots"));
+            const robotsSnap = await getDocs(collection(getDb(), "users", user.uid, "robots"));
             const robotList = robotsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as RobotData));
             setRobots(robotList);
 
             // Load variants
-            const variantsSnap = await getDocs(collection(db, "users", user.uid, "variants"));
+            const variantsSnap = await getDocs(collection(getDb(), "users", user.uid, "variants"));
             const variantList = variantsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as VariantData));
             setVariants(variantList);
         } catch (error: any) {

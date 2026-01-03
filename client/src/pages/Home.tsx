@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
-import { db, functions } from "@/lib/firebase";
+import { getDb, functions } from "@/lib/firebase";
 import { callGenerateRobot } from "@/lib/functions";
 import { httpsCallable } from "firebase/functions";
 import { collection, getDocs } from "firebase/firestore";
@@ -202,7 +202,7 @@ export default function Home() {
 
     const loadFollowing = async () => {
       try {
-        const followSnap = await getDocs(collection(db, "publicUsers", user.uid, "following"));
+        const followSnap = await getDocs(collection(getDb(), "publicUsers", user.uid, "following"));
         const ids = followSnap.docs.map((docSnap) => docSnap.id);
         setFollowing(ids);
       } catch (error) {
@@ -213,7 +213,7 @@ export default function Home() {
     const loadRobots = async () => {
       setRobotsLoading(true);
       try {
-        const q = collection(db, "users", user.uid, "robots");
+        const q = collection(getDb(), "users", user.uid, "robots");
         const snapshot = await getDocs(q);
         // Simple mapping, might want sorting
         const robotList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as RobotData));
@@ -340,7 +340,7 @@ export default function Home() {
       const follow = httpsCallable(functions, "followUser");
       await follow({ targetUid: followTarget.trim() });
       setFollowTarget("");
-      const followSnap = await getDocs(collection(db, "publicUsers", user.uid, "following"));
+      const followSnap = await getDocs(collection(getDb(), "publicUsers", user.uid, "following"));
       setFollowing(followSnap.docs.map((docSnap) => docSnap.id));
       toast.success("Followed");
     } catch (error) {

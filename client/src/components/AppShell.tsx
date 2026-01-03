@@ -8,7 +8,7 @@ import { BattleIcon, HomeIcon, ShopIcon, ProfileIcon, UnitsIcon } from "@/compon
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserData } from "@/hooks/useUserData";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { db, functions } from "@/lib/firebase";
+import { functions } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { getBadgeLabel } from "@/lib/badges";

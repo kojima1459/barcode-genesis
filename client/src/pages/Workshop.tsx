@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
-import { db, functions } from "@/lib/firebase";
+import { getDb, functions } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
 import { collection, orderBy, query, getDocs } from "firebase/firestore";
 import { ArrowLeft, Loader2, Plus, RefreshCw, AlertCircle, Trash2 } from "lucide-react";
@@ -69,7 +69,7 @@ export default function Workshop() {
         setLoadingVariants(true);
 
         try {
-            const robotsQuery = query(collection(db, "users", user.uid, "robots"), orderBy("createdAt", "desc"));
+            const robotsQuery = query(collection(getDb(), "users", user.uid, "robots"), orderBy("createdAt", "desc"));
             const robotSnap = await getDocs(robotsQuery);
             setRobots(robotSnap.docs.map(d => ({ id: d.id, ...d.data() } as RobotData)));
         } catch (error) {
@@ -80,7 +80,7 @@ export default function Workshop() {
         }
 
         try {
-            const variantsQuery = query(collection(db, "users", user.uid, "variants"), orderBy("createdAt", "desc"));
+            const variantsQuery = query(collection(getDb(), "users", user.uid, "variants"), orderBy("createdAt", "desc"));
             const variantSnap = await getDocs(variantsQuery);
             setVariants(variantSnap.docs.map(d => ({ id: d.id, ...d.data() } as VariantData)));
         } catch (error) {

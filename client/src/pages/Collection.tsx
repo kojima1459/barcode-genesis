@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
-import { db } from "@/lib/firebase";
+import { getDb } from "@/lib/firebase";
 import { collection, query, getDocs, orderBy } from "firebase/firestore";
 import { ArrowLeft, Loader2, Filter } from "lucide-react";
 import RobotSVG from "@/components/RobotSVG";
@@ -75,7 +75,7 @@ export default function Collection() {
       if (!user) return;
 
       try {
-        const robotsRef = collection(db, "users", user.uid, "robots");
+        const robotsRef = collection(getDb(), "users", user.uid, "robots");
         const q = query(robotsRef, orderBy("createdAt", "desc"));
         const querySnapshot = await getDocs(q);
 

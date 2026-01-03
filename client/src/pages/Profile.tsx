@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useSound } from "@/contexts/SoundContext";
-import { db, storage } from "@/lib/firebase";
+import { getDb, storage } from "@/lib/firebase";
 // [REFACTOR 1.3] Removed unused import: getDoc
 import { doc, updateDoc, collection, getDocs, query, orderBy } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -51,7 +51,7 @@ export default function Profile() {
     const fetchRobots = async () => {
       if (!user) return;
       try {
-        const q = query(collection(db, "users", user.uid, "robots"), orderBy("createdAt", "desc"));
+        const q = query(collection(getDb(), "users", user.uid, "robots"), orderBy("createdAt", "desc"));
         const snapshot = await getDocs(q);
         const robotData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as RobotData));
         setRobots(robotData);
@@ -80,7 +80,7 @@ export default function Profile() {
     }
 
     try {
-      await updateDoc(doc(db, "users", user.uid), {
+      await updateDoc(doc(getDb(), "users", user.uid), {
         displayName: trimmedName
       });
       // useUserData will auto-update
@@ -122,7 +122,7 @@ export default function Profile() {
       await uploadBytes(storageRef, compressedBlob);
       const downloadURL = await getDownloadURL(storageRef);
 
-      await updateDoc(doc(db, "users", user.uid), {
+      await updateDoc(doc(getDb(), "users", user.uid), {
         photoURL: downloadURL
       });
 

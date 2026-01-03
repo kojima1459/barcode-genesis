@@ -9,7 +9,7 @@ import { CountUp } from "@/components/ui/CountUp";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { db, functions } from "@/lib/firebase";
+import { getDb, functions } from "@/lib/firebase";
 import { SHOP_ITEMS, ShopItemCategory, getCategoryLabel, getItemLabel, getItemDescription } from "@/lib/items";
 import { PRODUCTS } from "../../../shared/products";
 import { toast } from "sonner";
@@ -66,7 +66,7 @@ export default function Shop() {
       }
 
       try {
-        const inventorySnap = await getDocs(collection(db, "users", user.uid, "inventory"));
+        const inventorySnap = await getDocs(collection(getDb(), "users", user.uid, "inventory"));
         const nextInventory: InventoryMap = {};
         inventorySnap.forEach((itemDoc) => {
           const data = itemDoc.data();

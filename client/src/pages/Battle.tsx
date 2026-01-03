@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
-import { db, functions } from "@/lib/firebase";
+import { getDb, functions } from "@/lib/firebase";
 import { collection, getDoc, getDocs, query, orderBy, onSnapshot } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { ArrowLeft, Loader2, Sword, Wifi, Users, X } from "lucide-react";
@@ -159,9 +159,9 @@ export default function Battle() {
       }
       try {
         const [robotsSnap, variantsSnap, userDoc] = await Promise.all([
-          getDocs(query(collection(db, "users", user.uid, "robots"), orderBy("createdAt", "desc"))),
-          getDocs(query(collection(db, "users", user.uid, "variants"), orderBy("createdAt", "desc"))),
-          getDoc(doc(db, "users", user.uid))
+          getDocs(query(collection(getDb(), "users", user.uid, "robots"), orderBy("createdAt", "desc"))),
+          getDocs(query(collection(getDb(), "users", user.uid, "variants"), orderBy("createdAt", "desc"))),
+          getDoc(doc(getDb(), "users", user.uid))
         ]);
 
         const robotList = robotsSnap.docs.map(snap => ({ id: snap.id, ...snap.data() } as RobotData));
