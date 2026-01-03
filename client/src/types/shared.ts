@@ -180,16 +180,33 @@ export interface BattleLog {
     specialApplied?: boolean;
     specialType?: PhaseBSpecialType;
     specialMessage?: string;
-    specialTriggered?: boolean;  // Added for battleFx.ts
-    finisherApplied?: boolean;   // Added for battleFx.ts
+    specialTriggered?: boolean;
+    specialRoleName?: string;
+    specialName?: string;
+    specialImpact?: string;  // Display text like "1200ダメージ!"
+    specialHits?: number;
+    finisherApplied?: boolean;
+    finisherMultiplier?: number;
 
     // Boss Battle specific
-    bossShieldBroken?: boolean;  // Added for battleFx.ts
+    bossShieldBroken?: boolean;
+    bossShieldRemaining?: number;
 
-    // Stance System (battleLogToEvents.ts)
+    // Stance System
     stanceAttacker?: string;
     stanceDefender?: string;
     stanceOutcome?: 'WIN' | 'LOSE' | 'DRAW';
+    stanceMultiplier?: number;
+
+    // Overdrive System
+    overdriveTriggered?: boolean;
+    overdriveMessage?: string;
+    attackerOverdriveGauge?: number;
+    defenderOverdriveGauge?: number;
+
+    // Sudden Death System
+    suddenDeathTick?: number;
+    suddenDeathDamage?: number;
 
     // Phase B: Level Bonus (for transparency)
     levelBonus?: {
@@ -208,6 +225,7 @@ export interface BattleItemInput {
 }
 
 export interface BattleResult {
+    battleId?: string;  // Added for BattleReplay confetti seed
     winnerId: string;
     loserId: string;
     logs: BattleLog[];

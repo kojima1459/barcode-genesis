@@ -1,11 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 
-type SoundType = 'bgm_menu' | 'bgm_battle' | 'se_click' | 'se_scan' | 'se_attack' | 'se_win' | 'se_lose' | 'se_levelup' | 'se_equip' | 'se_reveal' | 'se_rare' | 'se_hit_heavy' | 'se_hit_light' | 'se_miss';
+type SoundType = 'bgm_menu' | 'bgm_battle' | 'se_click' | 'se_scan' | 'se_attack' | 'se_win' | 'se_lose' | 'se_levelup' | 'se_equip' | 'se_reveal' | 'se_rare' | 'se_hit_heavy' | 'se_hit_light' | 'se_miss' | 'se_battle_start';
 
 interface SoundContextType {
   playBGM: (type: 'bgm_menu' | 'bgm_battle') => void;
   stopBGM: () => void;
-  playSE: (type: 'se_click' | 'se_scan' | 'se_attack' | 'se_win' | 'se_lose' | 'se_levelup' | 'se_equip' | 'se_reveal' | 'se_rare' | 'se_hit_heavy' | 'se_hit_light' | 'se_miss') => void;
+  playSE: (type: 'se_click' | 'se_scan' | 'se_attack' | 'se_win' | 'se_lose' | 'se_levelup' | 'se_equip' | 'se_reveal' | 'se_rare' | 'se_hit_heavy' | 'se_hit_light' | 'se_miss' | 'se_battle_start') => void;
   volume: number;
   setVolume: (volume: number) => void;
   isMuted: boolean;
@@ -38,6 +38,7 @@ export function SoundProvider({ children }: { children: React.ReactNode }) {
     se_hit_heavy: '/sfx/hit_heavy.mp3',
     se_hit_light: '/sfx/hit_light.mp3',
     se_miss: '/sfx/attack.mp3',
+    se_battle_start: '/sfx/scan.mp3',
   };
 
   // 初期化時にSEをプリロード
@@ -96,7 +97,7 @@ export function SoundProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const playSE = (type: 'se_click' | 'se_scan' | 'se_attack' | 'se_win' | 'se_lose' | 'se_levelup' | 'se_equip' | 'se_reveal' | 'se_rare' | 'se_hit_heavy' | 'se_hit_light' | 'se_miss') => {
+  const playSE = (type: 'se_click' | 'se_scan' | 'se_attack' | 'se_win' | 'se_lose' | 'se_levelup' | 'se_equip' | 'se_reveal' | 'se_rare' | 'se_hit_heavy' | 'se_hit_light' | 'se_miss' | 'se_battle_start') => {
     const audio = seRefs.current.get(type);
     if (audio) {
       audio.currentTime = 0;

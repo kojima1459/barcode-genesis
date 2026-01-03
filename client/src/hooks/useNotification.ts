@@ -58,7 +58,9 @@ export const useNotification = () => {
     // Listen for foreground messages
     useEffect(() => {
         if (permission === 'granted') {
-            const unsubscribe = onMessage(messaging, (payload) => {
+            const msg = getMessaging();
+            if (!msg) return;
+            const unsubscribe = onMessage(msg, (payload) => {
                 console.log('Foreground Message:', payload);
                 toast(payload.notification?.title || 'New Message', {
                     description: payload.notification?.body,

@@ -86,7 +86,7 @@ export async function generateImageFromElement(
  */
 export function canShareFiles(): boolean {
     try {
-        return !!(navigator.share && navigator.canShare);
+        return typeof navigator.share === 'function' && typeof navigator.canShare === 'function';
     } catch (error) {
         console.warn('[Share] Error checking share capabilities:', error);
         return false;

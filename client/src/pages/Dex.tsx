@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { collection, getDocs, orderBy, query, doc, updateDoc, serverTimestamp } from "firebase/firestore";
-import { Loader2, Swords, Factory, ChevronDown, ChevronRight, ScanBarcode, Star, HelpCircle } from "lucide-react";
+import { Loader2, Swords, Factory, ChevronDown, ChevronRight, ScanBarcode, Star, HelpCircle, Filter } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 import { useAuth } from "@/contexts/AuthContext";

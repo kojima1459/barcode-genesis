@@ -49,8 +49,10 @@ export interface ButtonProps
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, onClick, ...props }, ref) => {
     // Use try-catch pattern to handle cases where Button is used outside providers
-    let triggerHaptic: (type: string) => void = () => { };
-    let playSE: (type: string) => void = () => { };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let triggerHaptic: (type: any) => void = () => { };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let playSE: (type: any) => void = () => { };
 
     try {
       const hapticContext = useHaptic();

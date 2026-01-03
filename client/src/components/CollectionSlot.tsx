@@ -1,12 +1,12 @@
 import { memo } from "react";
 import { motion } from "framer-motion";
 import RobotSVG from "@/components/RobotSVG";
-import { RobotData, RobotRole } from "@/types/shared";
+import { RobotData } from "@/types/shared";
 import { Badge } from "@/components/ui/badge";
 import { getRarityLabel } from "@/lib/rarity";
 
 interface CollectionSlotProps {
-    role: RobotRole;
+    role: string;  // Can be dexRegistry.RobotRole or shared.RobotRole
     rarity: number; // 1-5
     robot?: RobotData;
     unlocked: boolean;

@@ -58,7 +58,7 @@ export function AnimatedHPBar({
         }
     };
 
-    const getPulseAnimation = (percent: number) => {
+    const getPulseAnimation = (percent: number): { scale?: number[]; transition?: { duration: number; repeat: number; ease: string } } => {
         if (percent <= 20 && !prefersReducedMotion) {
             return {
                 scale: [1, 1.02, 1],
@@ -69,7 +69,7 @@ export function AnimatedHPBar({
                 }
             };
         }
-        return {};
+        return { scale: undefined, transition: undefined };
     };
 
     return (
@@ -118,9 +118,11 @@ export function AnimatedHPBar({
                         width: `${hpPercent}%`,
                     }}
                     initial={false}
-                    animate={{
-                        ...getPulseAnimation(hpPercent)
-                    }}
+                    // @ts-expect-error framer-motion type issue with conditional animation
+                    animate={getPulseAnimation(hpPercent).scale ? {
+                        scale: getPulseAnimation(hpPercent).scale,
+                        transition: getPulseAnimation(hpPercent).transition
+                    } : undefined}
                 >
                     {/* Holographic Shine Effect */}
                     <motion.div

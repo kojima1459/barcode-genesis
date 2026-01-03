@@ -44,10 +44,10 @@ import { GlobalHeader } from "@/components/GlobalHeader";
 
 interface Mission {
   id: string;
-  title?: string;
-  progress?: number;
-  target?: number;
-  claimed?: boolean;
+  title: string;
+  progress: number;
+  target: number;
+  claimed: boolean;
   rewardCredits?: number;
 }
 
@@ -171,7 +171,7 @@ export default function Home() {
     // Play welcome BGM (bgm_menu contains the voice) only once per session
     const hasPlayedWelcome = sessionStorage.getItem(`welcome_played_${user.uid}`);
     if (!hasPlayedWelcome) {
-      playBGM('bgm_menu', false); // Play without loop to avoid repeating voice
+      playBGM('bgm_menu'); // Play once
       sessionStorage.setItem(`welcome_played_${user.uid}`, 'true');
     }
   }, [user, playBGM]);
@@ -286,7 +286,7 @@ export default function Home() {
       const data = result.data as { claimed?: boolean; streak?: number; creditsGained?: number; newBadges?: string[] };
       if (data?.claimed) {
         if (typeof data.streak === "number") {
-          setLoginStreak(data.streak);
+          // loginStreak is read from useUserData() which auto-refreshes
         }
         toast.success("ログインボーナス獲得！");
         setHasClaimed(true);
@@ -314,7 +314,7 @@ export default function Home() {
       const claim = httpsCallable(functions, "claimMissionReward");
       const result = await claim({ dateKey: missionDateKey, missionId });
       const data = result.data as { credits: number; missionId: string };
-      setCredits(data.credits);
+      // credits is read from useUserData() which auto-refreshes
       setMissions((prev) =>
         prev.map((mission) =>
           mission.id === missionId ? { ...mission, claimed: true } : mission

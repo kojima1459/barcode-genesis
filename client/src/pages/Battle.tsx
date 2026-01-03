@@ -128,7 +128,7 @@ export default function Battle() {
 
   const selectedVariant = variants.find(v => v.id === selectedRobotId);
   const myRobot = robots.find(r => r.id === selectedRobotId)
-    || (selectedVariant ? { ...selectedVariant, name: selectedVariant.name || `Variant ${selectedRobotId?.slice(0, 4)}` } as RobotData : null)
+    || (selectedVariant ? { ...selectedVariant, name: selectedVariant.name || `Variant ${selectedRobotId?.slice(0, 4)}`, rarityName: 'Fusion', baseHp: 100, baseAttack: 50, baseDefense: 50, baseSpeed: 50 } as unknown as RobotData : null)
     || battleResult?.resolvedPlayerRobot;
 
   // Use hook's resolved enemy if battling, otherwise use selection from training list or default logic
@@ -728,10 +728,10 @@ export default function Battle() {
         )}
 
         <AnimatePresence>
-          {activeCutIn && (
+          {activeCutIn && myRobot && (
             <SkillCutIn
               skillName={activeCutIn.skillName}
-              robot={activeCutIn.robotId === myRobot.id ? myRobot : enemyRobot}
+              robot={activeCutIn.robotId === myRobot.id ? myRobot : (enemyRobot ?? myRobot)}
               onComplete={() => { }} // Controlled by parent timeout, empty callback fine
             />
           )}

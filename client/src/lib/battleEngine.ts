@@ -114,7 +114,7 @@ export interface BattleLog {
     specialTriggered?: boolean;
     specialName?: string;
     specialRoleName?: string;
-    specialImpact?: string;
+    specialImpact?: string;  // Display text like "1200ダメージ!"
     specialHits?: number;
 }
 
