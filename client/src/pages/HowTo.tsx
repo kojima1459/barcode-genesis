@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { ArrowLeft, ScanLine, Swords, Factory, HelpCircle } from "lucide-react";
+import { ArrowLeft, ScanLine, Swords, Factory, HelpCircle, Layers, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import SEO from "@/components/SEO";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -123,6 +123,63 @@ export default function HowTo() {
                   {t('units')}
                 </Button>
               </Link>
+            </div>
+          </div>
+        </TechCard>
+
+        {/* Enhancement Features */}
+        <TechCard
+          header={
+            <div className="flex items-center gap-2 text-neon-green">
+              <Layers className="h-5 w-5" />
+              {t('howto_enhance_title')}
+            </div>
+          }
+        >
+          <div className="space-y-4 text-sm text-muted-foreground">
+            <p>{t('howto_enhance_desc')}</p>
+            <div className="space-y-3">
+              <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+                <div className="font-semibold text-neon-cyan text-xs">{t('howto_synthesis_title')}</div>
+                <div className="text-xs mt-1">{t('howto_synthesis_desc')}</div>
+              </div>
+              <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+                <div className="font-semibold text-neon-orange text-xs">{t('howto_evolution_title')}</div>
+                <div className="text-xs mt-1">{t('howto_evolution_desc')}</div>
+              </div>
+              <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+                <div className="font-semibold text-neon-purple text-xs">{t('howto_workshop_title')}</div>
+                <div className="text-xs mt-1">{t('howto_workshop_desc')}</div>
+              </div>
+            </div>
+            <p className="text-xs bg-accent/10 border border-accent/20 rounded-lg p-2">{t('howto_enhance_tip')}</p>
+          </div>
+        </TechCard>
+
+        {/* Level Up Methods */}
+        <TechCard
+          header={
+            <div className="flex items-center gap-2 text-neon-cyan">
+              <TrendingUp className="h-5 w-5" />
+              {t('howto_levelup_title')}
+            </div>
+          }
+        >
+          <div className="space-y-4 text-sm text-muted-foreground">
+            <p>{t('howto_levelup_desc')}</p>
+            <div className="space-y-3">
+              <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-3">
+                <div className="font-semibold text-green-400 text-xs flex items-center gap-1">✅ {t('howto_battle_title')}</div>
+                <div className="text-xs mt-1">{t('howto_battle_xp')}</div>
+              </div>
+              <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-3">
+                <div className="font-semibold text-green-400 text-xs flex items-center gap-1">✅ {t('howto_synthesis_title')}</div>
+                <div className="text-xs mt-1">{t('howto_synthesis_xp')}</div>
+              </div>
+              <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3">
+                <div className="font-semibold text-yellow-400 text-xs">{t('howto_training_title')}</div>
+                <div className="text-xs mt-1">{t('howto_training_warn')}</div>
+              </div>
             </div>
           </div>
         </TechCard>

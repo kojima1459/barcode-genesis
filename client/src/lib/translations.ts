@@ -628,6 +628,26 @@ export const translations = {
     failed_load_workshop: "工房データの読み込みに失敗しました",
     failed_load_robot_detail: "ロボット詳細の読み込みに失敗しました",
     failed_logout: "ログアウトに失敗しました",
+
+    // HowTo: Enhancement Features
+    howto_enhance_title: "強化機能の違い",
+    howto_enhance_desc: "ロボットの強化には3つの方法があります。用途に応じて使い分けましょう。",
+    howto_synthesis_title: "合成 (Synthesis)",
+    howto_synthesis_desc: "不要なロボットを素材にしてXP（経験値）を獲得。レベルアップで工房上限も増加。",
+    howto_evolution_title: "進化 (Evolution)",
+    howto_evolution_desc: "同じカテゴリのロボット2体を消費して★ランクを上げ、基礎ステータスを底上げ。",
+    howto_workshop_title: "工房 (Workshop)",
+    howto_workshop_desc: "2体のパーツを組み合わせて新しい見た目（バリアント）を作成。親は消えません。",
+    howto_enhance_tip: "💡 工房が満杯になったら、合成でレベルを上げると上限が解放されます。",
+
+    // HowTo: Level Up Methods
+    howto_levelup_title: "レベルの上げ方",
+    howto_levelup_desc: "ユーザーレベルを上げる方法は2つあります。",
+    howto_battle_title: "対戦バトル",
+    howto_battle_xp: "敵に勝つとXPとクレジットを獲得。負けても少しもらえます。",
+    howto_synthesis_xp: "不要なロボを素材にしてXPを獲得。バトルせず効率的にレベルアップ。",
+    howto_training_title: "訓練モード",
+    howto_training_warn: "⚠️ 訓練は自分のロボ同士で練習するモードです。XP・クレジットは獲得できません。",
   },
   en: {
     // Common
@@ -1064,5 +1084,25 @@ export const translations = {
     scan_limit_upgrade: "Would you like to upgrade to remove this limit?",
     view_premium: "View Premium Plans",
     close: "Close",
+
+    // HowTo: Enhancement Features
+    howto_enhance_title: "Enhancement Features",
+    howto_enhance_desc: "There are 3 ways to power up your robots. Use them based on your needs.",
+    howto_synthesis_title: "Synthesis",
+    howto_synthesis_desc: "Use spare robots as materials to gain XP. Level up to expand workshop capacity.",
+    howto_evolution_title: "Evolution",
+    howto_evolution_desc: "Consume 2 robots of the same category to increase ★ rank and boost base stats.",
+    howto_workshop_title: "Workshop",
+    howto_workshop_desc: "Combine 2 robots to create a new look (Variant). Parents are NOT consumed.",
+    howto_enhance_tip: "💡 If workshop is full, level up via Synthesis to expand capacity.",
+
+    // HowTo: Level Up Methods
+    howto_levelup_title: "How to Level Up",
+    howto_levelup_desc: "There are 2 ways to gain user XP.",
+    howto_battle_title: "PvP Battle",
+    howto_battle_xp: "Win battles to earn XP and credits. You get a small amount even if you lose.",
+    howto_synthesis_xp: "Use spare robots as materials to gain XP. Efficient leveling without battles.",
+    howto_training_title: "Training Mode",
+    howto_training_warn: "⚠️ Training is practice between your own robots. NO XP or credits are awarded.",
   }
 };
