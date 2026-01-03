@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { ArrowLeft, ScanLine, Swords, Factory, HelpCircle, Layers, TrendingUp } from "lucide-react";
+import { ArrowLeft, ScanLine, Swords, Factory, HelpCircle, Layers, TrendingUp, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import SEO from "@/components/SEO";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -184,6 +184,20 @@ export default function HowTo() {
           </div>
         </TechCard>
 
+        {/* Workshop Expansion */}
+        <TechCard
+          header={
+            <div className="flex items-center gap-2 text-yellow-500">
+              <Trophy className="h-5 w-5" />
+              {t('howto_expansion_title')}
+            </div>
+          }
+        >
+          <div className="space-y-2 text-sm text-muted-foreground">
+            <p>{t('howto_expansion_desc')}</p>
+          </div>
+        </TechCard>
+
         {/* FAQ Section */}
         <TechCard
           header={
@@ -209,6 +223,6 @@ export default function HowTo() {
           </div>
         </TechCard>
       </main>
-    </div>
+    </div >
   );
 }

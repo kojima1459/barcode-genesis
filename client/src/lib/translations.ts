@@ -658,6 +658,10 @@ export const translations = {
     robot_detail_variant_success: "バリアントを作成しました！",
     robot_detail_variant_full: "工房が満杯です。レベルを上げて上限を解放してください。",
     robot_detail_capacity: "工房容量",
+
+    // HowTo: Workshop Expansion
+    howto_expansion_title: "工房の拡張（昇進試験）",
+    howto_expansion_desc: "レベルが一定に達するとホーム画面に「昇進試験」が発生。ボスを倒すと工房の上限が増えます。",
   },
   en: {
     // Common
@@ -1124,5 +1128,9 @@ export const translations = {
     robot_detail_variant_success: "Variant created!",
     robot_detail_variant_full: "Workshop is full. Level up to expand capacity.",
     robot_detail_capacity: "Workshop Capacity",
+
+    // HowTo: Workshop Expansion
+    howto_expansion_title: "Workshop Expansion (Promotion Exam)",
+    howto_expansion_desc: "Reach certain levels to unlock 'Promotion Exam' on Home. Defeat the boss to increase workshop capacity.",
   }
 };
