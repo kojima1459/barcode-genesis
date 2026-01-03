@@ -108,7 +108,7 @@ export default function Workshop() {
         const b = params.get("b") ?? sessionStorage.getItem("workshopParentB");
         if (a) setRobotAId(a);
         if (b) setRobotBId(b);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+         
     }, [user]);
 
     // Keep Dex navigation state in sync

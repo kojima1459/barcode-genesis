@@ -41,7 +41,7 @@ const useVersionCheck = () => {
       // Unregister all service workers
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.getRegistrations().then(function (registrations) {
-          for (let registration of registrations) {
+          for (const registration of registrations) {
             registration.unregister();
             console.log('[VersionCheck] Unregistered SW:', registration.scope);
           }
@@ -51,7 +51,7 @@ const useVersionCheck = () => {
       // IMPORTANT: Also clear all caches (SW may have cached old bundles)
       if ('caches' in window) {
         caches.keys().then(function (names) {
-          for (let name of names) {
+          for (const name of names) {
             caches.delete(name);
             console.log('[VersionCheck] Deleted cache:', name);
           }

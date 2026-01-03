@@ -77,7 +77,7 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
       // PHASE 2: Native BarcodeDetector API (OS Level)
       if ('BarcodeDetector' in window) {
         try {
-          // @ts-ignore
+          // @ts-expect-error - Quagga typings incomplete
           const detector = new BarcodeDetector({
             formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39']
           });

@@ -84,7 +84,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     };
 
     return (
-      // @ts-ignore
+      // @ts-expect-error - Radix Slot typing conflict with motion
       <Comp
         data-slot="button"
         className={cn(buttonVariants({ variant, size, className }))}

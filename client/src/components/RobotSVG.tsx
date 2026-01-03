@@ -61,31 +61,29 @@ function RobotSVGComponent({
   rarityEffect,
   role
 }: RobotSVGProps) {
-  // Defensive check: If parts is invalid, render nothing
-  if (!parts || typeof parts !== 'object') {
-    return null;
-  }
+  // ===== HOOKS MUST BE CALLED FIRST (before any early returns) =====
+  // Use fallback empty object if parts is invalid - actual check happens after hooks
+  const safeParts = (parts && typeof parts === 'object') ? parts : {
+    head: 1, face: 1, body: 1, armLeft: 1, armRight: 1, legLeft: 1, legRight: 1, backpack: 1, weapon: 1, accessory: 1
+  };
 
   const isLite = simplified || size < 100;
 
-
   // Use fx.variant/nonce if available
-  /* logic already added previously */
   const activeVariant = fx ? fx.variant : variant;
   const activeNonce = fx ? fx.nonce : 0;
 
   const shouldAnimate = !isLite && animate;
 
-
   // Generate a deterministic seed from parts for style consistencies
-  const seed = useMemo(() => getRobotSeed(parts), [parts]);
+  const seed = useMemo(() => getRobotSeed(safeParts), [safeParts]);
   const tier = useMemo<RarityTier>(() => getRarityTier(seed), [seed]);
   const motif = useMemo<Motif>(() => getMotif(seed), [seed]);
 
   // Stable ID for gradients/filters
   const instanceId = useMemo(() => `mech-${seed}-${variantKey}`, [seed, variantKey]);
 
-  // Color Mapping: Use props.colors if valid, else fall back (though generateRobot always provides them now)
+  // Color Mapping: Use props.colors if valid, else fall back
   const colorTokens = useMemo(() => {
     if (colors && colors.primary) {
       return {
@@ -93,7 +91,7 @@ function RobotSVGComponent({
         subColor: colors.secondary,
         accentColor: colors.accent,
         sensorColor: colors.glow,
-        highlightColor: isRareVariant ? colors.glow : colors.accent, // Type B shines more
+        highlightColor: isRareVariant ? colors.glow : colors.accent,
       };
     }
     // Fallback legacy logic
@@ -106,7 +104,6 @@ function RobotSVGComponent({
       ? pickFromPalette(aceAccentPalette, seed, 23)
       : pickFromPalette(massAccentPalette, seed, 23);
     const sensorColor = pickFromPalette(sensorPalette, seed, 11);
-    const highlightColor = "#F5D24B";
     return {
       mainColor,
       subColor,
@@ -117,41 +114,45 @@ function RobotSVGComponent({
   }, [colors, seed, tier, isRareVariant]);
 
   const activeGlow = colorTokens.sensorColor;
-  const accentColor = colorTokens.accentColor; // For decals
+  const accentColor = colorTokens.accentColor;
   const { mainColor, subColor, highlightColor } = colorTokens;
 
   // Phase B: Role-based Visual Diversity
-  // Scale and proportions based on role
   const roleTransform = useMemo(() => {
     if (!role) return '';
     const r = role.toLowerCase();
 
     if (r === 'tank') {
-      // Wider, shorter, heavier
       return 'translate(100, 100) scale(1.15, 0.95) translate(-100, -100)';
     }
     if (r === 'speed') {
-      // Thinner, taller, streamlined
       return 'translate(100, 100) scale(0.9, 1.05) translate(-100, -100)';
     }
     if (r === 'striker') {
-      // Slightly larger/aggressive
       return 'translate(100, 100) scale(1.05) translate(-100, -100)';
     }
     if (r === 'support') {
-      // Compact
       return 'translate(100, 100) scale(0.95) translate(-100, -100)';
     }
     return '';
   }, [role]);
 
   // Phase B: Legendary Aura logic
-  // If rarityEffect is 'legendary', use a golden/rainbow aura
   const effectiveAura = useMemo(() => {
     if (rarityEffect === 'legendary') return 'legendary';
     if (rarityEffect === 'rare') return 'rare';
     return 'none';
   }, [rarityEffect]);
+
+  // ===== NOW SAFE TO DO EARLY RETURN (after all hooks) =====
+  // Defensive check: If parts is invalid, render nothing
+  if (!parts || typeof parts !== 'object') {
+    return null;
+  }
+
+  // Use the safe parts for rendering (same reference if valid)
+  const renderParts = safeParts;
+
   const { aura = 'none', decal = 'none', eyeGlow = 'normal' } = visuals || {};
 
 

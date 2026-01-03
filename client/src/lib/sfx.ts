@@ -135,7 +135,7 @@ export function setMuted(muted: boolean): void {
     // Persist to localStorage
     try {
         localStorage.setItem('sfx_muted', muted ? '1' : '0');
-    } catch { }
+    } catch { /* ignore storage errors */ }
 }
 
 /**

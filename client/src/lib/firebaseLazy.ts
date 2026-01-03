@@ -38,8 +38,8 @@ let storageInstance: FirebaseStorage | null = null;
 let googleProviderInstance: GoogleAuthProviderType | null = null;
 
 // Initialization flag to prevent multiple initializations
-let isInitializing = false;
-let initPromise: Promise<void> | null = null;
+const isInitializing = false;
+const initPromise: Promise<void> | null = null;
 
 /**
  * Initialize Firebase app (lazy, singleton)

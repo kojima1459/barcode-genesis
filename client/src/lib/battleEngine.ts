@@ -719,8 +719,8 @@ export const simulateBattle = (
     let p2Stunned = false;
 
     // Special Move System: Initialize state (once per battle)
-    let p1SpecialUsed = false;
-    let p2SpecialUsed = false;
+    const p1SpecialUsed = false;
+    const p2SpecialUsed = false;
     const p1SpecialRequested = !!specialInput?.p1Used;
     const p2SpecialRequested = !!specialInput?.p2Used;
 
