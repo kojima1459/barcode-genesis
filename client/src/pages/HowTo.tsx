@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { ArrowLeft, ScanLine, Swords, Factory, HelpCircle, Layers, TrendingUp, Trophy } from "lucide-react";
+import { ArrowLeft, ScanLine, Swords, Factory, HelpCircle, Layers, TrendingUp, Trophy, ScanBarcode } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import SEO from "@/components/SEO";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -52,109 +52,166 @@ export default function HowTo() {
         </TechCard>
 
         {/* STEP 1: Scan & Generate */}
-        <TechCard
-          header={
-            <div className="flex items-center gap-2 text-neon-cyan">
-              <ScanLine className="h-5 w-5" />
-              {t('howto_step1_title')}
+        <div className="relative overflow-hidden rounded-xl border border-cyan-500/30 bg-black/40 backdrop-blur-sm group hover:border-cyan-500/50 transition-all">
+          <div className="absolute inset-0 bg-linear-to-br from-cyan-900/20 to-transparent opacity-50" />
+          <ScanBarcode className="absolute -right-8 -bottom-8 w-48 h-48 text-cyan-500/5 rotate-[-15deg] group-hover:scale-105 transition-transform duration-700" />
+
+          <div className="relative p-5 z-10">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-lg bg-cyan-500/20 flex items-center justify-center border border-cyan-500/50 shadow-[0_0_10px_rgba(6,182,212,0.3)]">
+                <ScanLine className="w-5 h-5 text-cyan-400" />
+              </div>
+              <h2 className="text-xl font-bold italic text-white font-orbitron tracking-wide">
+                STEP 01 <span className="text-cyan-400 not-italic ml-2 text-base font-sans">{t('howto_step1_title')}</span>
+              </h2>
             </div>
-          }
-        >
-          <div className="space-y-4 text-sm text-muted-foreground">
-            <p>{t('howto_step1_desc')}</p>
-            <ul className="list-disc list-inside space-y-1 pl-2 text-xs">
-              <li>{t('howto_step1_note1')}</li>
-              <li>{t('howto_step1_note2')}</li>
-            </ul>
-            <Link href="/scan">
-              <Button className="w-full bg-accent text-background hover:bg-accent/90 mt-2">
-                {t('scan_barcode')}
-              </Button>
-            </Link>
+
+            <div className="space-y-4 text-sm text-gray-300 pl-1">
+              <p>{t('howto_step1_desc')}</p>
+              <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-cyan-200/80">
+                <li className="flex items-start gap-2 bg-cyan-950/30 p-2 rounded border border-cyan-500/10">
+                  <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 mt-1 shrink-0" />
+                  {t('howto_step1_note1')}
+                </li>
+                <li className="flex items-start gap-2 bg-cyan-950/30 p-2 rounded border border-cyan-500/10">
+                  <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 mt-1 shrink-0" />
+                  {t('howto_step1_note2')}
+                </li>
+              </ul>
+              <Link href="/scan">
+                <Button className="w-full bg-linear-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 text-white font-bold tracking-wider shadow-[0_0_15px_rgba(6,182,212,0.4)] border-none mt-2 h-10">
+                  {t('scan_barcode')}
+                </Button>
+              </Link>
+            </div>
           </div>
-        </TechCard>
+        </div>
 
         {/* STEP 2: Battle */}
-        <TechCard
-          header={
-            <div className="flex items-center gap-2 text-neon-orange">
-              <Swords className="h-5 w-5" />
-              {t('howto_step2_title')}
+        <div className="relative overflow-hidden rounded-xl border border-pink-500/30 bg-black/40 backdrop-blur-sm group hover:border-pink-500/50 transition-all">
+          <div className="absolute inset-0 bg-linear-to-br from-pink-900/20 to-transparent opacity-50" />
+          <Swords className="absolute -right-8 -bottom-8 w-48 h-48 text-pink-500/5 rotate-[-15deg] group-hover:scale-105 transition-transform duration-700" />
+
+          <div className="relative p-5 z-10">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-lg bg-pink-500/20 flex items-center justify-center border border-pink-500/50 shadow-[0_0_10px_rgba(236,72,153,0.3)]">
+                <Swords className="w-5 h-5 text-pink-400" />
+              </div>
+              <h2 className="text-xl font-bold italic text-white font-orbitron tracking-wide">
+                STEP 02 <span className="text-pink-400 not-italic ml-2 text-base font-sans">{t('howto_step2_title')}</span>
+              </h2>
             </div>
-          }
-        >
-          <div className="space-y-4 text-sm text-muted-foreground">
-            <p>{t('howto_step2_desc')}</p>
-            <ul className="list-disc list-inside space-y-1 pl-2 text-xs">
-              <li>{t('howto_step2_note1')}</li>
-              <li>{t('howto_step2_note2')}</li>
-            </ul>
-            <Link href="/battle">
-              <Button className="w-full bg-accent2 text-white hover:bg-accent2/90 mt-2">
-                {t('battle')}
-              </Button>
-            </Link>
+
+            <div className="space-y-4 text-sm text-gray-300 pl-1">
+              <p>{t('howto_step2_desc')}</p>
+              <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-pink-200/80">
+                <li className="flex items-start gap-2 bg-pink-950/30 p-2 rounded border border-pink-500/10">
+                  <div className="w-1.5 h-1.5 rounded-full bg-pink-400 mt-1 shrink-0" />
+                  {t('howto_step2_note1')}
+                </li>
+                <li className="flex items-start gap-2 bg-pink-950/30 p-2 rounded border border-pink-500/10">
+                  <div className="w-1.5 h-1.5 rounded-full bg-pink-400 mt-1 shrink-0" />
+                  {t('howto_step2_note2')}
+                </li>
+              </ul>
+              <Link href="/battle">
+                <Button className="w-full bg-linear-to-r from-pink-600 to-pink-500 hover:from-pink-500 hover:to-pink-400 text-white font-bold tracking-wider shadow-[0_0_15px_rgba(236,72,153,0.4)] border-none mt-2 h-10">
+                  {t('battle')}
+                </Button>
+              </Link>
+            </div>
           </div>
-        </TechCard>
+        </div>
 
         {/* STEP 3: Workshop & Dex */}
-        <TechCard
-          header={
-            <div className="flex items-center gap-2 text-neon-purple">
-              <Factory className="h-5 w-5" />
-              {t('howto_step3_title')}
+        <div className="relative overflow-hidden rounded-xl border border-orange-500/30 bg-black/40 backdrop-blur-sm group hover:border-orange-500/50 transition-all">
+          <div className="absolute inset-0 bg-linear-to-br from-orange-900/20 to-transparent opacity-50" />
+          <Factory className="absolute -right-8 -bottom-8 w-48 h-48 text-orange-500/5 rotate-[-15deg] group-hover:scale-105 transition-transform duration-700" />
+
+          <div className="relative p-5 z-10">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-lg bg-orange-500/20 flex items-center justify-center border border-orange-500/50 shadow-[0_0_10px_rgba(249,115,22,0.3)]">
+                <Factory className="w-5 h-5 text-orange-400" />
+              </div>
+              <h2 className="text-xl font-bold italic text-white font-orbitron tracking-wide">
+                STEP 03 <span className="text-orange-400 not-italic ml-2 text-base font-sans">{t('howto_step3_title')}</span>
+              </h2>
             </div>
-          }
-        >
-          <div className="space-y-4 text-sm text-muted-foreground">
-            <p>{t('howto_step3_desc')}</p>
-            <ul className="list-disc list-inside space-y-1 pl-2 text-xs">
-              <li>{t('howto_step3_note1')}</li>
-              <li>{t('howto_step3_note2')}</li>
-            </ul>
-            <div className="grid grid-cols-2 gap-3 mt-2">
-              <Link href="/workshop">
-                <Button variant="outline" className="w-full border-white/10">
-                  {t('workshop')}
-                </Button>
-              </Link>
-              <Link href="/dex">
-                <Button variant="outline" className="w-full border-white/10">
-                  {t('units')}
-                </Button>
-              </Link>
+
+            <div className="space-y-4 text-sm text-gray-300 pl-1">
+              <p>{t('howto_step3_desc')}</p>
+              <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-orange-200/80">
+                <li className="flex items-start gap-2 bg-orange-950/30 p-2 rounded border border-orange-500/10">
+                  <div className="w-1.5 h-1.5 rounded-full bg-orange-400 mt-1 shrink-0" />
+                  {t('howto_step3_note1')}
+                </li>
+                <li className="flex items-start gap-2 bg-orange-950/30 p-2 rounded border border-orange-500/10">
+                  <div className="w-1.5 h-1.5 rounded-full bg-orange-400 mt-1 shrink-0" />
+                  {t('howto_step3_note2')}
+                </li>
+              </ul>
+              <div className="grid grid-cols-2 gap-3 mt-2">
+                <Link href="/workshop">
+                  <Button className="w-full bg-linear-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white font-bold tracking-wider shadow-[0_0_15px_rgba(249,115,22,0.4)] border-none h-10">
+                    {t('menu_craft')}
+                  </Button>
+                </Link>
+                <Link href="/dex">
+                  <Button variant="outline" className="w-full border-orange-500/30 text-orange-400 hover:bg-orange-500/10 hover:text-orange-300 h-10">
+                    {t('units')}
+                  </Button>
+                </Link>
+              </div>
             </div>
           </div>
-        </TechCard>
+        </div>
 
         {/* Enhancement Features */}
-        <TechCard
-          header={
-            <div className="flex items-center gap-2 text-neon-green">
-              <Layers className="h-5 w-5" />
-              {t('howto_enhance_title')}
+        <div className="relative overflow-hidden rounded-xl border border-green-500/30 bg-black/40 backdrop-blur-sm group hover:border-green-500/50 transition-all">
+          <div className="absolute inset-0 bg-linear-to-br from-green-900/20 to-transparent opacity-50" />
+          <Layers className="absolute -right-8 -bottom-8 w-48 h-48 text-green-500/5 rotate-[-15deg] group-hover:scale-105 transition-transform duration-700" />
+
+          <div className="relative p-5 z-10">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-lg bg-green-500/20 flex items-center justify-center border border-green-500/50 shadow-[0_0_10px_rgba(34,197,94,0.3)]">
+                <Layers className="w-5 h-5 text-green-400" />
+              </div>
+              <h2 className="text-xl font-bold italic text-white font-orbitron tracking-wide">
+                GUIDE <span className="text-green-400 not-italic ml-2 text-base font-sans">{t('howto_enhance_title')}</span>
+              </h2>
             </div>
-          }
-        >
-          <div className="space-y-4 text-sm text-muted-foreground">
-            <p>{t('howto_enhance_desc')}</p>
-            <div className="space-y-3">
-              <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-                <div className="font-semibold text-neon-cyan text-xs">{t('howto_synthesis_title')}</div>
-                <div className="text-xs mt-1">{t('howto_synthesis_desc')}</div>
+
+            <div className="space-y-4 text-sm text-gray-300 pl-1">
+              <p>{t('howto_enhance_desc')}</p>
+              <div className="space-y-3">
+                <div className="rounded-lg border border-green-500/20 bg-green-900/10 p-3 hover:bg-green-900/20 transition-colors">
+                  <div className="font-semibold text-green-400 text-xs flex items-center gap-1 mb-1">
+                    <Factory className="w-3 h-3" />
+                    {t('howto_synthesis_title')}
+                  </div>
+                  <div className="text-xs text-green-200/80">{t('howto_synthesis_desc')}</div>
+                </div>
+                <div className="rounded-lg border border-green-500/20 bg-green-900/10 p-3 hover:bg-green-900/20 transition-colors">
+                  <div className="font-semibold text-orange-400 text-xs flex items-center gap-1 mb-1">
+                    <TrendingUp className="w-3 h-3" />
+                    {t('howto_evolution_title')}
+                  </div>
+                  <div className="text-xs text-orange-200/80">{t('howto_evolution_desc')}</div>
+                </div>
+                <div className="rounded-lg border border-green-500/20 bg-green-900/10 p-3 hover:bg-green-900/20 transition-colors">
+                  <div className="font-semibold text-purple-400 text-xs flex items-center gap-1 mb-1">
+                    <Trophy className="w-3 h-3" />
+                    {t('howto_workshop_title')}
+                  </div>
+                  <div className="text-xs text-purple-200/80">{t('howto_workshop_desc')}</div>
+                </div>
               </div>
-              <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-                <div className="font-semibold text-neon-orange text-xs">{t('howto_evolution_title')}</div>
-                <div className="text-xs mt-1">{t('howto_evolution_desc')}</div>
-              </div>
-              <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-                <div className="font-semibold text-neon-purple text-xs">{t('howto_workshop_title')}</div>
-                <div className="text-xs mt-1">{t('howto_workshop_desc')}</div>
-              </div>
+              <p className="text-xs bg-green-500/10 border border-green-500/20 rounded-lg p-3 text-green-200/90 italic">
+                💡 {t('howto_enhance_tip')}
+              </p>
             </div>
-            <p className="text-xs bg-accent/10 border border-accent/20 rounded-lg p-2">{t('howto_enhance_tip')}</p>
           </div>
-        </TechCard>
+        </div>
 
         {/* Level Up Methods */}
         <TechCard
