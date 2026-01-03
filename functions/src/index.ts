@@ -168,8 +168,8 @@ const getUserCredits = (user: any): number => {
 };
 
 // ロボット生成API
-const FREE_DAILY_LIMIT = 100; // Temporarily increased for testing (was 1)
-const PREMIUM_DAILY_LIMIT = 10;
+const FREE_DAILY_LIMIT = 5;      // Free users: 5 scans/day
+const PREMIUM_DAILY_LIMIT = 9999; // Premium users: effectively unlimited
 
 export const generateRobot = functions.https.onCall(async (data: GenerateRobotRequest, context): Promise<GenerateRobotResponse> => {
   // 認証チェック
@@ -221,8 +221,8 @@ export const generateRobot = functions.https.onCall(async (data: GenerateRobotRe
         throw new functions.https.HttpsError(
           'resource-exhausted',
           isPremium
-            ? `Premium limit reached (${PREMIUM_DAILY_LIMIT}/day). Come back tomorrow!`
-            : `Free limit reached (${FREE_DAILY_LIMIT}/day). Upgrade to Premium for ${PREMIUM_DAILY_LIMIT}/day!`
+            ? `Daily limit reached. Come back tomorrow!`
+            : `Free limit reached (${FREE_DAILY_LIMIT}/day). Upgrade to Premium for unlimited scans!`
         );
       }
 
@@ -921,6 +921,7 @@ export const matchBattle = functions.https.onCall(async (data: any, context) => 
       const entryFeeAmount = entryFeeCharged ? entryFeeState.fee : 0;
 
       const todayKey = getJstDateKey();
+      const isPremiumUser = userData?.isPremium === true;
       const rewardResult = applyBattleRewards({
         battleData: { status: "completed", winner: resultType },
         userData,
@@ -928,6 +929,7 @@ export const matchBattle = functions.https.onCall(async (data: any, context) => 
         winnerUid,
         todayKey,
         dailyCreditsCap: DAILY_CREDITS_CAP,
+        isPremium: isPremiumUser,  // Premium XP Bonus (150%)
       });
 
       const earnedCredits = rewardResult.reward.creditsReward;

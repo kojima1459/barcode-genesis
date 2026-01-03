@@ -145,8 +145,8 @@ const getUserCredits = (user) => {
     return typeof credits === "number" ? credits : 0;
 };
 // ロボット生成API
-const FREE_DAILY_LIMIT = 100; // Temporarily increased for testing (was 1)
-const PREMIUM_DAILY_LIMIT = 10;
+const FREE_DAILY_LIMIT = 5; // Free users: 5 scans/day
+const PREMIUM_DAILY_LIMIT = 9999; // Premium users: effectively unlimited
 exports.generateRobot = functions.https.onCall(async (data, context) => {
     // 認証チェック
     if (!context.auth) {
@@ -183,8 +183,8 @@ exports.generateRobot = functions.https.onCall(async (data, context) => {
             const limit = isPremium ? PREMIUM_DAILY_LIMIT : FREE_DAILY_LIMIT;
             if (currentDailyCount >= limit) {
                 throw new functions.https.HttpsError('resource-exhausted', isPremium
-                    ? `Premium limit reached (${PREMIUM_DAILY_LIMIT}/day). Come back tomorrow!`
-                    : `Free limit reached (${FREE_DAILY_LIMIT}/day). Upgrade to Premium for ${PREMIUM_DAILY_LIMIT}/day!`);
+                    ? `Daily limit reached. Come back tomorrow!`
+                    : `Free limit reached (${FREE_DAILY_LIMIT}/day). Upgrade to Premium for unlimited scans!`);
             }
             (0, robotGenerator_1.assertRobotNotExists)(robotSnap.exists);
             const serverTimestamp = admin.firestore.FieldValue.serverTimestamp();
@@ -770,6 +770,7 @@ exports.matchBattle = functions.https.onCall(async (data, context) => {
             const entryFeeCharged = entryFeeState.charged;
             const entryFeeAmount = entryFeeCharged ? entryFeeState.fee : 0;
             const todayKey = (0, dateKey_1.getJstDateKey)();
+            const isPremiumUser = (userData === null || userData === void 0 ? void 0 : userData.isPremium) === true;
             const rewardResult = (0, battleRewards_1.applyBattleRewards)({
                 battleData: { status: "completed", winner: resultType },
                 userData,
@@ -777,6 +778,7 @@ exports.matchBattle = functions.https.onCall(async (data, context) => {
                 winnerUid,
                 todayKey,
                 dailyCreditsCap: battleRewards_1.DAILY_CREDITS_CAP,
+                isPremium: isPremiumUser, // Premium XP Bonus (150%)
             });
             const earnedCredits = rewardResult.reward.creditsReward;
             const earnedXp = rewardResult.reward.xpReward;

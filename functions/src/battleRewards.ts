@@ -53,8 +53,9 @@ export const applyBattleRewards = (params: {
   todayKey: string;
   dailyCreditsCap?: number;
   dailyXpCap?: number;
+  isPremium?: boolean;  // NEW: Premium user flag
 }): BattleRewardApplication => {
-  const { battleData, userData, userId, winnerUid, todayKey, dailyCreditsCap } = params;
+  const { battleData, userData, userId, winnerUid, todayKey, dailyCreditsCap, isPremium } = params;
   const rewardGranted = battleData?.rewardGranted === true;
   const isCompleted = battleData?.status === "completed" || !!battleData?.winner;
   const isWinner = !!winnerUid && winnerUid === userId;
@@ -74,7 +75,11 @@ export const applyBattleRewards = (params: {
 
   const creditsRemaining = Math.max(0, creditsCap - effectiveCredits);
   const creditsReward = isWinner ? Math.min(CREDITS_REWARD, creditsRemaining) : 0;
-  const xpReward = isWinner ? XP_REWARD : 0;
+
+  // NEW: Premium XP Bonus (150%)
+  const baseXpReward = isWinner ? XP_REWARD : 0;
+  const xpReward = isPremium ? Math.floor(baseXpReward * 1.5) : baseXpReward;
+
   const scanTokensGained = isWinner ? SCAN_TOKENS_REWARD : 0;
   const dailyCreditsCapApplied = isWinner && creditsReward === 0;
   const dailyCapApplied = dailyCreditsCapApplied;
