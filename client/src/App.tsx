@@ -25,7 +25,7 @@ const useVersionCheck = () => {
   useEffect(() => {
     const storedVersion = localStorage.getItem("app_version");
     if (storedVersion !== APP_VERSION) {
-      console.log(`Version mismatch: ${storedVersion} -> ${APP_VERSION}. Clearing cache...`);
+      console.log(`[VersionCheck] Version mismatch: ${storedVersion} -> ${APP_VERSION}. Forcing full refresh...`);
 
       // 言語設定を保存（クリア後に復元）
       const savedLanguage = localStorage.getItem('language');
@@ -38,16 +38,31 @@ const useVersionCheck = () => {
         localStorage.setItem('language', savedLanguage);
       }
 
+      // Unregister all service workers
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.getRegistrations().then(function (registrations) {
           for (let registration of registrations) {
             registration.unregister();
+            console.log('[VersionCheck] Unregistered SW:', registration.scope);
           }
         });
       }
 
-      // Force reload ignoring cache
-      window.location.reload();
+      // IMPORTANT: Also clear all caches (SW may have cached old bundles)
+      if ('caches' in window) {
+        caches.keys().then(function (names) {
+          for (let name of names) {
+            caches.delete(name);
+            console.log('[VersionCheck] Deleted cache:', name);
+          }
+        });
+      }
+
+      // Delay reload slightly to allow cache operations to complete
+      setTimeout(() => {
+        // Force reload ignoring cache
+        window.location.reload();
+      }, 100);
     }
   }, []);
 };
