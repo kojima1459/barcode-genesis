@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, Component } from "react";
+import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
@@ -44,6 +45,32 @@ import BattleReplay from "@/components/BattleReplay";
 import { useBattleLogic } from "@/hooks/useBattleLogic";
 import SEO from "@/components/SEO";
 
+class ReplayErrorBoundary extends Component<{ onReset: () => void; children: ReactNode }, { hasError: boolean }> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error) {
+    console.error("[ReplayErrorBoundary] Caught error:", error);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="glass-panel p-6 rounded-2xl border border-red-500/30 text-center space-y-4">
+          <div className="text-sm font-bold text-red-400">Replay error.</div>
+          <Button onClick={this.props.onReset} className="bg-red-500 hover:bg-red-600 text-white">
+            Back to Battle
+          </Button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 
 
 export default function Battle() {
@@ -60,6 +87,7 @@ export default function Battle() {
   const [loading, setLoading] = useState(true);
   const [userLevel, setUserLevel] = useState(1);
   const [selectedRobotId, setSelectedRobotId] = useState<string | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
 
   // Training Mode Selection State
   const [enemyRobotId, setEnemyRobotId] = useState<string | null>(null);
@@ -123,6 +151,14 @@ export default function Battle() {
   });
 
   const handleStartBattle = () => {
+    try {
+      if (typeof AudioContext !== 'undefined') {
+        if (!audioContextRef.current) {
+          audioContextRef.current = new AudioContext();
+        }
+        audioContextRef.current.resume().catch(() => { });
+      }
+    } catch { /* ignore audio resume errors */ }
     hookStartBattle(enemyRobotId);
   };
 
@@ -351,7 +387,7 @@ export default function Battle() {
                       {robots.length === 0 && (
                         <EmptyState
                           title={t('no_data')}
-                          description={t('scan_first_desc') || "Please scan a barcode to generate a robot."}
+                          description={t('scan_first_desc')}
                         />
                       )}
                     </div>
@@ -394,7 +430,7 @@ export default function Battle() {
                       {variants.length === 0 && (
                         <EmptyState
                           title={t('no_variants')}
-                          description={t('fusion_hint_desc') || "Fuse robots in Workshop to create variants."}
+                          description={t('fusion_hint_desc')}
                         />
                       )}
                     </div>
@@ -712,15 +748,17 @@ export default function Battle() {
 
         {/* バトル画面 */}
         {(battleResult || isBattling) && myRobot && enemyRobot && (
-          <BattleReplay
-            p1={myRobot}
-            p2={enemyRobot}
-            result={battleResult!}
-            onComplete={() => {
-              resetBattleState();
-              playBGM('bgm_menu');
-            }}
-          />
+          <ReplayErrorBoundary onReset={resetBattleState}>
+            <BattleReplay
+              p1={myRobot}
+              p2={enemyRobot}
+              result={battleResult!}
+              onComplete={() => {
+                resetBattleState();
+                playBGM('bgm_menu');
+              }}
+            />
+          </ReplayErrorBoundary>
         )}
         {/* Effects Layer */}
         {activeEffect && (

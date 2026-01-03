@@ -30,9 +30,9 @@ export type LogType = 'NORMAL' | 'HIGHLIGHT' | 'CLIMAX';
  * Tempo multipliers per log type
  */
 export const TEMPO_MULTIPLIERS: Record<LogType, number> = {
-    NORMAL: 0.75,
-    HIGHLIGHT: 1.0,
-    CLIMAX: 1.35,
+    NORMAL: 0.6,
+    HIGHLIGHT: 0.85,
+    CLIMAX: 1.1,
 };
 
 /**
@@ -277,4 +277,3 @@ export function applyHitFlash(
         element.classList.remove(flashClass);
     };
 }
-

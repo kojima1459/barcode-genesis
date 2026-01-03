@@ -15,6 +15,7 @@ import {
     getPlaceholderVisuals,
     getPlaceholderColors,
 } from "@/lib/dexRegistry";
+import { translations } from "@/lib/translations";
 
 interface SilhouetteCardProps {
     slot: DexSlot;
@@ -80,7 +81,7 @@ export default function SilhouetteCard({ slot, lang = "ja" }: SilhouetteCardProp
 
                     {/* Hint text */}
                     <div className="text-[10px] text-muted-foreground/60">
-                        {lang === "ja" ? "スキャンで入手" : "Scan to unlock"}
+                        {(translations[lang] as Record<string, string>)?.scan_to_unlock || translations.ja.scan_to_unlock}
                     </div>
                 </div>
             </CardContent>

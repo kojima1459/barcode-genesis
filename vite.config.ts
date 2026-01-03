@@ -14,6 +14,7 @@ const plugins = [
   jsxLocPlugin(),
   vitePluginManusRuntime(),
   VitePWA({
+    injectRegister: false,
     registerType: 'autoUpdate',
     includeAssets: ['favicon.png', 'icon-192.png', 'icon-512.png', 'ogp.jpg'],
     manifest: {
@@ -147,8 +148,13 @@ export default defineConfig({
           // Core vendor chunks - loaded on every page (keep minimal)
           vendor: ['react', 'react-dom'],
 
-          // Firebase - loaded after auth
-          firebase: ['firebase/app', 'firebase/firestore', 'firebase/auth', 'firebase/functions'],
+          // Firebase - split by service to keep auth-only bootstrap small
+          'firebase-core': ['firebase/app'],
+          'firebase-auth': ['firebase/auth'],
+          'firebase-firestore': ['firebase/firestore'],
+          'firebase-functions': ['firebase/functions'],
+          'firebase-storage': ['firebase/storage'],
+          'firebase-messaging': ['firebase/messaging'],
 
           // Heavy libraries - lazy loaded only when needed
           'framer-motion': ['framer-motion'],

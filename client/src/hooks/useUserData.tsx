@@ -1,7 +1,6 @@
-import { useState, useEffect, createContext, useContext, ReactNode } from "react";
-import { doc, onSnapshot } from "firebase/firestore";
+import { useState, useEffect, useRef, createContext, useContext, ReactNode } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { getDb } from "@/lib/firebase";
+import type { Unsubscribe } from "firebase/firestore";
 
 export interface UserData {
     credits: number;
@@ -59,62 +58,97 @@ const UserDataContext = createContext<UserDataResult>({
 });
 
 export function UserDataProvider({ children }: { children: ReactNode }) {
-    const { user } = useAuth();
+    const { user, loading: authLoading } = useAuth();
     const [userData, setUserData] = useState<UserData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
+    const mountedRef = useRef(true);
 
     useEffect(() => {
+        mountedRef.current = true;
+        if (authLoading) {
+            if (!mountedRef.current) return;
+            setLoading(true);
+            return;
+        }
         if (!user) {
+            if (!mountedRef.current) return;
             setUserData(null);
+            setError(null);
             setLoading(false);
             return;
         }
 
-        setLoading(true);
-        const ref = doc(getDb(), "users", user.uid);
+        let unsub: Unsubscribe | null = null;
+        let cancelled = false;
 
-        const unsub = onSnapshot(
-            ref,
-            (snapshot) => {
-                if (snapshot.exists()) {
-                    const data = snapshot.data();
-                    // Normalize data to ensure types
-                    setUserData({
-                        credits: typeof data.credits === "number" ? data.credits : 0,
-                        scanTokens: typeof data.scanTokens === "number" ? data.scanTokens : 0,
-                        xp: typeof data.xp === "number" ? data.xp : 0,
-                        level: typeof data.level === "number" ? data.level : 1,
-                        isPremium: !!data.isPremium,
-                        loginStreak: typeof data.loginStreak === "number" ? data.loginStreak : 0,
-                        displayName: data.displayName,
-                        photoURL: data.photoURL,
-                        wins: typeof data.wins === "number" ? data.wins : 0,
-                        battles: typeof data.battles === "number" ? data.battles : 0,
-                        workshopLines: typeof data.workshopLines === "number" ? data.workshopLines : 1,
-                        createdAt: data.createdAt,
-                        lastLogin: data.lastLogin,
-                        activeUnitId: typeof data.activeUnitId === "string" ? data.activeUnitId : undefined,
-                        badgeIds: Array.isArray(data.badgeIds) ? data.badgeIds : [],
-                        titleId: typeof data.titleId === "string" ? data.titleId : undefined,
-                        lastFreeVariantDate: typeof data.lastFreeVariantDate === "string" ? data.lastFreeVariantDate : undefined,
-                        variantCount: typeof data.variantCount === "number" ? data.variantCount : 0,
-                    });
-                } else {
-                    // User document doesn't exist yet (might be creating)
-                    setUserData(null);
-                }
-                setLoading(false);
-            },
-            (err) => {
-                console.error("useUserData error:", err);
-                setError(err);
+        setLoading(true);
+        (async () => {
+            try {
+                const [{ doc, onSnapshot }, { getDb }] = await Promise.all([
+                    import("firebase/firestore"),
+                    import("@/lib/firebase"),
+                ]);
+                if (cancelled || !mountedRef.current) return;
+
+                const ref = doc(getDb(), "users", user.uid);
+                unsub = onSnapshot(
+                    ref,
+                    (snapshot) => {
+                        if (cancelled || !mountedRef.current) return;
+                        setError(null);
+                        if (snapshot.exists()) {
+                            const data = snapshot.data();
+                            // Normalize data to ensure types
+                            setUserData({
+                                credits: typeof data.credits === "number" ? data.credits : 0,
+                                scanTokens: typeof data.scanTokens === "number" ? data.scanTokens : 0,
+                                xp: typeof data.xp === "number" ? data.xp : 0,
+                                level: typeof data.level === "number" ? data.level : 1,
+                                isPremium: !!data.isPremium,
+                                loginStreak: typeof data.loginStreak === "number" ? data.loginStreak : 0,
+                                displayName: data.displayName,
+                                photoURL: data.photoURL,
+                                wins: typeof data.wins === "number" ? data.wins : 0,
+                                battles: typeof data.battles === "number" ? data.battles : 0,
+                                workshopLines: typeof data.workshopLines === "number" ? data.workshopLines : 1,
+                                createdAt: data.createdAt,
+                                lastLogin: data.lastLogin,
+                                activeUnitId: typeof data.activeUnitId === "string" ? data.activeUnitId : undefined,
+                                badgeIds: Array.isArray(data.badgeIds) ? data.badgeIds : [],
+                                titleId: typeof data.titleId === "string" ? data.titleId : undefined,
+                                lastFreeVariantDate: typeof data.lastFreeVariantDate === "string" ? data.lastFreeVariantDate : undefined,
+                                variantCount: typeof data.variantCount === "number" ? data.variantCount : 0,
+                            });
+                        } else {
+                            // User document doesn't exist yet (might be creating)
+                            setUserData(null);
+                        }
+                        setLoading(false);
+                    },
+                    (err) => {
+                        if (cancelled || !mountedRef.current) return;
+                        console.error("useUserData error:", err);
+                        setError(err as Error);
+                        setUserData(null);
+                        setLoading(false);
+                    }
+                );
+            } catch (err) {
+                if (cancelled || !mountedRef.current) return;
+                console.error("useUserData setup error:", err);
+                setError(err as Error);
+                setUserData(null);
                 setLoading(false);
             }
-        );
+        })();
 
-        return () => unsub();
-    }, [user]);
+        return () => {
+            cancelled = true;
+            mountedRef.current = false;
+            if (unsub) unsub();
+        };
+    }, [user, authLoading]);
 
     const value: UserDataResult = {
         userData,

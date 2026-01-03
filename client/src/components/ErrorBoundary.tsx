@@ -1,7 +1,7 @@
-import { cn } from "@/lib/utils";
 import { AlertTriangle, RotateCcw, Home } from "lucide-react";
 import { Component, ReactNode } from "react";
 import { Button } from "@/components/ui/button";
+import { addErrorLog } from "@/lib/errorLog";
 
 interface Props {
   children: ReactNode;
@@ -26,6 +26,16 @@ class ErrorBoundary extends Component<Props, State> {
     console.error('[ErrorBoundary] Caught error:', error);
     console.error('[ErrorBoundary] Error stack:', error.stack);
     console.error('[ErrorBoundary] Component stack:', errorInfo.componentStack);
+    try {
+      addErrorLog({
+        route: window.location.pathname + window.location.search,
+        message: error.message || "Unknown error",
+        stack: error.stack,
+        componentStack: errorInfo.componentStack,
+      });
+    } catch {
+      // Ignore logging failures to avoid cascading errors
+    }
   }
 
   handleGoHome = () => {
@@ -57,10 +67,18 @@ class ErrorBoundary extends Component<Props, State> {
               再起動を試みるか、基地へ帰還してください。
             </p>
 
+            <Button
+              onClick={() => (window.location.href = "/debug")}
+              variant="outline"
+              className="w-full border-red-500/40 text-red-300 hover:bg-red-500/10 h-10 mb-4 font-mono text-xs"
+            >
+              VIEW_ERROR_LOG
+            </Button>
+
             {/* Show error message in collapsed details */}
             <details className="w-full mb-8 text-left bg-black/40 rounded border border-white/5 p-3">
               <summary className="text-xs text-red-400/80 cursor-pointer hover:text-red-400 font-mono flex items-center gap-2">
-                <span className="opacity-50">&gt;</span> VIEW_ERROR_LOG
+                <span className="opacity-50">&gt;</span> DETAILS
               </summary>
               <div className="mt-2 overflow-auto max-h-32">
                 <pre className="text-[10px] text-red-500/70 whitespace-pre-wrap break-all font-mono">

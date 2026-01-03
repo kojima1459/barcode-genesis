@@ -167,7 +167,7 @@ function RoleSection({
                               <RobotSVG parts={robot.parts} colors={robot.colors} size={52} simplified={true} />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <div className="font-bold text-xs truncate">{robot.name || "Unnamed"}</div>
+                              <div className="font-bold text-xs truncate">{robot.name || t('label_unnamed')}</div>
                               <div className="text-[9px] text-muted-foreground font-mono">
                                 Lv.{robot.level ?? 1}
                               </div>
@@ -190,7 +190,7 @@ function RoleSection({
                               onClick={() => onWorkshop(robot.id)}
                             >
                               <Factory className="h-3 w-3 mr-1" />
-                              {t('workshop_short') || "WS"}
+                              {t('workshop_short')}
                             </Button>
                           </div>
                         </CardContent>
@@ -594,14 +594,14 @@ export default function Dex() {
             ) : robots.length === 0 ? (
               <EmptyState
                 title={t('no_robots_msg')}
-                description="Scan barcodes to discover new units."
+                description={t('dex_empty_desc')}
                 icon={ScanBarcode}
-                action={{ label: "Go to Scanner", onClick: () => setLocation("/") }}
+                action={{ label: t('dex_empty_action'), onClick: () => setLocation("/") }}
               />
             ) : filteredRobots.length === 0 ? (
               <EmptyState
                 title={t('no_filtered_robots')}
-                description="Try adjusting your search filters."
+                description={t('dex_empty_filtered_desc')}
                 icon={Filter}
               />
             ) : (
@@ -625,7 +625,7 @@ export default function Dex() {
                         <div className="flex-1 min-w-0 space-y-2">
                           <div className="flex items-center justify-between gap-2">
                             <div className="min-w-0">
-                              <div className="font-bold truncate">{r.name || "Unnamed"}</div>
+                              <div className="font-bold truncate">{r.name || t('label_unnamed')}</div>
                               <div className="text-[11px] text-muted-foreground font-mono" data-testid={`robot-id-${r.id}`} title={`ID: ${r.id}`}>ID: {shortId(r.id)}</div>
                               {r.parts && (
                                 <div className="flex flex-wrap gap-1 pt-1">

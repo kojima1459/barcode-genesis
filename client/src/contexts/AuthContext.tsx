@@ -1,6 +1,6 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { User, onAuthStateChanged, signInWithPopup, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
-import { getAuth, googleProvider } from "@/lib/firebase";
+import { getAuth, googleProvider } from "@/lib/firebaseAuth";
 
 // Auth状態: loading → authed or guest
 export type AuthStatus = 'loading' | 'authed' | 'guest';
@@ -20,11 +20,14 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [authStatus, setAuthStatus] = useState<AuthStatus>('loading');
+  const mountedRef = useRef(true);
 
   useEffect(() => {
     console.log("[AuthContext] Setting up onAuthStateChanged listener...");
+    mountedRef.current = true;
     const unsubscribe = onAuthStateChanged(getAuth(), (firebaseUser) => {
       console.log("[AuthContext] onAuthStateChanged fired:", firebaseUser ? `User authenticated - ${firebaseUser.email}` : "No user authenticated");
+      if (!mountedRef.current) return;
       if (firebaseUser) {
         setUser(firebaseUser);
         setAuthStatus('authed');
@@ -36,6 +39,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       console.log("[AuthContext] Cleaning up listener");
+      mountedRef.current = false;
       unsubscribe();
     };
   }, []);
@@ -95,4 +99,3 @@ export function useAuth() {
   }
   return context;
 }
-

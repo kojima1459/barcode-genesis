@@ -5,13 +5,13 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Route, Switch, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import { LanguageProvider } from "./contexts/LanguageContext";
+import { LanguageProvider, LANGUAGE_STORAGE_KEY } from "./contexts/LanguageContext";
 import { HapticProvider } from "@/contexts/HapticContext";
 import { TutorialProvider } from "@/contexts/TutorialContext";
 import TutorialOverlay from "@/components/TutorialOverlay";
 import { UserDataProvider } from "@/hooks/useUserData";
 import { SoundProvider, useSound } from "@/contexts/SoundContext";
-import { useEffect, lazy, Suspense, type ComponentType, useRef } from "react";
+import { useEffect, useRef, useState, lazy, Suspense, type ComponentType } from "react";
 import { AnimatePresence } from "framer-motion";
 import PageTransition from "@/components/PageTransition";
 import OfflineBanner from "@/components/OfflineBanner";
@@ -19,6 +19,9 @@ import { Loader2 } from "lucide-react";
 import AppShell from "@/components/AppShell";
 import { SystemSkeleton } from "@/components/ui/SystemSkeleton";
 import { APP_VERSION } from "./version";
+import { registerGlobalErrorHandlers } from "@/lib/errorLog";
+
+const DEV_RENDER_PHASE_KEY = "__lastRenderPhase";
 
 // Cache busting / Version check
 const useVersionCheck = () => {
@@ -28,15 +31,15 @@ const useVersionCheck = () => {
       console.log(`[VersionCheck] Version mismatch: ${storedVersion} -> ${APP_VERSION}. Forcing full refresh...`);
 
       // 言語設定を保存（クリア後に復元）
-      const savedLanguage = localStorage.getItem('language');
+      const storedLang = localStorage.getItem(LANGUAGE_STORAGE_KEY) ?? localStorage.getItem("language");
+      const savedLanguage = storedLang === "en" || storedLang === "ja" ? storedLang : "ja";
 
       localStorage.clear();
       localStorage.setItem("app_version", APP_VERSION);
 
       // 言語設定を復元（英語復活を防ぐ）
-      if (savedLanguage) {
-        localStorage.setItem('language', savedLanguage);
-      }
+      localStorage.setItem(LANGUAGE_STORAGE_KEY, savedLanguage);
+      localStorage.removeItem("language");
 
       // Unregister all service workers
       if ('serviceWorker' in navigator) {
@@ -89,6 +92,7 @@ const NotFound = lazy(() => import("@/pages/NotFound"));
 const Scan = lazy(() => import("@/pages/Scan"));
 const Workshop = lazy(() => import("@/pages/Workshop"));
 const BossBattle = lazy(() => import("@/pages/BossBattle"));
+const Debug = lazy(() => import("@/pages/Debug"));
 
 // Loading fallback component
 function PageLoader() {
@@ -119,6 +123,9 @@ function GlobalSoundManager() {
 
 function Router() {
   const [location] = useLocation();
+  if (import.meta.env.DEV && typeof window !== "undefined") {
+    (window as { [key: string]: string | undefined })[DEV_RENDER_PHASE_KEY] = `route:${location}`;
+  }
 
   const withShell = (Component: ComponentType) => () => (
     <AppShell>
@@ -136,6 +143,7 @@ function Router() {
             <Route path="/terms" component={Terms} />
             <Route path="/law" component={SpecifiedCommercial} />
             <Route path="/auth" component={Auth} />
+            <Route path="/debug" component={Debug} />
 
             <Route path="/">
               <ProtectedRoute component={withShell(Home)} />
@@ -145,6 +153,9 @@ function Router() {
             </Route>
             <Route path="/battle">
               <ProtectedRoute component={withShell(Battle)} />
+            </Route>
+            <Route path="/weekly-boss">
+              <ProtectedRoute component={withShell(BossBattle)} />
             </Route>
             <Route path="/boss">
               <ProtectedRoute component={withShell(BossBattle)} />
@@ -203,6 +214,60 @@ import { HelmetProvider } from "react-helmet-async";
 
 function App() {
   useVersionCheck();
+  const [devCrashNotice, setDevCrashNotice] = useState<string | null>(null);
+  const devCrashTimeoutRef = useRef<number | null>(null);
+  useEffect(() => {
+    const cleanup = registerGlobalErrorHandlers();
+    return () => cleanup();
+  }, []);
+  useEffect(() => {
+    if (!import.meta.env.DEV || typeof window === "undefined") return;
+
+    const onError = (event: ErrorEvent) => {
+      const phase = (window as { [key: string]: string | undefined })[DEV_RENDER_PHASE_KEY] || "unknown";
+      const route = window.location.pathname + window.location.search;
+      console.error("[DEV_CRASH] window.onerror", {
+        message: event.message,
+        stack: event.error?.stack,
+        route,
+        phase,
+      });
+      setDevCrashNotice(event.message || "DEV crash");
+      if (devCrashTimeoutRef.current) {
+        clearTimeout(devCrashTimeoutRef.current);
+      }
+      devCrashTimeoutRef.current = window.setTimeout(() => setDevCrashNotice(null), 3000);
+    };
+
+    const onRejection = (event: PromiseRejectionEvent) => {
+      const reason = event.reason;
+      const message = reason instanceof Error ? reason.message : String(reason);
+      const stack = reason instanceof Error ? reason.stack : undefined;
+      const phase = (window as { [key: string]: string | undefined })[DEV_RENDER_PHASE_KEY] || "unknown";
+      const route = window.location.pathname + window.location.search;
+      console.error("[DEV_CRASH] unhandledrejection", {
+        message,
+        stack,
+        route,
+        phase,
+      });
+      setDevCrashNotice(message || "DEV crash");
+      if (devCrashTimeoutRef.current) {
+        clearTimeout(devCrashTimeoutRef.current);
+      }
+      devCrashTimeoutRef.current = window.setTimeout(() => setDevCrashNotice(null), 3000);
+    };
+
+    window.addEventListener("error", onError);
+    window.addEventListener("unhandledrejection", onRejection);
+    return () => {
+      window.removeEventListener("error", onError);
+      window.removeEventListener("unhandledrejection", onRejection);
+      if (devCrashTimeoutRef.current) {
+        clearTimeout(devCrashTimeoutRef.current);
+      }
+    };
+  }, []);
   return (
     <ErrorBoundary>
       <LanguageProvider>
@@ -218,6 +283,11 @@ function App() {
                         <div className="min-h-screen bg-background text-foreground font-sans selection:bg-neon-cyan/30">
                           <OfflineBanner />
                           <TutorialOverlay />
+                          {import.meta.env.DEV && devCrashNotice && (
+                            <div className="fixed top-2 left-1/2 -translate-x-1/2 z-50 rounded bg-red-900/80 px-3 py-1 text-[10px] font-mono text-white shadow-lg">
+                              {devCrashNotice}
+                            </div>
+                          )}
                           <Toaster />
                           <Router />
                         </div>

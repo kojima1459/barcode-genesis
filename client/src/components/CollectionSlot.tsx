@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import RobotSVG from "@/components/RobotSVG";
 import { RobotData } from "@/types/shared";
 import { Badge } from "@/components/ui/badge";
-import { getRarityLabel } from "@/lib/rarity";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface CollectionSlotProps {
     role: string;  // Can be dexRegistry.RobotRole or shared.RobotRole
@@ -35,7 +35,14 @@ const PLACEHOLDER_COLORS = {
 };
 
 const CollectionSlot = memo(function CollectionSlot({ role, rarity, robot, unlocked, placeholderParts, placeholderColors }: CollectionSlotProps) {
-    const rarityLabel = ["COMMON", "UNCOMMON", "RARE", "EPIC", "LEGENDARY"][rarity - 1] || "COMMON";
+    const { t } = useLanguage();
+    const rarityLabel = [
+        t('label_rarity_common'),
+        t('label_rarity_uncommon'),
+        t('label_rarity_rare'),
+        t('label_rarity_epic'),
+        t('label_rarity_legendary'),
+    ][rarity - 1] || t('label_rarity_common');
     const rarityColor = [
         "border-white/20 bg-white/5 text-white/60", // Common
         "border-green-400/30 bg-green-400/5 text-green-400", // Uncommon

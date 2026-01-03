@@ -107,7 +107,7 @@ export default function Profile() {
     // [REFACTOR 2.2] File validation (size and type check)
     const validation = validateImageFile(file);
     if (!validation.valid) {
-      toast.error(validation.error || "Invalid file");
+      toast.error(validation.error || t('invalid_file'));
       return;
     }
 
@@ -115,11 +115,16 @@ export default function Profile() {
     try {
       // Compress image before upload
       // [REFACTOR 1.1] Using imported compressImage from imageUtils
-      const compressedBlob = await compressImage(file);
+      const processed = await compressImage(file);
+      const processedBlob = processed.blob;
+      console.debug(
+        "[Avatar] image processed",
+        `${file.type || file.name} ${file.size}B -> ${processedBlob.type} ${processedBlob.size}B`
+      );
       // [REFACTOR 3.3] Removed console.log in production - compression info
 
       const storageRef = ref(getStorage(), `users/${user.uid}/avatar`);
-      await uploadBytes(storageRef, compressedBlob);
+      await uploadBytes(storageRef, processedBlob);
       const downloadURL = await getDownloadURL(storageRef);
 
       await updateDoc(doc(getDb(), "users", user.uid), {
@@ -129,9 +134,21 @@ export default function Profile() {
       // useUserData will auto-update
       toast.success(t('upload_photo_success'));
       playSE('se_click');
-    } catch (error) {
+    } catch (error: any) {
       console.error("Avatar upload failed:", error);
-      toast.error(t('upload_photo_failed'));
+      const message = typeof error?.message === "string" ? error.message : "";
+      const code = typeof error?.code === "string" ? error.code : "";
+      if (code.includes("unauthorized") || code.includes("permission-denied")) {
+        toast.error("アップロード権限がありません");
+      } else if (message.includes("対応していない形式")) {
+        toast.error("対応していない形式です（jpg/png/webp/heic/heif）");
+      } else if (message.includes("変換に失敗")) {
+        toast.error("HEIC変換に失敗しました");
+      } else if (message.includes("大きすぎます")) {
+        toast.error("画像が大きすぎます");
+      } else {
+        toast.error(t('upload_photo_failed'));
+      }
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -213,7 +230,7 @@ export default function Profile() {
 
                 <div className="w-32 h-32 rounded-full bg-secondary flex items-center justify-center text-4xl overflow-hidden border-2 border-secondary group-hover:border-primary transition-colors relative">
                   {userData?.photoURL ? (
-                    <img src={userData.photoURL} alt="Profile" className="w-full h-full object-cover" loading="lazy" />
+                    <img src={userData.photoURL} alt={t('profile')} className="w-full h-full object-cover" loading="lazy" />
                   ) : (
                     "👤"
                   )}

@@ -7,6 +7,7 @@ import { functions } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
 import { toast } from "sonner";
 import { RobotData } from "@/types/shared";
+import { translateSync } from "@/contexts/LanguageContext";
 import RobotSVG from "@/components/RobotSVG";
 
 const FAMILY_NAMES = ["DRINK", "SNACK", "DAILY", "BEAUTY", "OTHER"];
@@ -33,7 +34,7 @@ export default function EvolutionModal({ isOpen, onClose, target, allRobots, onS
     // Get target's family
     const targetBarcode = target.sourceBarcode || target.id;
     const targetFamily = target.family ?? getFamilyFromBarcode(targetBarcode);
-    const targetFamilyName = FAMILY_NAMES[targetFamily - 1] || "UNKNOWN";
+    const targetFamilyName = FAMILY_NAMES[targetFamily - 1] || translateSync('label_unknown');
 
     // Filter candidates: same family, exclude target
     const candidates = useMemo(() => {

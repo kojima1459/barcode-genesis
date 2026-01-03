@@ -1,6 +1,7 @@
 import { memo, useMemo } from "react";
 import { BattleEvent } from "@/lib/battleReplay";
 import { Sword, Shield, Zap, Users, AlertTriangle, Target, Sparkles } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface BattleHUDExtendedProps {
     // Robot info
@@ -17,6 +18,7 @@ interface BattleHUDExtendedProps {
     // Last known gauge values (persisted)
     p1OverdriveGauge: number;
     p2OverdriveGauge: number;
+    nextHitKills?: boolean;
 }
 
 /**
@@ -36,18 +38,31 @@ const BattleHUDExtended = memo(({
     currentHp,
     currentEvent,
     p1OverdriveGauge,
-    p2OverdriveGauge
+    p2OverdriveGauge,
+    nextHitKills
 }: BattleHUDExtendedProps) => {
+    const { t } = useLanguage();
     // A. Advantage calculation
     const advantage = useMemo(() => {
-        const p1HpPercent = (currentHp[p1Id] ?? p1MaxHp) / p1MaxHp * 100;
-        const p2HpPercent = (currentHp[p2Id] ?? p2MaxHp) / p2MaxHp * 100;
-        const diff = p1HpPercent - p2HpPercent;
+        const p1HpRatio = (currentHp[p1Id] ?? p1MaxHp) / p1MaxHp;
+        const p2HpRatio = (currentHp[p2Id] ?? p2MaxHp) / p2MaxHp;
+        const diff = p1HpRatio - p2HpRatio;
 
-        if (diff > 10) return { text: "YOU ADV", color: "text-cyan-400", bg: "bg-cyan-500/20" };
-        if (diff < -10) return { text: "ENEMY ADV", color: "text-red-400", bg: "bg-red-500/20" };
-        return { text: "EVEN", color: "text-yellow-400", bg: "bg-yellow-500/20" };
+        if (diff >= 0.2) return { text: t("battle_advantage"), color: "text-cyan-400", bg: "bg-cyan-500/20" };
+        if (diff <= -0.2) return { text: t("battle_disadvantage"), color: "text-red-400", bg: "bg-red-500/20" };
+        return { text: t("battle_even"), color: "text-yellow-400", bg: "bg-yellow-500/20" };
+    }, [currentHp, p1Id, p2Id, p1MaxHp, p2MaxHp, t]);
+
+    const hpDiff = useMemo(() => {
+        const p1Hp = currentHp[p1Id] ?? p1MaxHp;
+        const p2Hp = currentHp[p2Id] ?? p2MaxHp;
+        return p1Hp - p2Hp;
     }, [currentHp, p1Id, p2Id, p1MaxHp, p2MaxHp]);
+
+    const nextActor = useMemo(() => {
+        if (!currentEvent?.attackerId) return null;
+        return currentEvent.attackerId === p1Id ? p1Name : p2Name;
+    }, [currentEvent, p1Id, p2Id, p1Name, p2Name]);
 
     // B. Stance visualization
     const stanceInfo = useMemo(() => {
@@ -130,8 +145,16 @@ const BattleHUDExtended = memo(({
             });
         }
 
+        if (nextHitKills) {
+            flags.push({
+                icon: <AlertTriangle className="w-3 h-3" />,
+                label: t("battle_next_hit_kills"),
+                color: "text-red-400 bg-red-500/20"
+            });
+        }
+
         return flags;
-    }, [currentEvent]);
+    }, [currentEvent, nextHitKills, t]);
 
     return (
         <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
@@ -141,6 +164,22 @@ const BattleHUDExtended = memo(({
                     {advantage.text}
                 </span>
             </div>
+
+            {/* A2. HP Diff */}
+            <div className="px-2 py-0.5 rounded-full bg-black/40 border border-white/10">
+                <span className={`text-[9px] font-black italic ${hpDiff >= 0 ? "text-cyan-400" : "text-pink-400"}`}>
+                    HP差 {hpDiff >= 0 ? "+" : ""}{Math.abs(hpDiff)}
+                </span>
+            </div>
+
+            {/* A3. Next Actor */}
+            {nextActor && (
+                <div className="px-2 py-0.5 rounded-full bg-black/40 border border-white/10">
+                    <span className="text-[9px] font-black italic text-white/70">
+                        次: {nextActor}
+                    </span>
+                </div>
+            )}
 
             {/* B. Stance Visualization */}
             {stanceInfo && (
@@ -162,6 +201,7 @@ const BattleHUDExtended = memo(({
 
             {/* C. Overdrive Gauges */}
             <div className="flex items-center gap-2 px-2 py-0.5 rounded-full bg-black/40 border border-white/10">
+                <span className="text-[8px] font-black italic text-white/50">必殺</span>
                 {/* P1 Gauge */}
                 <div className="flex items-center gap-1">
                     <Zap className="w-3 h-3 text-cyan-400" />

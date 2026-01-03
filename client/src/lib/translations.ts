@@ -73,6 +73,9 @@ export const translations = {
     unlocked_status: "UNLOCKED",
     no_robots_msg: "まだロボットがありません。`/scan` から生成してください。",
     no_filtered_robots: "条件に一致するロボットがいません。",
+    dex_empty_desc: "バーコードをスキャンして新しいユニットを発見しよう。",
+    dex_empty_action: "スキャンへ",
+    dex_empty_filtered_desc: "検索条件を調整してください。",
     no_variants_msg: "まだバリアントがありません。`/workshop` で作成できます。",
     parents_label: "Parents:",
     parents_missing: "親ロボットが未登録です",
@@ -170,6 +173,10 @@ export const translations = {
 
     // Battle
     battle_arena: "バトルアリーナ",
+    battle_advantage: "優勢",
+    battle_even: "互角",
+    battle_disadvantage: "劣勢",
+    battle_next_hit_kills: "次の一撃で撃破",
 
     your_id: "あなたのID",
 
@@ -543,8 +550,8 @@ export const translations = {
     error_upgrade_failed: "強化に失敗しました",
     error_cosmetic_failed: "適用に失敗しました",
     error_load_detail: "Failed to load robot detail",
-    error_unknown_skill: "Unknown Skill",
-    error_unknown_opponent: "Unknown",
+    error_unknown_skill: "未知のスキル",
+    error_unknown_opponent: "不明",
 
     // Loading/Empty States
     loading_calibrating: "CALIBRATING...",
@@ -553,8 +560,8 @@ export const translations = {
     empty_no_data: "データなし",
     empty_no_robots: "ロボットがありません",
     empty_no_variants: "バリアントがありません",
-    unknown_value: "N/A",
-    unknown_date: "Unknown",
+    unknown_value: "不明",
+    unknown_date: "不明",
 
     // Common UI
     label_vs: "vs",
@@ -564,6 +571,21 @@ export const translations = {
     label_id: "ID:",
     label_capacity: "CAPACITY:",
     label_credits_label: "CREDITS:",
+    label_unknown: "不明",
+    label_unnamed: "未命名",
+    label_commander: "コマンダー",
+    label_overdrive: "オーバードライブ！",
+    label_special: "スペシャル",
+    label_rarity_common: "コモン",
+    label_rarity_uncommon: "アンコモン",
+    label_rarity_rare: "レア",
+    label_rarity_epic: "エピック",
+    label_rarity_legendary: "レジェンダリー",
+    element_neutral: "ニュートラル",
+    invalid_file: "ファイルが不正です",
+    login_bonus_failed: "ログインボーナスの取得に失敗しました",
+    scan_first_desc: "先にバーコードをスキャンしてロボットを生成してください。",
+    fusion_hint_desc: "工房でロボットを融合してバリアントを作成できます。",
 
     // Boss Features (New)
     scan_to_unlock: "スキャンして解放",
@@ -666,6 +688,9 @@ export const translations = {
     leaderboard_desc: "Check top players",
     shop: "Shop",
     shop_desc: "Purchase items",
+    dex_empty_desc: "Scan barcodes to discover new units.",
+    dex_empty_action: "Go to Scanner",
+    dex_empty_filtered_desc: "Try adjusting your search filters.",
 
     // Scan
     back_to_menu: "Back to Menu",
@@ -684,6 +709,10 @@ export const translations = {
 
     // Battle
     battle_arena: "Battle Arena",
+    battle_advantage: "Advantage",
+    battle_even: "Even",
+    battle_disadvantage: "Disadvantage",
+    battle_next_hit_kills: "Next hit kills",
     select_robot: "Select Your Robot",
     your_id: "Your ID",
     select_opponent: "Select Opponent",
@@ -988,6 +1017,21 @@ export const translations = {
     label_id: "ID:",
     label_capacity: "CAPACITY:",
     label_credits_label: "CREDITS:",
+    label_unknown: "Unknown",
+    label_unnamed: "Unnamed",
+    label_commander: "Commander",
+    label_overdrive: "OVERDRIVE!",
+    label_special: "SPECIAL",
+    label_rarity_common: "Common",
+    label_rarity_uncommon: "Uncommon",
+    label_rarity_rare: "Rare",
+    label_rarity_epic: "Epic",
+    label_rarity_legendary: "Legendary",
+    element_neutral: "Neutral",
+    invalid_file: "Invalid file",
+    login_bonus_failed: "Login bonus failed",
+    scan_first_desc: "Please scan a barcode to generate a robot.",
+    fusion_hint_desc: "Fuse robots in Workshop to create variants.",
 
     // Boss Features (New)
     scan_to_unlock: "Scan to Unlock",

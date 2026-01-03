@@ -10,19 +10,27 @@
 // ============================================
 
 /** Maximum dimension for compressed images (pixels) */
-export const IMAGE_MAX_SIZE = 512;
+export const IMAGE_MAX_SIZE = 1024;
+
+/** Minimum dimension for compressed images (pixels) */
+export const IMAGE_MIN_SIZE = 512;
 
 /** JPEG compression quality (0.0 - 1.0) */
 export const JPEG_QUALITY = 0.8;
 
+/** Minimum JPEG quality for compression attempts */
+export const MIN_JPEG_QUALITY = 0.6;
+
 /** Maximum allowed file size for source images (bytes) */
 export const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB (increased for large iPhone photos)
+
+/** Target max size for processed images (bytes) */
+export const TARGET_FILE_SIZE = 500 * 1024; // ~500KB
 
 /** Allowed MIME types for image upload (including iPhone formats) */
 export const ALLOWED_IMAGE_TYPES = [
     'image/jpeg',
     'image/png',
-    'image/gif',
     'image/webp',
     'image/heic',  // iPhone default format
     'image/heif',  // iPhone alternative format
@@ -58,11 +66,22 @@ export function validateImageFile(file: File): ImageValidationResult {
         };
     }
 
-    // Check basic image MIME type (lenient - accept any image/*)
-    if (!file.type.startsWith('image/')) {
+    const type = file.type.toLowerCase();
+    const name = file.name.toLowerCase();
+    const hasAllowedExt = name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.png')
+        || name.endsWith('.webp') || name.endsWith('.heic') || name.endsWith('.heif');
+
+    if (type && !ALLOWED_IMAGE_TYPES.includes(type)) {
         return {
             valid: false,
-            error: `画像ファイルを選択してください`
+            error: '対応していない形式です（jpg/png/webp/heic/heif）'
+        };
+    }
+
+    if (!type && !hasAllowedExt) {
+        return {
+            valid: false,
+            error: '対応していない形式です（jpg/png/webp/heic/heif）'
         };
     }
 
@@ -120,66 +139,115 @@ async function convertHeicToJpeg(file: File): Promise<Blob> {
  * @returns Promise resolving to compressed Blob
  * @throws Error if image processing fails
  */
-export async function compressImage(file: File): Promise<Blob> {
+export interface ProcessedImageResult {
+    blob: Blob;
+    width: number;
+    height: number;
+}
+
+async function loadImageSource(blob: Blob): Promise<{ width: number; height: number; draw: (ctx: CanvasRenderingContext2D, w: number, h: number) => void; cleanup: () => void; }> {
+    if (typeof createImageBitmap === 'function') {
+        const bitmap = await createImageBitmap(blob);
+        return {
+            width: bitmap.width,
+            height: bitmap.height,
+            draw: (ctx, w, h) => ctx.drawImage(bitmap, 0, 0, w, h),
+            cleanup: () => {
+                if (typeof (bitmap as ImageBitmap).close === 'function') {
+                    (bitmap as ImageBitmap).close();
+                }
+            }
+        };
+    }
+
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        const url = URL.createObjectURL(blob);
+        img.onload = () => {
+            resolve({
+                width: img.naturalWidth,
+                height: img.naturalHeight,
+                draw: (ctx, w, h) => ctx.drawImage(img, 0, 0, w, h),
+                cleanup: () => URL.revokeObjectURL(url),
+            });
+        };
+        img.onerror = () => {
+            URL.revokeObjectURL(url);
+            reject(new Error('画像を読み込めませんでした。別の形式の画像をお試しください。'));
+        };
+        img.src = url;
+    });
+}
+
+async function canvasToJpegBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob> {
+    return new Promise((resolve, reject) => {
+        canvas.toBlob(
+            (blob) => {
+                if (!blob) {
+                    reject(new Error('Failed to create compressed image blob'));
+                    return;
+                }
+                resolve(blob);
+            },
+            'image/jpeg',
+            quality
+        );
+    });
+}
+
+export async function compressImage(file: File): Promise<ProcessedImageResult> {
     // Convert HEIC to JPEG first if needed
     let imageBlob: Blob = file;
     if (isHeicFormat(file)) {
         imageBlob = await convertHeicToJpeg(file);
     }
 
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
+    const source = await loadImageSource(imageBlob);
+    try {
+        let lastBlob: Blob | null = null;
+        let lastWidth = source.width;
+        let lastHeight = source.height;
+        const sizeSteps = [IMAGE_MAX_SIZE, IMAGE_MIN_SIZE];
+        const qualitySteps = [JPEG_QUALITY, 0.7, MIN_JPEG_QUALITY];
 
-        reader.onload = (e) => {
-            const img = new Image();
-
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-
-                if (!ctx) {
-                    reject(new Error('Canvas 2D context not available'));
-                    return;
+        for (const maxSize of sizeSteps) {
+            let { width, height } = source;
+            if (width > height) {
+                if (width > maxSize) {
+                    height = Math.round((height * maxSize) / width);
+                    width = maxSize;
                 }
+            } else if (height > maxSize) {
+                width = Math.round((width * maxSize) / height);
+                height = maxSize;
+            }
 
-                // Calculate new dimensions (max IMAGE_MAX_SIZE px)
-                let { width, height } = img;
-                if (width > height) {
-                    if (width > IMAGE_MAX_SIZE) {
-                        height = Math.round((height * IMAGE_MAX_SIZE) / width);
-                        width = IMAGE_MAX_SIZE;
-                    }
-                } else {
-                    if (height > IMAGE_MAX_SIZE) {
-                        width = Math.round((width * IMAGE_MAX_SIZE) / height);
-                        height = IMAGE_MAX_SIZE;
-                    }
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                throw new Error('Canvas 2D context not available');
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            source.draw(ctx, width, height);
+
+            for (const quality of qualitySteps) {
+                const blob = await canvasToJpegBlob(canvas, quality);
+                lastBlob = blob;
+                lastWidth = width;
+                lastHeight = height;
+                if (blob.size <= TARGET_FILE_SIZE) {
+                    return { blob, width, height };
                 }
+            }
+        }
 
-                canvas.width = width;
-                canvas.height = height;
-                ctx.drawImage(img, 0, 0, width, height);
-
-                // Convert to JPEG blob
-                canvas.toBlob(
-                    (blob) => {
-                        if (blob) {
-                            resolve(blob);
-                        } else {
-                            reject(new Error('Failed to create compressed image blob'));
-                        }
-                    },
-                    'image/jpeg',
-                    JPEG_QUALITY
-                );
-            };
-
-            img.onerror = () => reject(new Error('画像を読み込めませんでした。別の形式の画像をお試しください。'));
-            img.src = e.target?.result as string;
-        };
-
-        reader.onerror = () => reject(new Error('Failed to read image file'));
-        reader.readAsDataURL(imageBlob);
-    });
+        if (lastBlob) {
+            throw new Error('画像が大きすぎます。別の画像をお試しください。');
+        }
+        throw new Error('画像の圧縮に失敗しました');
+    } finally {
+        source.cleanup();
+    }
 }
-

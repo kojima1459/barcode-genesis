@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useSound } from "@/contexts/SoundContext";
 import RobotSVG from "@/components/RobotSVG";
-import { DailyBossData, BossType } from "@/types/boss";
+import { DailyBossData, BossType, WeeklyBossData, WeeklyBossResponse } from "@/types/boss";
 import { RobotData, VariantData } from "@/types/shared";
 import { SystemSkeleton } from "@/components/ui/SystemSkeleton";
 import Interactive from "@/components/ui/interactive";
@@ -52,7 +52,7 @@ export default function BossBattle() {
     const { t } = useLanguage();
     const { playSE } = useSound();
     const { user } = useAuth();
-    const [, setLocation] = useLocation();
+    const [location, setLocation] = useLocation();
 
     // States
     const [loading, setLoading] = useState(true);
@@ -68,18 +68,47 @@ export default function BossBattle() {
     const [battleResult, setBattleResult] = useState<BossBattleResult | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
 
+    const search = location.includes("?") ? location.split("?")[1] : "";
+    const query = new URLSearchParams(search);
+    const mode = query.get("mode");
+
     const loadData = useCallback(async () => {
         if (!user) return;
         setLoading(true);
         setLoadError(null);
         try {
-            // Load boss data
-            const getDailyBoss = httpsCallable(functions, "getDailyBoss");
-            const bossResult = await getDailyBoss();
-            const bossResponse = bossResult.data as { boss: DailyBossData; canChallenge: boolean; hasScannedToday: boolean };
-            setBossData(bossResponse.boss);
-            setCanChallenge(bossResponse.canChallenge);
-            setHasScannedToday(bossResponse.hasScannedToday);
+            if (mode === "weekly") {
+                const getWeeklyBoss = httpsCallable(functions, "getWeeklyBoss");
+                const weeklyResult = await getWeeklyBoss();
+                const weeklyResponse = weeklyResult.data as WeeklyBossResponse;
+                const weeklyBoss = weeklyResponse?.boss as WeeklyBossData | undefined;
+                if (!weeklyBoss) {
+                    throw new Error("Weekly boss not available");
+                }
+                const mappedBoss: DailyBossData = {
+                    bossId: weeklyBoss.bossId,
+                    dateKey: weeklyResponse.weekKey || weeklyBoss.weekKey || "",
+                    type: "TANK",
+                    name: weeklyBoss.name,
+                    epithet: "WEEKLY BOSS",
+                    baseName: weeklyBoss.name,
+                    stats: weeklyBoss.stats,
+                    role: "BOSS",
+                    parts: {},
+                    colors: {},
+                };
+                setBossData(mappedBoss);
+                setCanChallenge(true);
+                setHasScannedToday(true);
+            } else {
+                // Load boss data
+                const getDailyBoss = httpsCallable(functions, "getDailyBoss");
+                const bossResult = await getDailyBoss();
+                const bossResponse = bossResult.data as { boss: DailyBossData; canChallenge: boolean; hasScannedToday: boolean };
+                setBossData(bossResponse.boss);
+                setCanChallenge(bossResponse.canChallenge);
+                setHasScannedToday(bossResponse.hasScannedToday);
+            }
 
             // Load robots
             const robotsSnap = await getDocs(collection(getDb(), "users", user.uid, "robots"));
@@ -95,13 +124,15 @@ export default function BossBattle() {
             const code = error?.code || '';
             if (code === 'unauthenticated') {
                 setLoadError(t('login_required'));
+            } else if (mode === "weekly") {
+                setLoadError("今週のボス情報を取得できませんでした");
             } else {
                 setLoadError(t('data_load_error'));
             }
         } finally {
             setLoading(false);
         }
-    }, [user]);
+    }, [user, mode]);
 
     // Auto-select first robot when robots are loaded
     useEffect(() => {

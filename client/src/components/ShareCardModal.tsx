@@ -5,6 +5,7 @@ import { RobotData } from "@/types/shared";
 import RobotCard from "./RobotCard";
 import { Share2, Download, Loader2 } from "lucide-react";
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { toast } from 'sonner';
 import { generateImageFromElement, shareImage, downloadBlob } from '@/utils/share';
 
@@ -34,6 +35,7 @@ interface ShareCardModalProps {
 
 export default function ShareCardModal({ robot, trigger }: ShareCardModalProps) {
     const { user } = useAuth();
+    const { t } = useLanguage();
     const [isOpen, setIsOpen] = useState(false);
     const [generatedImage, setGeneratedImage] = useState<string | null>(null);
     const [generatedBlob, setGeneratedBlob] = useState<Blob | null>(null);
@@ -267,14 +269,14 @@ export default function ShareCardModal({ robot, trigger }: ShareCardModalProps) 
 
             {/* Hidden Card Render Area */}
             {isOpen && (
-                <div style={{ position: 'fixed', top: 0, left: 0, opacity: 0, pointerEvents: 'none', zIndex: -1 }}>
-                    <RobotCard
-                        ref={cardRef}
-                        robot={robot}
-                        userName={user?.displayName || "COMMANDER"}
-                        staticMode={true}
-                    />
-                </div>
+                        <div style={{ position: 'fixed', top: 0, left: 0, opacity: 0, pointerEvents: 'none', zIndex: -1 }}>
+                            <RobotCard
+                                ref={cardRef}
+                                robot={robot}
+                                userName={user?.displayName || t('label_commander')}
+                                staticMode={true}
+                            />
+                        </div>
             )}
         </Dialog>
     );

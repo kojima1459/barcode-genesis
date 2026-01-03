@@ -1,14 +1,11 @@
 import { ReactNode, useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { collection } from "firebase/firestore";
-import { httpsCallable } from "firebase/functions";
 import { Coins, Factory, Gift, Crown, BookOpen } from "lucide-react";
 import { BattleIcon, HomeIcon, ShopIcon, ProfileIcon, UnitsIcon } from "@/components/icons/AppIcons";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserData } from "@/hooks/useUserData";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { functions } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { getBadgeLabel } from "@/lib/badges";
@@ -26,7 +23,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const [location] = useLocation();
 
   // Centralized User Data
-  const { credits, loginStreak, titleId, workshopLines } = useUserData();
+  const { credits, loginStreak, titleId, workshopLines, error } = useUserData();
+  const userDataDenied = (error as { code?: string } | null)?.code === "permission-denied";
 
   const [dailyFreeStatus, setDailyFreeStatus] = useState<string>("unknown");
 
@@ -68,7 +66,11 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
     const claim = async () => {
       try {
-        const claimDailyLogin = httpsCallable(functions, "claimDailyLogin");
+        const [{ httpsCallable }, { getFunctions }] = await Promise.all([
+          import("firebase/functions"),
+          import("@/lib/firebase"),
+        ]);
+        const claimDailyLogin = httpsCallable(getFunctions(), "claimDailyLogin");
         const result = await claimDailyLogin();
         const data = result.data as {
           claimed?: boolean;
@@ -98,7 +100,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
   const navItems = useMemo(
     () => [
-      { path: "/", label: t('menu_home') || "Home", icon: HomeIcon },
+      { path: "/", label: t('menu_home'), icon: HomeIcon },
       { path: "/battle", label: t('menu_battle'), icon: BattleIcon },
       { path: "/dex", label: t('menu_units'), icon: UnitsIcon },
       { path: "/shop", label: t('menu_shop'), icon: ShopIcon },
@@ -162,6 +164,11 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
         <main className="flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain -webkit-overflow-scrolling-touch"
           style={{ paddingBottom: "calc(var(--bottom-nav-height) + env(safe-area-inset-bottom) + 16px)" }}>
+          {userDataDenied && (
+            <div className="mx-4 mt-3 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs font-mono text-destructive">
+              読み込み不可
+            </div>
+          )}
           {children}
 
           {/* Footer - inside main for proper spacing */}

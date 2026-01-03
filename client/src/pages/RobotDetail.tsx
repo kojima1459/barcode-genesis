@@ -1,15 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
-import { httpsCallable } from "firebase/functions";
-import { collection, doc, getDoc, getDocs, orderBy, query } from "firebase/firestore";
-import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from "recharts";
 import { ArrowLeft, Loader2, Zap, Cpu, Calendar, Barcode, Trophy, Skull } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import RobotSVG from "@/components/RobotSVG";
 import { useAuth } from "@/contexts/AuthContext";
-import { getDb, functions } from "@/lib/firebase";
 import { getItemLabel } from "@/lib/items";
 import { toast } from "sonner";
 import { RobotData } from "@/types/shared";
@@ -22,7 +18,6 @@ import { useRobotFx } from "@/hooks/useRobotFx";
 import { Interactive } from "@/components/ui/interactive";
 import { ScrambleText } from "@/components/ui/ScrambleText";
 import { SystemSkeleton } from "@/components/ui/SystemSkeleton";
-import { Timestamp } from "firebase/firestore";
 
 
 type InventoryMap = Record<string, number>;
@@ -55,6 +50,20 @@ const getLevelInfo = (robot: RobotData) => {
   return { level, nextLevelExp: nextLevelXp, progress };
 };
 
+const formatCreatedAt = (createdAt: unknown, fallback: string) => {
+  if (createdAt && typeof createdAt === "object") {
+    const withToDate = createdAt as { toDate?: () => Date };
+    if (typeof withToDate.toDate === "function") {
+      return withToDate.toDate().toLocaleDateString("ja-JP");
+    }
+    const withSeconds = createdAt as { seconds?: number };
+    if (typeof withSeconds.seconds === "number") {
+      return new Date(withSeconds.seconds * 1000).toLocaleDateString("ja-JP");
+    }
+  }
+  return fallback;
+};
+
 export default function RobotDetail({ robotId }: { robotId: string }) {
   const { user } = useAuth();
   const { t } = useLanguage();
@@ -84,6 +93,7 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
   const [isApplyingCosmetic, setIsApplyingCosmetic] = useState(false);
   const [cosmeticError, setCosmeticError] = useState<string | null>(null);
   const [isEvolutionModalOpen, setIsEvolutionModalOpen] = useState(false);
+  const [Recharts, setRecharts] = useState<null | typeof import("recharts")>(null);
 
   // Battle history state
   const [battleHistory, setBattleHistory] = useState<Array<{
@@ -92,6 +102,20 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
     won: boolean;
     date: Date;
   }>>([]);
+
+  useEffect(() => {
+    let active = true;
+    import("recharts")
+      .then((mod) => {
+        if (active) setRecharts(mod);
+      })
+      .catch(() => {
+        if (active) setRecharts(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!user) {
@@ -104,19 +128,24 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
     const loadRobots = async () => {
       setLoading(true);
       try {
-        const baseRef = doc(getDb(), "users", user.uid, "robots", robotId);
+        const [{ collection, doc, getDoc, getDocs, orderBy, query }, { getDb }] = await Promise.all([
+          import("firebase/firestore"),
+          import("@/lib/firebase"),
+        ]);
+        const db = getDb();
+        const baseRef = doc(db, "users", user.uid, "robots", robotId);
         const baseSnap = await getDoc(baseRef);
         if (!baseSnap.exists()) {
           setBaseRobot(null);
           return;
         }
 
-        const robotsRef = collection(getDb(), "users", user.uid, "robots");
+        const robotsRef = collection(db, "users", user.uid, "robots");
         const robotsQuery = query(robotsRef, orderBy("createdAt", "desc"));
         const robotsSnap = await getDocs(robotsQuery);
         const robotsData = robotsSnap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as RobotData));
 
-        const inventorySnap = await getDocs(collection(getDb(), "users", user.uid, "inventory"));
+        const inventorySnap = await getDocs(collection(db, "users", user.uid, "inventory"));
         const inventoryData: InventoryMap = {};
         inventorySnap.forEach((itemDoc) => {
           const data = itemDoc.data();
@@ -131,7 +160,7 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
 
         // Fetch battle history (from user's battle_logs subcollection if exists)
         try {
-          const battleLogsRef = collection(getDb(), "users", user.uid, "battle_logs");
+          const battleLogsRef = collection(db, "users", user.uid, "battle_logs");
           const battleLogsQuery = query(battleLogsRef, orderBy("createdAt", "desc"));
           const battleLogsSnap = await getDocs(battleLogsQuery);
           const relevantBattles: Array<{ id: string; opponentName: string; won: boolean; date: Date }> = [];
@@ -141,7 +170,7 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
             if (data.robotId === robotId || data.playerRobotId === robotId) {
               relevantBattles.push({
                 id: docSnap.id,
-                opponentName: data.opponentRobotName || data.opponentName || "Unknown",
+                opponentName: data.opponentRobotName || data.opponentName || t('label_unknown'),
                 won: data.won ?? data.winnerId === robotId,
                 date: data.createdAt?.toDate?.() || new Date(),
               });
@@ -184,12 +213,20 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
     });
   };
 
+  const getCallable = async (name: string) => {
+    const [{ httpsCallable }, { getFunctions }] = await Promise.all([
+      import("firebase/functions"),
+      import("@/lib/firebase"),
+    ]);
+    return httpsCallable(getFunctions(), name);
+  };
+
   const handleSynthesize = async () => {
     if (!baseRobot) return;
     setSynthesizeError(null);
     setIsSynthesizing(true);
     try {
-      const synthesize = httpsCallable(functions, "synthesizeRobots");
+      const synthesize = await getCallable("synthesizeRobots");
       const result = await synthesize({ baseRobotId: baseRobot.id, materialRobotIds: selectedMaterials });
       const data = result.data as { baseRobotId: string; newLevel: number; newXp: number };
 
@@ -220,7 +257,7 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
     setInheritError(null);
     setIsInheriting(true);
     try {
-      const inherit = httpsCallable(functions, "inheritSkill");
+      const inherit = await getCallable("inheritSkill");
       const result = await inherit({
         baseRobotId: baseRobot.id,
         materialRobotId: inheritMaterialId,
@@ -251,7 +288,7 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
     setEquipError(null);
     setEquippingSlot(slot);
     try {
-      const equip = httpsCallable(functions, "equipItem");
+      const equip = await getCallable("equipItem");
       const result = await equip({ robotId: baseRobot.id, slot, itemId });
       const data = result.data as { equipped: { slot1?: string | null; slot2?: string | null }; inventory: InventoryMap };
 
@@ -272,7 +309,7 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
     setEquipError(null);
     setEquippingSlot(slot);
     try {
-      const equip = httpsCallable(functions, "equipItem");
+      const equip = await getCallable("equipItem");
       const result = await equip({ robotId: baseRobot.id, slot });
       const data = result.data as { equipped: { slot1?: string | null; slot2?: string | null }; inventory: InventoryMap };
 
@@ -295,7 +332,7 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
     setUpgradeError(null);
     setIsUpgrading(true);
     try {
-      const useUpgrade = httpsCallable(functions, "useUpgradeItem");
+      const useUpgrade = await getCallable("useUpgradeItem");
       const result = await useUpgrade({ robotId: baseRobot.id, itemId: upgradeItemId });
       const data = result.data as {
         robotId: string;
@@ -331,7 +368,7 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
     setCosmeticError(null);
     setIsApplyingCosmetic(true);
     try {
-      const applyCosmetic = httpsCallable(functions, "applyCosmeticItem");
+      const applyCosmetic = await getCallable("applyCosmeticItem");
       const result = await applyCosmetic({ robotId: baseRobot.id, itemId: cosmeticItemId });
       const data = result.data as {
         robotId: string;
@@ -434,7 +471,7 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
             <ScrambleText text={baseRobot.name} duration={1000} />
           </h1>
           <div className="text-neon-cyan font-orbitron text-sm mb-4">
-            {baseRobot.rarityName} // {baseRobot.elementName || "Neutral"}
+            {baseRobot.rarityName} // {baseRobot.elementName || t('element_neutral')}
           </div>
 
           {/* Level & XP */}
@@ -464,7 +501,7 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
               <Barcode className="w-4 h-4 text-muted-foreground" />
               <div>
                 <div className="text-xs text-muted-foreground">Source Barcode</div>
-                <div className="font-mono text-neon-cyan">{baseRobot.sourceBarcode || "N/A"}</div>
+                <div className="font-mono text-neon-cyan">{baseRobot.sourceBarcode || t('unknown_value')}</div>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -472,12 +509,7 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
               <div>
                 <div className="text-xs text-muted-foreground">Genesis Date</div>
                 <div className="font-mono">
-                  {baseRobot.createdAt instanceof Timestamp ?
-                    baseRobot.createdAt.toDate().toLocaleDateString("ja-JP") :
-                    // Fallback for serialized objects
-                    (baseRobot.createdAt as { seconds: number })?.seconds ?
-                      new Date((baseRobot.createdAt as { seconds: number }).seconds * 1000).toLocaleDateString("ja-JP") :
-                      "Unknown"}
+                  {formatCreatedAt(baseRobot.createdAt, t('unknown_date'))}
                 </div>
               </div>
             </div>
@@ -524,26 +556,32 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
         <div className="glass-panel p-6 rounded-xl border border-white/5 relative overflow-hidden">
           <h3 className="text-sm text-neon-cyan mb-4 font-orbitron font-semibold tracking-widest absolute top-4 left-6 z-10">STATUS ANALYSIS</h3>
           <div className="h-[250px] w-full relative z-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <RadarChart cx="50%" cy="50%" outerRadius="70%" data={[
-                { subject: 'HP', A: baseRobot.baseHp, fullMark: 500 },
-                { subject: 'ATK', A: baseRobot.baseAttack, fullMark: 200 },
-                { subject: 'DEF', A: baseRobot.baseDefense, fullMark: 200 },
-                { subject: 'SPD', A: baseRobot.baseSpeed, fullMark: 200 },
-              ]}>
-                <PolarGrid stroke="#ffffff33" />
-                <PolarAngleAxis dataKey="subject" tick={{ fill: '#0ff', fontSize: 12, fontFamily: 'Orbitron' }} />
-                <PolarRadiusAxis angle={30} domain={[0, 200]} tick={false} axisLine={false} />
-                <Radar
-                  name="Stats"
-                  dataKey="A"
-                  stroke="#00f3ff"
-                  strokeWidth={2}
-                  fill="#00f3ff"
-                  fillOpacity={0.3}
-                />
-              </RadarChart>
-            </ResponsiveContainer>
+            {Recharts ? (
+              <Recharts.ResponsiveContainer width="100%" height="100%">
+                <Recharts.RadarChart cx="50%" cy="50%" outerRadius="70%" data={[
+                  { subject: 'HP', A: baseRobot.baseHp, fullMark: 500 },
+                  { subject: 'ATK', A: baseRobot.baseAttack, fullMark: 200 },
+                  { subject: 'DEF', A: baseRobot.baseDefense, fullMark: 200 },
+                  { subject: 'SPD', A: baseRobot.baseSpeed, fullMark: 200 },
+                ]}>
+                  <Recharts.PolarGrid stroke="#ffffff33" />
+                  <Recharts.PolarAngleAxis dataKey="subject" tick={{ fill: '#0ff', fontSize: 12, fontFamily: 'Orbitron' }} />
+                  <Recharts.PolarRadiusAxis angle={30} domain={[0, 200]} tick={false} axisLine={false} />
+                  <Recharts.Radar
+                    name="Stats"
+                    dataKey="A"
+                    stroke="#00f3ff"
+                    strokeWidth={2}
+                    fill="#00f3ff"
+                    fillOpacity={0.3}
+                  />
+                </Recharts.RadarChart>
+              </Recharts.ResponsiveContainer>
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
+                {t('loading')}
+              </div>
+            )}
           </div>
         </div>
 
@@ -591,7 +629,7 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
                     <div className="font-bold text-sm">
                       {typeof skill === 'string' ? skill :
                         (skill && typeof skill === 'object' && 'name' in skill) ? (skill as { name: string }).name :
-                          'Unknown Skill'}
+                          t('error_unknown_skill')}
                     </div>
                   </div>
                 </div>

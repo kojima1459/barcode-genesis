@@ -15,8 +15,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import GenerationAnimation from "@/components/GenerationAnimation";
 import ShareCardModal from "@/components/ShareCardModal";
 import { useRobotFx } from "@/hooks/useRobotFx";
-import { httpsCallable } from "firebase/functions";
-import { functions } from "@/lib/firebase";
 import AdBanner from "@/components/AdBanner";
 import RoleReveal from "@/components/RoleReveal";
 import { isSpecialRare } from "@/lib/rarity";
@@ -75,7 +73,11 @@ export default function Scan() {
         try {
             let shouldAbort = false;
             try {
-                const awardScanToken = httpsCallable(functions, "awardScanToken");
+                const [{ httpsCallable }, { getFunctions }] = await Promise.all([
+                    import("firebase/functions"),
+                    import("@/lib/firebase"),
+                ]);
+                const awardScanToken = httpsCallable(getFunctions(), "awardScanToken");
                 await awardScanToken({ barcode, source: "camera" });
             } catch (error: any) {
                 const code = getCallableErrorCode(error);
@@ -269,7 +271,7 @@ export default function Scan() {
                                     <ScrambleText text={robot.rarityName} delay={400} />
                                 </span>
                                 <span className="px-3 py-1 rounded-full bg-neon-purple/20 text-neon-purple text-sm font-bold border border-neon-purple/50">
-                                    <ScrambleText text={robot.elementName || "Unknown"} delay={600} />
+                                    <ScrambleText text={robot.elementName || t('label_unknown')} delay={600} />
                                 </span>
                             </div>
 

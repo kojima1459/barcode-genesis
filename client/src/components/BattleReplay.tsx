@@ -137,9 +137,25 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
         specialHits?: number;
     }>({});
     const prefersReducedMotion = useReducedMotion();
+    const [showSpecialOverlay, setShowSpecialOverlay] = useState(false);
+    const [replayError, setReplayError] = useState<string | null>(null);
+    const [pauseTick, setPauseTick] = useState(0);
+    const [devCrashNotice, setDevCrashNotice] = useState<string | null>(null);
+    const specialOverlayIndexRef = useRef<number | null>(null);
+    const specialOverlayTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const pauseUntilRef = useRef(0);
+    const audioContextRef = useRef<AudioContext | null>(null);
+    const mountedRef = useRef(true);
+    const timeoutsRef = useRef<NodeJS.Timeout[]>([]);
+    const devCrashTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    // HUD helper state
+    const [lastDamage, setLastDamage] = useState(0);
+    const [lastDamageTargetId, setLastDamageTargetId] = useState<string | null>(null);
 
     // Initial Setup
     useEffect(() => {
+        if (!mountedRef.current) return;
         const generated = generateBattleEvents(result.logs, p1.id, p2.id);
         setEvents(generated);
         setCurrentEventIndex(0);
@@ -157,10 +173,175 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
         if (!next) playSfx('ui');
     };
 
+    const scheduleTimeout = (callback: () => void, ms: number) => {
+        const id = setTimeout(() => {
+            if (!mountedRef.current) return;
+            callback();
+        }, ms);
+        timeoutsRef.current.push(id);
+        return id;
+    };
+
+    const showDevCrash = (message: string) => {
+        if (!import.meta.env.DEV) return;
+        if (!mountedRef.current) return;
+        setDevCrashNotice(message);
+        if (devCrashTimeoutRef.current) {
+            clearTimeout(devCrashTimeoutRef.current);
+        }
+        devCrashTimeoutRef.current = scheduleTimeout(() => setDevCrashNotice(null), 3000);
+    };
+
+    const getAudioContext = () => {
+        if (audioContextRef.current || typeof AudioContext === 'undefined') {
+            return audioContextRef.current;
+        }
+        audioContextRef.current = new AudioContext();
+        return audioContextRef.current;
+    };
+
+    const playMiniSfx = (type: 'hit' | 'crit' | 'special') => {
+        if (isMuted) return;
+        try {
+            const ctx = getAudioContext();
+            if (!ctx) return;
+            if (ctx.state === 'suspended') {
+                ctx.resume().catch(() => { });
+            }
+            const now = ctx.currentTime;
+
+            if (type === 'hit') {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(180, now);
+                osc.frequency.exponentialRampToValueAtTime(120, now + 0.08);
+                gain.gain.setValueAtTime(0.12, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.1);
+                return;
+            }
+
+            if (type === 'crit') {
+                const playBeep = (time: number) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(820, time);
+                    gain.gain.setValueAtTime(0.1, time);
+                    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.07);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(time);
+                    osc.stop(time + 0.08);
+                };
+                playBeep(now);
+                playBeep(now + 0.1);
+                return;
+            }
+
+            if (type === 'special') {
+                const sweep = ctx.createOscillator();
+                const sweepGain = ctx.createGain();
+                sweep.type = 'sawtooth';
+                sweep.frequency.setValueAtTime(900, now);
+                sweep.frequency.exponentialRampToValueAtTime(180, now + 0.35);
+                sweepGain.gain.setValueAtTime(0.12, now);
+                sweepGain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+                sweep.connect(sweepGain);
+                sweepGain.connect(ctx.destination);
+                sweep.start(now);
+                sweep.stop(now + 0.36);
+
+                const thump = ctx.createOscillator();
+                const thumpGain = ctx.createGain();
+                thump.type = 'square';
+                thump.frequency.setValueAtTime(70, now + 0.06);
+                thumpGain.gain.setValueAtTime(0.16, now + 0.06);
+                thumpGain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+                thump.connect(thumpGain);
+                thumpGain.connect(ctx.destination);
+                thump.start(now + 0.06);
+                thump.stop(now + 0.2);
+            }
+        } catch {
+            // Ignore audio failures
+        }
+    };
+
+    const isImportantEvent = (event: BattleEvent) => Boolean(
+        event.specialTriggered ||
+        event.overdriveTriggered ||
+        event.isCritical ||
+        event.finisherApplied ||
+        event.bossShieldBroken ||
+        event.stunApplied ||
+        event.stunned ||
+        event.cheerApplied
+    );
+
+    const handleReplayError = (error: unknown) => {
+        console.error("[BattleReplay] Replay error:", error);
+        if (!mountedRef.current) return;
+        hasEndedRef.current = true;
+        setReplayError("Replay error");
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        if (specialOverlayTimeoutRef.current) clearTimeout(specialOverlayTimeoutRef.current);
+        timeoutsRef.current.forEach((timeoutId) => clearTimeout(timeoutId));
+        timeoutsRef.current = [];
+    };
+
     // Cleanup
     useEffect(() => {
         return () => {
+            mountedRef.current = false;
+            timeoutsRef.current.forEach((timeoutId) => clearTimeout(timeoutId));
+            timeoutsRef.current = [];
             if (timeoutRef.current) clearTimeout(timeoutRef.current);
+            if (specialOverlayTimeoutRef.current) clearTimeout(specialOverlayTimeoutRef.current);
+            if (devCrashTimeoutRef.current) clearTimeout(devCrashTimeoutRef.current);
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!import.meta.env.DEV || typeof window === "undefined") return;
+
+        const prevOnError = window.onerror;
+        const prevOnRejection = window.onunhandledrejection;
+
+        window.onerror = (message, source, lineno, colno, error) => {
+            console.error(
+                "[DEV_CRASH] window.onerror",
+                error?.stack || message,
+                source,
+                lineno,
+                colno
+            );
+            showDevCrash("DEV crash captured (onerror)");
+            if (typeof prevOnError === "function") {
+                return prevOnError(message, source, lineno, colno, error);
+            }
+            return false;
+        };
+
+        window.onunhandledrejection = (event) => {
+            const reason = event?.reason;
+            const message = reason instanceof Error ? reason.message : String(reason);
+            const stack = reason instanceof Error ? reason.stack : undefined;
+            console.error("[DEV_CRASH] unhandledrejection", message, stack);
+            showDevCrash("DEV crash captured (unhandledrejection)");
+            if (typeof prevOnRejection === "function") {
+                return prevOnRejection(event);
+            }
+            return undefined;
+        };
+
+        return () => {
+            window.onerror = prevOnError;
+            window.onunhandledrejection = prevOnRejection;
         };
     }, []);
 
@@ -168,88 +349,135 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
     useEffect(() => {
         if (events.length === 0) return;
         if (hasEndedRef.current) return;
+        if (replayError) return;
 
         if (currentEventIndex >= events.length) {
             handleBattleEnd();
             return;
         }
 
+        if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+        }
+
+        const pauseRemaining = Math.max(0, pauseUntilRef.current - Date.now());
+        if (pauseRemaining > 0) {
+            timeoutRef.current = scheduleTimeout(() => {
+                setPauseTick((prev) => prev + 1);
+            }, pauseRemaining);
+            return;
+        }
+
         const event = events[currentEventIndex];
+
+        if (!isSkipped && event.type === 'SPECIAL_CUT_IN') {
+            if (specialOverlayIndexRef.current !== currentEventIndex) {
+                specialOverlayIndexRef.current = currentEventIndex;
+                if (!mountedRef.current) return;
+                setShowSpecialOverlay(true);
+                if (specialOverlayTimeoutRef.current) {
+                    clearTimeout(specialOverlayTimeoutRef.current);
+                }
+                pauseUntilRef.current = Date.now() + 600;
+                specialOverlayTimeoutRef.current = scheduleTimeout(() => {
+                    if (!mountedRef.current) return;
+                    setShowSpecialOverlay(false);
+                    pauseUntilRef.current = 0;
+                }, 600);
+            }
+        }
+
         let delay = (event.delay || 0) / speed;
+        if (!isSkipped) {
+            if (event.logType === 'NORMAL') {
+                delay *= 0.7;
+            }
+            if (isImportantEvent(event)) {
+                delay = Math.max(delay, 500);
+            }
+        }
 
         // Critical Hit Slow-mo Logic
         if (event.type === 'ATTACK_IMPACT' && event.isCritical && !isSkipped) {
             delay *= 3; // 3x duration for impact
+            if (!mountedRef.current) return;
             setIsCriticalMoment(true);
-            setTimeout(() => setIsCriticalMoment(false), delay);
+            scheduleTimeout(() => setIsCriticalMoment(false), delay);
         }
 
         if (isSkipped) delay = 20;
+        delay = Math.max(delay, 20);
 
         const execute = () => {
-            // Update current event for HUD
-            setCurrentEvent(event);
+            try {
+                if (!mountedRef.current) return;
+                // Update current event for HUD
+                setCurrentEvent(event);
 
-            // Process Event Side Effects
-            switch (event.type) {
-                case 'SPECIAL_CUT_IN':
-                    // Show cut-in overlay
-                    const attackerRobot = event.attackerId === p1.id ? p1 : p2;
-                    setCutInData({
-                        robotName: attackerRobot.name,
-                        overdriveTriggered: event.overdriveTriggered,
-                        overdriveMessage: event.overdriveMessage,
-                        specialTriggered: event.specialTriggered,
-                        specialName: event.specialName,
-                        specialRoleName: event.specialRoleName,
-                        specialImpact: event.specialImpact,
-                        specialHits: event.specialHits
-                    });
-                    setShowCutIn(true);
-                    // Play special SFX
-                    playSfx('crit', { volume: 0.8 });
-                    shake({ intensity: 'medium', duration: 400 });
-                    // Auto-hide after delay
-                    setTimeout(() => setShowCutIn(false), (event.delay || 800) / speed);
-                    break;
+                // Process Event Side Effects
+                switch (event.type) {
+                    case 'SPECIAL_CUT_IN':
+                        // Show cut-in overlay
+                        const attackerRobot = event.attackerId === p1.id ? p1 : p2;
+                        setCutInData({
+                            robotName: attackerRobot.name,
+                            overdriveTriggered: event.overdriveTriggered,
+                            overdriveMessage: event.overdriveMessage,
+                            specialTriggered: event.specialTriggered,
+                            specialName: event.specialName,
+                            specialRoleName: event.specialRoleName,
+                            specialImpact: event.specialImpact,
+                            specialHits: event.specialHits
+                        });
+                        setShowCutIn(true);
+                        // Play special SFX (generated)
+                        playMiniSfx('special');
+                        shake({ intensity: 'medium', duration: 400 });
+                        // Auto-hide after delay
+                        scheduleTimeout(() => setShowCutIn(false), (event.delay || 650) / speed);
+                        break;
 
-                case 'LOG_MESSAGE':
-                    if (event.message) {
-                        setActiveMessage(event.message);
-                        if (isHighlightLog(event.message)) {
-                            setHighlightMessages(prev => [...prev, event.message!].slice(-5));
+                    case 'LOG_MESSAGE':
+                        if (event.message) {
+                            const isHighlight = event.logType === 'HIGHLIGHT' || event.logType === 'CLIMAX' || isHighlightLog(event.message);
+                            if (isHighlight) {
+                                setActiveMessage(event.message);
+                                setHighlightMessages(prev => [...prev, event.message!].slice(-5));
+                            }
                         }
-                    }
-                    // Update overdrive gauges from LOG_MESSAGE events
-                    if (event.attackerOverdriveGauge !== undefined) {
-                        if (event.attackerId === p1.id) {
-                            setP1OverdriveGauge(event.attackerOverdriveGauge);
-                        } else {
-                            setP2OverdriveGauge(event.attackerOverdriveGauge);
+                        if (event.attackerId) {
+                            setCurrentAttackerId(event.attackerId);
                         }
-                    }
-                    if (event.defenderOverdriveGauge !== undefined) {
-                        if (event.defenderId === p1.id) {
-                            setP1OverdriveGauge(event.defenderOverdriveGauge);
-                        } else {
-                            setP2OverdriveGauge(event.defenderOverdriveGauge);
+                        // Update overdrive gauges from LOG_MESSAGE events
+                        if (event.attackerOverdriveGauge !== undefined) {
+                            if (event.attackerId === p1.id) {
+                                setP1OverdriveGauge(event.attackerOverdriveGauge);
+                            } else {
+                                setP2OverdriveGauge(event.attackerOverdriveGauge);
+                            }
                         }
-                    }
-                    break;
+                        if (event.defenderOverdriveGauge !== undefined) {
+                            if (event.defenderId === p1.id) {
+                                setP1OverdriveGauge(event.defenderOverdriveGauge);
+                            } else {
+                                setP2OverdriveGauge(event.defenderOverdriveGauge);
+                            }
+                        }
+                        break;
 
-                case 'ATTACK_PREPARE':
-                    if (event.attackerId) {
-                        setLungeId(event.attackerId);
-                        setCurrentAttackerId(event.attackerId);
-                        setTimeout(() => setLungeId(null), 200 / speed);
-                        playSfx('attack', { volume: 0.4 });
-                    }
-                    break;
+                    case 'ATTACK_PREPARE':
+                        if (event.attackerId) {
+                            setLungeId(event.attackerId);
+                            setCurrentAttackerId(event.attackerId);
+                            scheduleTimeout(() => setLungeId(null), 140 / speed);
+                            playSfx('attack', { volume: 0.5 });
+                        }
+                        break;
 
-                case 'ATTACK_IMPACT':
-                    if (event.defenderId) {
-                        setShakeId(event.defenderId);
-                        setTimeout(() => setShakeId(null), 300 / speed);
+                    case 'ATTACK_IMPACT':
+                        if (event.defenderId) {
+                            setShakeId(event.defenderId);
+                            scheduleTimeout(() => setShakeId(null), 300 / speed);
 
                         // Enhanced shake for special/overdrive
                         if (event.specialTriggered || event.overdriveTriggered) {
@@ -262,78 +490,94 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
 
                         if (event.isMiss) {
                             playGenerated('miss');
-                        } else if (event.isCritical || event.specialTriggered) {
-                            playSfx('crit', { volume: 0.7 });
+                        } else if (event.specialTriggered || event.overdriveTriggered) {
+                            playMiniSfx('special');
+                        } else if (event.isCritical) {
+                            playMiniSfx('crit');
                         } else {
-                            playSfx('hit', { volume: 0.5 });
+                            playMiniSfx('hit');
                         }
 
-                        if (event.cheerApplied) {
-                            setTimeout(() => playSfx('cheer', { volume: 0.6 }), 100);
+                            if (event.cheerApplied) {
+                                scheduleTimeout(() => playSfx('cheer', { volume: 0.6 }), 100);
+                            }
                         }
-                    }
-                    break;
+                        break;
 
-                case 'DAMAGE_POPUP':
-                    if (event.defenderId) {
-                        const popupId = `popup-${currentEventIndex}-${Date.now()}`;
-                        const value = event.damage || 0;
-                        const isCritical = Boolean(event.isCritical) || Boolean(event.specialTriggered);
-                        const isDodge = Boolean(event.isMiss);
+                    case 'DAMAGE_POPUP':
+                        if (event.defenderId) {
+                            const popupId = `popup-${currentEventIndex}-${Date.now()}`;
+                            const value = event.damage || 0;
+                            const isCritical = Boolean(event.isCritical) || Boolean(event.specialTriggered);
+                            const isDodge = Boolean(event.isMiss);
 
-                        setPopups(prev => [...prev.slice(-4), {
-                            id: popupId,
-                            value,
-                            isCritical,
-                            isDodge,
-                            cheerApplied: event.cheerApplied,
-                            x: 40 + ((currentEventIndex * 17) % 20),
-                            y: 30 + ((currentEventIndex * 13) % 20),
-                            targetId: event.defenderId!
-                        }]);
-                        setTimeout(() => {
-                            setPopups(prev => prev.filter(p => p.id !== popupId));
-                        }, 1200);
-                    }
-                    break;
-
-                case 'HP_UPDATE':
-                    if (event.currentHp) {
-                        if (event.currentHp[p1.id] < (lastHp[p1.id] ?? p1.baseHp)) {
-                            setFlashP1(true);
-                            setTimeout(() => setFlashP1(false), 300);
+                            setPopups(prev => [...prev.slice(-4), {
+                                id: popupId,
+                                value,
+                                isCritical,
+                                isDodge,
+                                cheerApplied: event.cheerApplied,
+                                x: 40 + ((currentEventIndex * 17) % 20),
+                                y: 30 + ((currentEventIndex * 13) % 20),
+                                targetId: event.defenderId!
+                            }]);
+                            setLastDamage(value);
+                            setLastDamageTargetId(event.defenderId);
+                            scheduleTimeout(() => {
+                                setPopups(prev => prev.filter(p => p.id !== popupId));
+                            }, 900);
                         }
-                        if (event.currentHp[p2.id] < (lastHp[p2.id] ?? p2.baseHp)) {
-                            setFlashP2(true);
-                            setTimeout(() => setFlashP2(false), 300);
-                        }
-                        setLastHp(event.currentHp);
-                        setHp(prev => ({ ...prev, ...event.currentHp }));
-                    }
-                    // Also update gauges from HP_UPDATE
-                    if (event.attackerOverdriveGauge !== undefined) {
-                        setP1OverdriveGauge(event.attackerOverdriveGauge);
-                    }
-                    if (event.defenderOverdriveGauge !== undefined) {
-                        setP2OverdriveGauge(event.defenderOverdriveGauge);
-                    }
-                    break;
+                        break;
 
-                case 'PHASE_START':
-                    if (event.turn) setCurrentTurn(event.turn);
-                    break;
+                    case 'HP_UPDATE':
+                        if (event.currentHp) {
+                            if (event.currentHp[p1.id] < (lastHp[p1.id] ?? p1.baseHp)) {
+                                setFlashP1(true);
+                                scheduleTimeout(() => setFlashP1(false), 300);
+                            }
+                            if (event.currentHp[p2.id] < (lastHp[p2.id] ?? p2.baseHp)) {
+                                setFlashP2(true);
+                                scheduleTimeout(() => setFlashP2(false), 300);
+                            }
+                            setLastHp(event.currentHp);
+                            setHp(prev => ({ ...prev, ...event.currentHp }));
+                        }
+                        // Also update gauges from HP_UPDATE
+                        if (event.attackerOverdriveGauge !== undefined && event.attackerId) {
+                            if (event.attackerId === p1.id) {
+                                setP1OverdriveGauge(event.attackerOverdriveGauge);
+                            } else {
+                                setP2OverdriveGauge(event.attackerOverdriveGauge);
+                            }
+                        }
+                        if (event.defenderOverdriveGauge !== undefined && event.defenderId) {
+                            if (event.defenderId === p1.id) {
+                                setP1OverdriveGauge(event.defenderOverdriveGauge);
+                            } else {
+                                setP2OverdriveGauge(event.defenderOverdriveGauge);
+                            }
+                        }
+                        break;
+
+                    case 'PHASE_START':
+                        if (event.turn) setCurrentTurn(event.turn);
+                        break;
+                }
+
+                // Next event
+                setCurrentEventIndex(prev => prev + 1);
+            } catch (error) {
+                handleReplayError(error);
             }
-
-            // Next event
-            setCurrentEventIndex(prev => prev + 1);
         };
 
-        timeoutRef.current = setTimeout(execute, delay);
-    }, [currentEventIndex, events, speed, isSkipped]);
+        timeoutRef.current = scheduleTimeout(execute, delay);
+    }, [currentEventIndex, events, speed, isSkipped, showSpecialOverlay, replayError, pauseTick]);
 
 
     const handleBattleEnd = () => {
         if (hasEndedRef.current) return;
+        if (!mountedRef.current) return;
         hasEndedRef.current = true;
 
         const isWin = result.winnerId === p1.id;
@@ -347,7 +591,12 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
     };
 
     const handleSkip = () => {
+        if (!mountedRef.current) return;
         setIsSkipped(true);
+        if (specialOverlayTimeoutRef.current) {
+            clearTimeout(specialOverlayTimeoutRef.current);
+        }
+        setShowSpecialOverlay(false);
         playGenerated('ui_skip');
     };
 
@@ -363,6 +612,7 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
 
     // NEW: Results Only - Jump to end
     const handleResultsOnly = () => {
+        if (!mountedRef.current) return;
         setShowResultsOnly(true);
         setIsSkipped(true);
         playGenerated('ui_skip');
@@ -389,12 +639,40 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
         return Math.max(0, Math.min(100, (current / max) * 100));
     };
 
+    const nextHitKills = lastDamageTargetId === p2.id && lastDamage > 0
+        && lastDamage >= (hp[p2.id] ?? p2.baseHp);
+
+    if (replayError) {
+        return (
+            <div className="glass-panel p-6 rounded-2xl border border-red-500/30 text-center space-y-4">
+                <div className="text-sm font-bold text-red-400">Replay error.</div>
+                <Button onClick={onComplete} className="bg-red-500 hover:bg-red-600 text-white">
+                    Back to Battle
+                </Button>
+            </div>
+        );
+    }
+
     return (
         <div className={`space-y-8 relative py-8 w-full transition-all duration-200 ${isCriticalMoment ? 'grayscale-[0.5] scale-[1.02]' : ''}`} style={shakeStyle}>
             {/* Visual Overlays */}
             {isFinished && result.winnerId === p1.id && <VictoryEffect />}
             {isFinished && result.winnerId === p1.id && <Confetti seed={result.battleId || 'victory'} />}
             {isFinished && result.winnerId !== p1.id && <DefeatEffect />}
+
+            {import.meta.env.DEV && devCrashNotice && (
+                <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg bg-red-900/80 text-white text-xs font-mono border border-red-500/40 shadow-lg">
+                    {devCrashNotice}
+                </div>
+            )}
+
+            {showSpecialOverlay && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-sm pointer-events-none">
+                    <div className="px-10 py-6 rounded-2xl border border-white/20 bg-black/60 text-white text-4xl sm:text-5xl font-black tracking-[0.2em]">
+                        SPECIAL
+                    </div>
+                </div>
+            )}
 
             {/* Special/Overdrive Cut-In Overlay */}
             <SpecialCutIn
@@ -487,6 +765,7 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
                             currentEvent={currentEvent}
                             p1OverdriveGauge={p1OverdriveGauge}
                             p2OverdriveGauge={p2OverdriveGauge}
+                            nextHitKills={nextHitKills}
                         />
                     </div>
                 </div>
@@ -714,4 +993,3 @@ const RobotCard = memo(({ robot, hpPercent, currentHp, isShaking, isLunging, isP
     );
 });
 RobotCard.displayName = 'RobotCard';
-

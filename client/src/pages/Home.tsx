@@ -298,7 +298,7 @@ export default function Home() {
         toast("本日は受け取り済みです", { icon: "✅" });
       }
     } catch (error: any) {
-      const message = error?.message || "Login bonus failed";
+      const message = error?.message || t('login_bonus_failed');
       console.error("Login bonus failed:", error);
       setLoginError(message);
     } finally {
@@ -441,7 +441,9 @@ export default function Home() {
                   lastResult={weeklyLastResult}
                   isLoading={weeklyLoading}
                   error={weeklyError}
-                  onChallenge={() => setLocation('/weekly-boss')}
+                  onChallenge={() => {
+                    setLocation("/boss?mode=weekly");
+                  }}
                   onRetry={loadWeeklyBoss}
                 />
               </section>
@@ -720,5 +722,3 @@ export default function Home() {
     </div>
   );
 }
-
-

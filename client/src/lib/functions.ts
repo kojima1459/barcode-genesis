@@ -1,4 +1,4 @@
-import { getAuth } from "./firebase";
+import { getAuth } from "./firebaseAuth";
 
 // 型定義
 interface GenerateRobotRequest {

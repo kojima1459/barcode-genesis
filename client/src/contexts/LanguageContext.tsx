@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { translations, Language } from '@/lib/translations';
 
 /**
@@ -17,16 +17,23 @@ interface LanguageContextType {
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
+export const LANGUAGE_STORAGE_KEY = 'lang';
+const LEGACY_LANGUAGE_STORAGE_KEY = 'language';
+let cachedLanguage: Language = 'ja';
 
 // localStorage から言語設定を同期的に取得（初期化時のチラつき防止）
+function normalizeLanguage(value: string | null): Language {
+  return value === 'en' || value === 'ja' ? value : 'ja';
+}
+
 function getInitialLanguage(): Language {
   if (typeof window === 'undefined') return 'ja';
 
   try {
-    const savedLang = localStorage.getItem('language');
-    if (savedLang === 'ja' || savedLang === 'en') {
-      return savedLang;
-    }
+    const stored = localStorage.getItem(LANGUAGE_STORAGE_KEY);
+    if (stored) return normalizeLanguage(stored);
+    const legacy = localStorage.getItem(LEGACY_LANGUAGE_STORAGE_KEY);
+    if (legacy) return normalizeLanguage(legacy);
   } catch {
     // localStorage アクセス失敗時は ja にフォールバック
   }
@@ -77,13 +84,31 @@ function createTranslateFunction(language: Language) {
 }
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [language, setLanguageState] = useState<Language>(getInitialLanguage);
+  const [language, setLanguageState] = useState<Language>('ja');
+
+  // Ensure localStorage is normalized and the single source of truth
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const storedRaw = localStorage.getItem(LANGUAGE_STORAGE_KEY);
+      const legacyRaw = localStorage.getItem(LEGACY_LANGUAGE_STORAGE_KEY);
+      const normalized = normalizeLanguage(storedRaw ?? legacyRaw);
+      localStorage.setItem(LANGUAGE_STORAGE_KEY, normalized);
+      if (legacyRaw !== null) localStorage.removeItem(LEGACY_LANGUAGE_STORAGE_KEY);
+      cachedLanguage = normalized;
+      if (normalized !== language) setLanguageState(normalized);
+    } catch {
+      // Ignore localStorage failures
+    }
+  }, []);
 
   // 言語設定を保存（localStorage + state）
   const setLanguage = (lang: Language) => {
-    setLanguageState(lang);
+    const normalized = normalizeLanguage(lang);
+    setLanguageState(normalized);
+    cachedLanguage = normalized;
     try {
-      localStorage.setItem('language', lang);
+      localStorage.setItem(LANGUAGE_STORAGE_KEY, normalized);
     } catch {
       // localStorage 書き込み失敗を無視
     }
@@ -110,6 +135,9 @@ export function useLanguage() {
 // 単独で使える翻訳関数（コンテキスト外での使用）
 // 注意: これは言語設定変更に追従しないので、コンポーネント内ではuseLanguage()を使用
 export function translateSync(key: string, params?: Record<string, string | number>): string {
-  const language = getInitialLanguage();
-  return createTranslateFunction(language)(key, params);
+  return createTranslateFunction(cachedLanguage)(key, params);
+}
+
+export function getCachedLanguage(): Language {
+  return cachedLanguage;
 }

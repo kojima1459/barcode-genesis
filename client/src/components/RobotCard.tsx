@@ -4,6 +4,7 @@ import RobotSVG from './RobotSVG';
 import { ScrambleText } from './ui/ScrambleText';
 import { HolographicCard } from './ui/HolographicCard';
 import { Trophy } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
 import {
     StatIconHP,
     StatIconATK,
@@ -32,7 +33,9 @@ interface RobotCardProps {
     staticMode?: boolean;
 }
 
-const RobotCard = React.forwardRef<HTMLDivElement, RobotCardProps>(({ robot, userName = "COMMANDER", originalItemName, staticMode = false }, ref) => {
+const RobotCard = React.forwardRef<HTMLDivElement, RobotCardProps>(({ robot, userName, originalItemName, staticMode = false }, ref) => {
+    const { t } = useLanguage();
+    const resolvedUserName = userName ?? t('label_commander');
     // Rarity color mapping (Legacy + Phase B)
     const getRarityColor = () => {
         if (robot.rarityTier === 'legendary') return '#ffd700'; // Gold
@@ -150,7 +153,7 @@ const RobotCard = React.forwardRef<HTMLDivElement, RobotCardProps>(({ robot, use
                                 {robot.rarity || 1}
                             </div>
                             <div className="text-lg font-orbitron font-semibold mb-1" style={{ color: mainColor }}>
-                                <ScrambleText text={robot.rarityName || "UNKNOWN"} delay={300} instant={staticMode} />
+                                <ScrambleText text={robot.rarityName || t('label_unknown')} delay={300} instant={staticMode} />
                             </div>
                             <div className="flex gap-1.5">
                                 {[...Array(5)].map((_, i) => (
@@ -255,7 +258,7 @@ const RobotCard = React.forwardRef<HTMLDivElement, RobotCardProps>(({ robot, use
                             </div>
                             <div className="flex items-center gap-2 mt-1">
                                 <Trophy className="w-3 h-3 text-neon-yellow" />
-                                <span className="text-[10px] font-mono text-white/60 tracking-wider">CMDR: {userName}</span>
+                                <span className="text-[10px] font-mono text-white/60 tracking-wider">CMDR: {resolvedUserName}</span>
                             </div>
                         </div>
 

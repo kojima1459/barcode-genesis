@@ -10,6 +10,7 @@
 
 import { toBlob, toPng } from 'html-to-image';
 import { toast } from 'sonner';
+import { safeRemove } from '@/lib/utils';
 
 export interface ShareOptions {
     title: string;
@@ -102,9 +103,13 @@ export function downloadBlob(blob: Blob, filename: string): boolean {
         const link = document.createElement('a');
         link.href = url;
         link.download = filename;
+        if (!document.body) {
+            console.warn('[Share] document.body not available for download');
+            return false;
+        }
         document.body.appendChild(link);
         link.click();
-        document.body.removeChild(link);
+        safeRemove(link);
 
         // Clean up the URL after a short delay
         setTimeout(() => URL.revokeObjectURL(url), 1000);

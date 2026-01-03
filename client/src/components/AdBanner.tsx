@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, memo } from 'react';
+import { Component, type ReactNode, useEffect, useRef, useState, memo } from 'react';
 import { useUserData } from '@/hooks/useUserData';
+import { safeRemove } from '@/lib/utils';
 
 /**
  * AdBanner Component - Performance Optimized
@@ -12,6 +13,7 @@ function AdBannerComponent() {
   const { isPremium } = useUserData();
   const [isVisible, setIsVisible] = useState(false);
   const [adLoaded, setAdLoaded] = useState(false);
+  const unmountedRef = useRef(false);
 
   // IntersectionObserver: Only load ad when visible
   useEffect(() => {
@@ -19,7 +21,9 @@ function AdBannerComponent() {
 
     const observer = new IntersectionObserver(
       (entries) => {
+        if (unmountedRef.current) return;
         if (entries[0].isIntersecting) {
+          if (unmountedRef.current) return;
           setIsVisible(true);
           observer.disconnect();
         }
@@ -36,11 +40,14 @@ function AdBannerComponent() {
     if (!isVisible || adLoaded || isPremium || !bannerRef.current) return;
 
     const loadAd = () => {
+      if (unmountedRef.current) return;
       const container = bannerRef.current;
-      if (!container) return;
+      if (!container || !container.isConnected) return;
 
       try {
-        container.innerHTML = '';
+        while (container.firstChild) {
+          safeRemove(container.firstChild);
+        }
 
         const iframe = document.createElement('iframe');
         Object.assign(iframe.style, {
@@ -77,7 +84,9 @@ function AdBannerComponent() {
           `);
           doc.close();
         }
-        setAdLoaded(true);
+        if (!unmountedRef.current) {
+          setAdLoaded(true);
+        }
       } catch (error) {
         console.warn("Failed to load ad banner:", error);
       }
@@ -85,19 +94,30 @@ function AdBannerComponent() {
 
     // Use requestIdleCallback if available, otherwise setTimeout
     if ('requestIdleCallback' in window) {
-      const id = window.requestIdleCallback(loadAd, { timeout: 2000 });
-      return () => window.cancelIdleCallback(id);
-    } else {
-      const id = setTimeout(loadAd, 100);
-      return () => clearTimeout(id);
+      let idleId: number | null = null;
+      const startDelay = setTimeout(() => {
+        idleId = window.requestIdleCallback(loadAd, { timeout: 2000 });
+      }, 200);
+      return () => {
+        clearTimeout(startDelay);
+        if (idleId !== null) {
+          window.cancelIdleCallback(idleId);
+        }
+      };
     }
+
+    const id = setTimeout(loadAd, 300);
+    return () => clearTimeout(id);
   }, [isVisible, adLoaded, isPremium]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      unmountedRef.current = true;
       if (bannerRef.current) {
-        bannerRef.current.innerHTML = '';
+        while (bannerRef.current.firstChild) {
+          safeRemove(bannerRef.current.firstChild);
+        }
       }
     };
   }, []);
@@ -121,4 +141,31 @@ function AdBannerComponent() {
   );
 }
 
-export default memo(AdBannerComponent);
+class AdErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error) {
+    console.warn("[AdBanner] ErrorBoundary caught error:", error);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return null;
+    }
+    return this.props.children;
+  }
+}
+
+const AdBanner = memo(function AdBanner() {
+  return (
+    <AdErrorBoundary>
+      <AdBannerComponent />
+    </AdErrorBoundary>
+  );
+});
+
+export default AdBanner;

@@ -74,22 +74,45 @@ export interface BattleEvent {
     logType?: LogType;
 }
 
-// Base delays (ms) - will be multiplied by tempo
+// Base delays (ms) - tuned for snappy feel
 const BASE_DELAYS = {
-    MESSAGE: 100,
-    PREPARE: 100,
-    IMPACT: 50,
-    POPUP: 100,
-    HP_UPDATE: 150,
-    CUT_IN: 800,
+    MESSAGE: 70,
+    PREPARE: 70,
+    IMPACT: 40,
+    POPUP: 80,
+    HP_UPDATE: 110,
+    CUT_IN: 650,
 };
+
+const FORCE_SPECIAL_TURN = 3;
 
 export function generateBattleEvents(logs: BattleLog[], p1Id: string, p2Id: string): BattleEvent[] {
     const events: BattleEvent[] = [];
+    const specialUsed: Record<string, boolean> = { [p1Id]: false, [p2Id]: false };
 
     logs.forEach((log, index) => {
+        const attackerId = log.attackerId;
+        const attackerGauge = typeof log.attackerOverdriveGauge === "number" ? log.attackerOverdriveGauge : 0;
+        const rawSpecial = Boolean(log.specialTriggered || log.overdriveTriggered);
+        const allowSpecial = rawSpecial && !specialUsed[attackerId];
+        const forceSpecial = !rawSpecial && !specialUsed[attackerId] && (
+            attackerGauge >= 100 || log.turn === FORCE_SPECIAL_TURN
+        );
+        const effectiveSpecial = allowSpecial || forceSpecial;
+        const effectiveOverdrive = (log.overdriveTriggered && !specialUsed[attackerId]) || (forceSpecial && attackerGauge >= 100);
+
+        if (effectiveSpecial) {
+            specialUsed[attackerId] = true;
+        }
+
+        const logForTempo: BattleLog = {
+            ...log,
+            specialTriggered: effectiveSpecial || undefined,
+            overdriveTriggered: effectiveOverdrive || undefined,
+        };
+
         // Classify log type for tempo optimization
-        const logType = classifyLogType(log);
+        const logType = classifyLogType(logForTempo);
         const tempoMultiplier = TEMPO_MULTIPLIERS[logType];
 
         // Calculate tempo-adjusted delays
@@ -99,14 +122,14 @@ export function generateBattleEvents(logs: BattleLog[], p1Id: string, p2Id: stri
         const popupDelay = Math.round(BASE_DELAYS.POPUP * tempoMultiplier);
         const hpUpdateDelay = Math.round(BASE_DELAYS.HP_UPDATE * tempoMultiplier);
 
-        // 0. SPECIAL_CUT_IN event (before attack if CLIMAX)
-        if (logType === 'CLIMAX') {
+        // 0. SPECIAL_CUT_IN event (before attack)
+        if (effectiveSpecial) {
             events.push({
                 type: 'SPECIAL_CUT_IN',
                 attackerId: log.attackerId,
-                overdriveTriggered: log.overdriveTriggered,
+                overdriveTriggered: effectiveOverdrive,
                 overdriveMessage: log.overdriveMessage,
-                specialTriggered: log.specialTriggered,
+                specialTriggered: effectiveSpecial,
                 specialName: log.specialName,
                 specialRoleName: log.specialRoleName,
                 specialImpact: log.specialImpact,
@@ -117,44 +140,46 @@ export function generateBattleEvents(logs: BattleLog[], p1Id: string, p2Id: stri
         }
 
         // 1. Attack Preparation (Message) with extended HUD data
-        events.push({
-            type: 'LOG_MESSAGE',
-            message: log.message,
-            turn: log.turn,
-            attackerId: log.attackerId,
-            defenderId: log.defenderId,
-            // Stance data
-            stanceAttacker: log.stanceAttacker,
-            stanceDefender: log.stanceDefender,
-            stanceOutcome: log.stanceOutcome,
-            stanceMultiplier: log.stanceMultiplier,
-            // Overdrive gauges
-            attackerOverdriveGauge: log.attackerOverdriveGauge,
-            defenderOverdriveGauge: log.defenderOverdriveGauge,
-            // Status
-            guarded: log.guarded,
-            guardMultiplier: log.guardMultiplier,
-            stunApplied: log.stunApplied,
-            stunned: log.stunned,
-            // Items
-            itemApplied: log.itemApplied,
-            itemType: log.itemType,
-            itemEffect: log.itemEffect,
-            // Cheer
-            cheerApplied: log.cheerApplied,
-            cheerSide: log.cheerSide,
-            cheerMultiplier: log.cheerMultiplier,
-            // Boss Shield
-            bossShieldRemaining: log.bossShieldRemaining,
-            bossShieldBroken: log.bossShieldBroken,
-            // Special/Finisher flags for HUD
-            overdriveTriggered: log.overdriveTriggered,
-            specialTriggered: log.specialTriggered,
-            finisherApplied: log.finisherApplied,
-            finisherMultiplier: log.finisherMultiplier,
-            logType,
-            delay: messageDelay
-        });
+        if (logType !== 'NORMAL') {
+            events.push({
+                type: 'LOG_MESSAGE',
+                message: log.message,
+                turn: log.turn,
+                attackerId: log.attackerId,
+                defenderId: log.defenderId,
+                // Stance data
+                stanceAttacker: log.stanceAttacker,
+                stanceDefender: log.stanceDefender,
+                stanceOutcome: log.stanceOutcome,
+                stanceMultiplier: log.stanceMultiplier,
+                // Overdrive gauges
+                attackerOverdriveGauge: log.attackerOverdriveGauge,
+                defenderOverdriveGauge: log.defenderOverdriveGauge,
+                // Status
+                guarded: log.guarded,
+                guardMultiplier: log.guardMultiplier,
+                stunApplied: log.stunApplied,
+                stunned: log.stunned,
+                // Items
+                itemApplied: log.itemApplied,
+                itemType: log.itemType,
+                itemEffect: log.itemEffect,
+                // Cheer
+                cheerApplied: log.cheerApplied,
+                cheerSide: log.cheerSide,
+                cheerMultiplier: log.cheerMultiplier,
+                // Boss Shield
+                bossShieldRemaining: log.bossShieldRemaining,
+                bossShieldBroken: log.bossShieldBroken,
+                // Special/Finisher flags for HUD
+                overdriveTriggered: effectiveOverdrive,
+                specialTriggered: effectiveSpecial,
+                finisherApplied: log.finisherApplied,
+                finisherMultiplier: log.finisherMultiplier,
+                logType,
+                delay: messageDelay
+            });
+        }
 
         // 2. Attack Animation Start (Attacker lunges)
         events.push({
@@ -175,8 +200,8 @@ export function generateBattleEvents(logs: BattleLog[], p1Id: string, p2Id: stri
             cheerApplied: log.cheerApplied,
             pursuitDamage: log.pursuitDamage,
             followUpDamage: log.followUpDamage,
-            specialTriggered: log.specialTriggered,
-            overdriveTriggered: log.overdriveTriggered,
+            specialTriggered: effectiveSpecial,
+            overdriveTriggered: effectiveOverdrive,
             delay: impactDelay
         });
 
@@ -190,7 +215,7 @@ export function generateBattleEvents(logs: BattleLog[], p1Id: string, p2Id: stri
                 isMiss: log.action === 'miss',
                 isGuard: log.guarded,
                 cheerApplied: log.cheerApplied,
-                specialTriggered: log.specialTriggered,
+                specialTriggered: effectiveSpecial,
                 specialHits: log.specialHits,
                 logType,
                 delay: popupDelay
@@ -200,6 +225,8 @@ export function generateBattleEvents(logs: BattleLog[], p1Id: string, p2Id: stri
         // 5. HP Update
         events.push({
             type: 'HP_UPDATE',
+            attackerId: log.attackerId,
+            defenderId: log.defenderId,
             currentHp: {
                 [log.attackerId]: log.attackerHp,
                 [log.defenderId]: log.defenderHp

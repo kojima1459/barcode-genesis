@@ -1,5 +1,6 @@
 import { memo } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface SpecialCutInProps {
     show: boolean;
@@ -36,15 +37,16 @@ const SpecialCutIn = memo(({
     onComplete
 }: SpecialCutInProps) => {
     const prefersReducedMotion = useReducedMotion();
+    const { t } = useLanguage();
 
     // Determine display text
     const isOverdrive = overdriveTriggered;
     const isSpecial = specialTriggered && !overdriveTriggered;
 
     const mainText = isOverdrive
-        ? (overdriveMessage || "OVERDRIVE!")
+        ? (overdriveMessage || t('label_overdrive'))
         : isSpecial
-            ? `${specialRoleName || ''} ${specialName || 'SPECIAL'}`.trim()
+            ? `${specialRoleName || ''} ${specialName || t('label_special')}`.trim()
             : "";
 
     const subText = isSpecial && specialImpact ? specialImpact : "";

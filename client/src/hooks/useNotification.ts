@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getToken, onMessage } from 'firebase/messaging';
-import { getMessaging, getDb } from '@/lib/firebase';
-import { doc, setDoc, arrayUnion } from 'firebase/firestore';
+import type { NotificationPayload } from 'firebase/messaging';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
@@ -26,6 +24,10 @@ export const useNotification = () => {
             setPermission(permission);
 
             if (permission === 'granted') {
+                const [{ getToken }, { getMessaging }] = await Promise.all([
+                    import('firebase/messaging'),
+                    import('@/lib/firebase'),
+                ]);
                 const msg = getMessaging();
                 if (!msg) {
                     toast.error("Messaging not supported in this browser");
@@ -47,6 +49,10 @@ export const useNotification = () => {
     };
 
     const saveTokenToDatabase = async (token: string, uid: string) => {
+        const [{ doc, setDoc }, { getDb }] = await Promise.all([
+            import('firebase/firestore'),
+            import('@/lib/firebase'),
+        ]);
         const tokenRef = doc(getDb(), 'users', uid, 'fcmTokens', token);
         await setDoc(tokenRef, {
             token,
@@ -58,15 +64,29 @@ export const useNotification = () => {
     // Listen for foreground messages
     useEffect(() => {
         if (permission === 'granted') {
-            const msg = getMessaging();
-            if (!msg) return;
-            const unsubscribe = onMessage(msg, (payload) => {
-                console.log('Foreground Message:', payload);
-                toast(payload.notification?.title || 'New Message', {
-                    description: payload.notification?.body,
+            let active = true;
+            const setup = async () => {
+                const [{ onMessage }, { getMessaging }] = await Promise.all([
+                    import('firebase/messaging'),
+                    import('@/lib/firebase'),
+                ]);
+                if (!active) return;
+                const msg = getMessaging();
+                if (!msg) return;
+                const unsubscribe = onMessage(msg, (payload: NotificationPayload) => {
+                    console.log('Foreground Message:', payload);
+                    toast(payload.notification?.title || 'New Message', {
+                        description: payload.notification?.body,
+                    });
                 });
-            });
-            return () => unsubscribe();
+                return unsubscribe;
+            };
+            let cleanup: (() => void) | undefined;
+            setup().then((unsub) => { cleanup = unsub; }).catch(() => { });
+            return () => {
+                active = false;
+                cleanup?.();
+            };
         }
     }, [permission]);
 

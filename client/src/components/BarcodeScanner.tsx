@@ -2,12 +2,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from "@zxing/library";
 import { useRef, useState } from "react";
 import { AlertCircle, Keyboard, Image, Loader2, Sparkles, Camera, Upload } from "lucide-react";
 import { toast } from "sonner";
-import { httpsCallable } from "firebase/functions";
-import { functions } from "@/lib/firebase";
 
 interface BarcodeScannerProps {
   onScanSuccess: (decodedText: string) => void;
@@ -23,6 +20,8 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
   // 2つのinput要素のためのref
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const zxingRef = useRef<null | typeof import("@zxing/library")>(null);
+  const zxingLoadRef = useRef<null | Promise<typeof import("@zxing/library")>>(null);
 
   const addLog = (msg: string) => {
     console.log(msg);
@@ -51,7 +50,11 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
         const resizedBase64 = await resizeAndCompressForCloud(imageFile);
         addLog(`Sending to AI Engine (Gemini 2.0) (size: ${Math.round(resizedBase64.length / 1024)}KB)`);
 
-        const scanBarcodeFromImage = httpsCallable(functions, 'scanBarcodeFromImage');
+        const [{ httpsCallable }, { getFunctions }] = await Promise.all([
+          import("firebase/functions"),
+          import("@/lib/firebase"),
+        ]);
+        const scanBarcodeFromImage = httpsCallable(getFunctions(), 'scanBarcodeFromImage');
         const result = await scanBarcodeFromImage({ imageBase64: resizedBase64 });
         const data = result.data as any;
 
@@ -97,23 +100,28 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
       }
 
       // PHASE 3: ZXing Multi-pass (Software Engine)
-      const hints = new Map();
-      hints.set(DecodeHintType.POSSIBLE_FORMATS, [
-        BarcodeFormat.EAN_13, BarcodeFormat.EAN_8,
-        BarcodeFormat.UPC_A, BarcodeFormat.UPC_E,
-        BarcodeFormat.CODE_128, BarcodeFormat.CODE_39
-      ]);
-      hints.set(DecodeHintType.TRY_HARDER, true);
+      try {
+        const { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } = await loadZxing();
+        const hints = new Map();
+        hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+          BarcodeFormat.EAN_13, BarcodeFormat.EAN_8,
+          BarcodeFormat.UPC_A, BarcodeFormat.UPC_E,
+          BarcodeFormat.CODE_128, BarcodeFormat.CODE_39
+        ]);
+        hints.set(DecodeHintType.TRY_HARDER, true);
 
-      const reader = new BrowserMultiFormatReader(hints);
-      const resultText = await multiAttemptScaleAndScan(imageFile, reader);
+        const reader = new BrowserMultiFormatReader(hints);
+        const resultText = await multiAttemptScaleAndScan(imageFile, reader);
 
-      if (resultText) {
-        setManualCode(resultText);
-        toast.success(`精密ローカル検知: ${resultText}`);
-        resetInputs();
-        onScanSuccess(resultText);
-        return;
+        if (resultText) {
+          setManualCode(resultText);
+          toast.success(`精密ローカル検知: ${resultText}`);
+          resetInputs();
+          onScanSuccess(resultText);
+          return;
+        }
+      } catch (zxingError) {
+        console.warn("ZXing failed, falling back to Quagga...", zxingError);
       }
 
       // PHASE 4: Quagga2 Fallback (Alternative Software Engine)
@@ -206,7 +214,7 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
   }
 
   // Try multiple scales and filters to find the barcode (Phase 3 fallback)
-  async function multiAttemptScaleAndScan(file: File, reader: BrowserMultiFormatReader): Promise<string | null> {
+  async function multiAttemptScaleAndScan(file: File, reader: { decodeFromCanvas: (canvas: HTMLCanvasElement) => Promise<{ getText: () => string }> }): Promise<string | null> {
     const img = new window.Image();
     const url = URL.createObjectURL(file);
 
@@ -278,6 +286,15 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
     }
     return null;
   }
+
+  const loadZxing = async () => {
+    if (zxingRef.current) return zxingRef.current;
+    if (!zxingLoadRef.current) {
+      zxingLoadRef.current = import("@zxing/library");
+    }
+    zxingRef.current = await zxingLoadRef.current;
+    return zxingRef.current;
+  };
 
   // Quagga2 Wrapper for Phase 4 (Lazy loaded)
   async function scanWithQuagga(imageUrl: string): Promise<string | null> {
