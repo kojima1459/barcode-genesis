@@ -32,7 +32,7 @@ import { BossAlertCard } from "@/components/BossAlertCard";
 import { MilestoneBossCard } from "@/components/MilestoneBossCard";
 import { WeeklyBossCard } from "@/components/WeeklyBossCard";
 import { cn } from "@/lib/utils";
-import { useLocation, Link } from "wouter";
+import { useLocation } from "wouter";
 import {
   DailyBossData,
   DailyBossResponse,
