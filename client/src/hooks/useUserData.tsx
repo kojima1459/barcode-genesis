@@ -92,48 +92,58 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
                 if (cancelled || !mountedRef.current) return;
 
                 const ref = doc(getDb(), "users", user.uid);
-                unsub = onSnapshot(
-                    ref,
-                    (snapshot) => {
-                        if (cancelled || !mountedRef.current) return;
-                        setError(null);
-                        if (snapshot.exists()) {
-                            const data = snapshot.data();
-                            // Normalize data to ensure types
-                            setUserData({
-                                credits: typeof data.credits === "number" ? data.credits : 0,
-                                scanTokens: typeof data.scanTokens === "number" ? data.scanTokens : 0,
-                                xp: typeof data.xp === "number" ? data.xp : 0,
-                                level: typeof data.level === "number" ? data.level : 1,
-                                isPremium: !!data.isPremium,
-                                loginStreak: typeof data.loginStreak === "number" ? data.loginStreak : 0,
-                                displayName: data.displayName,
-                                photoURL: data.photoURL,
-                                wins: typeof data.wins === "number" ? data.wins : 0,
-                                battles: typeof data.battles === "number" ? data.battles : 0,
-                                workshopLines: typeof data.workshopLines === "number" ? data.workshopLines : 1,
-                                createdAt: data.createdAt,
-                                lastLogin: data.lastLogin,
-                                activeUnitId: typeof data.activeUnitId === "string" ? data.activeUnitId : undefined,
-                                badgeIds: Array.isArray(data.badgeIds) ? data.badgeIds : [],
-                                titleId: typeof data.titleId === "string" ? data.titleId : undefined,
-                                lastFreeVariantDate: typeof data.lastFreeVariantDate === "string" ? data.lastFreeVariantDate : undefined,
-                                variantCount: typeof data.variantCount === "number" ? data.variantCount : 0,
-                            });
-                        } else {
-                            // User document doesn't exist yet (might be creating)
+                const startSubscription = () => {
+                    if (cancelled || !mountedRef.current) return;
+                    unsub = onSnapshot(
+                        ref,
+                        (snapshot) => {
+                            if (cancelled || !mountedRef.current) return;
+                            setError(null);
+                            if (snapshot.exists()) {
+                                const data = snapshot.data();
+                                // Normalize data to ensure types
+                                setUserData({
+                                    credits: typeof data.credits === "number" ? data.credits : 0,
+                                    scanTokens: typeof data.scanTokens === "number" ? data.scanTokens : 0,
+                                    xp: typeof data.xp === "number" ? data.xp : 0,
+                                    level: typeof data.level === "number" ? data.level : 1,
+                                    isPremium: !!data.isPremium,
+                                    loginStreak: typeof data.loginStreak === "number" ? data.loginStreak : 0,
+                                    displayName: data.displayName,
+                                    photoURL: data.photoURL,
+                                    wins: typeof data.wins === "number" ? data.wins : 0,
+                                    battles: typeof data.battles === "number" ? data.battles : 0,
+                                    workshopLines: typeof data.workshopLines === "number" ? data.workshopLines : 1,
+                                    createdAt: data.createdAt,
+                                    lastLogin: data.lastLogin,
+                                    activeUnitId: typeof data.activeUnitId === "string" ? data.activeUnitId : undefined,
+                                    badgeIds: Array.isArray(data.badgeIds) ? data.badgeIds : [],
+                                    titleId: typeof data.titleId === "string" ? data.titleId : undefined,
+                                    lastFreeVariantDate: typeof data.lastFreeVariantDate === "string" ? data.lastFreeVariantDate : undefined,
+                                    variantCount: typeof data.variantCount === "number" ? data.variantCount : 0,
+                                });
+                            } else {
+                                // User document doesn't exist yet (might be creating)
+                                setUserData(null);
+                            }
+                            setLoading(false);
+                        },
+                        (err) => {
+                            if (cancelled || !mountedRef.current) return;
+                            console.error("useUserData error:", err);
+                            setError(err as Error);
                             setUserData(null);
+                            setLoading(false);
                         }
-                        setLoading(false);
-                    },
-                    (err) => {
-                        if (cancelled || !mountedRef.current) return;
-                        console.error("useUserData error:", err);
-                        setError(err as Error);
-                        setUserData(null);
-                        setLoading(false);
-                    }
-                );
+                    );
+                };
+
+                if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+                    (window as Window & { requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => number })
+                        .requestIdleCallback(startSubscription, { timeout: 800 });
+                } else {
+                    setTimeout(startSubscription, 800);
+                }
             } catch (err) {
                 if (cancelled || !mountedRef.current) return;
                 console.error("useUserData setup error:", err);

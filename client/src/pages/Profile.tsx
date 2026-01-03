@@ -5,10 +5,9 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useSound } from "@/contexts/SoundContext";
-import { getDb, getStorage } from "@/lib/firebase";
+import { getDb } from "@/lib/firebase";
 // [REFACTOR 1.3] Removed unused import: getDoc
 import { doc, updateDoc, collection, getDocs, query, orderBy } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 // [REFACTOR 1.3] Removed unused imports: ArrowLeft
 import { Copy, Edit2, Save, User, Trophy, Sword, Shield, LogOut, Camera, Loader2 } from "lucide-react";
 import { Link, useLocation } from "wouter";
@@ -123,6 +122,10 @@ export default function Profile() {
       );
       // [REFACTOR 3.3] Removed console.log in production - compression info
 
+      const [{ ref, uploadBytes, getDownloadURL }, { getStorage }] = await Promise.all([
+        import("firebase/storage"),
+        import("@/lib/firebase"),
+      ]);
       const storageRef = ref(getStorage(), `users/${user.uid}/avatar`);
       await uploadBytes(storageRef, processedBlob);
       const downloadURL = await getDownloadURL(storageRef);
