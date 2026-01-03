@@ -1,7 +1,7 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
 import { useAuth } from "@/contexts/AuthContext";
-import { db } from "@/lib/firebase";
+import { getDb } from "@/lib/firebase";
 
 export interface UserData {
     credits: number;
@@ -72,7 +72,7 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
         }
 
         setLoading(true);
-        const ref = doc(db, "users", user.uid);
+        const ref = doc(getDb(), "users", user.uid);
 
         const unsub = onSnapshot(
             ref,

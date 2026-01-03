@@ -30,7 +30,7 @@ export default function PageTransition({ children, className = "" }: PageTransit
     }
 
     return (
-        <LazyMotion features={domAnimation} strict>
+        <LazyMotion features={domAnimation}>
             <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}

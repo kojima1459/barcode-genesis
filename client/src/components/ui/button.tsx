@@ -48,8 +48,24 @@ export interface ButtonProps
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, onClick, ...props }, ref) => {
-    const { triggerHaptic } = useHaptic();
-    const { playSE } = useSound();
+    // Use try-catch pattern to handle cases where Button is used outside providers
+    let triggerHaptic: (type: string) => void = () => { };
+    let playSE: (type: string) => void = () => { };
+
+    try {
+      const hapticContext = useHaptic();
+      triggerHaptic = hapticContext.triggerHaptic;
+    } catch {
+      // No-op if HapticProvider is not available
+    }
+
+    try {
+      const soundContext = useSound();
+      playSE = soundContext.playSE;
+    } catch {
+      // No-op if SoundProvider is not available
+    }
+
     const Comp = asChild ? Slot : motion.button
 
     const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {

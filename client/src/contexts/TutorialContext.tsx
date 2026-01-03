@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
-import { db } from '@/lib/firebase';
+import { getDb } from '@/lib/firebase';
 import { collection, getDocs, limit, query } from 'firebase/firestore';
 
 export type TutorialStep = 'HOME_GENERATE' | 'SCAN_BARCODE' | 'SCAN_RESULT' | 'COMPLETED';
@@ -35,7 +35,7 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
             // Check if user has any robots
             try {
-                const q = query(collection(db, 'users', user.uid, 'robots'), limit(1));
+                const q = query(collection(getDb(), 'users', user.uid, 'robots'), limit(1));
                 const snapshot = await getDocs(q);
 
                 if (snapshot.empty) {

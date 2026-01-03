@@ -19,10 +19,10 @@ export default function Auth() {
   // Redirect if already logged in or after successful login
   useEffect(() => {
     if (authStatus === 'authed' && user) {
-      console.log("[Auth] User authenticated, performing hard redirect to HOME...");
-      window.location.href = "/";
+      console.log("[Auth] User authenticated, navigating to HOME...");
+      setLocation("/");
     }
-  }, [user, authStatus]);
+  }, [user, authStatus, setLocation]);
 
   // If still loading auth state, show loading
   if (loading) {
