@@ -5,8 +5,6 @@
  * Extracted from Profile.tsx for reusability and testability.
  */
 
-import heic2any from 'heic2any';
-
 // ============================================
 // Constants (Issue 5.2: Magic numbers → Constants)
 // ============================================
@@ -92,6 +90,8 @@ function isHeicFormat(file: File): boolean {
  */
 async function convertHeicToJpeg(file: File): Promise<Blob> {
     try {
+        // Dynamic import to avoid loading issues on some browsers
+        const heic2any = (await import('heic2any')).default;
         const result = await heic2any({
             blob: file,
             toType: 'image/jpeg',
