@@ -1,0 +1,23 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // ユーザーのアバター画像
+    match /users/{userId}/avatar {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == userId
+                   && request.resource.size < 5 * 1024 * 1024  // 5MB以下
+                   && request.resource.contentType.matches('image/.*');
+    }
+    
+    // ユーザー固有のファイル
+    match /users/{userId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // その他は拒否
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
