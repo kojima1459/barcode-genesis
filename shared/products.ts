@@ -13,8 +13,8 @@ export interface Product {
 export const PRODUCTS: Product[] = [
   {
     id: 'coin_pack_small',
-    name: 'Coin Pouch',
-    description: 'A small pouch of coins to get you started.',
+    name: 'Credit Pouch',
+    description: 'A small pouch of credits to get you started.',
     price: 120,
     currency: 'jpy',
     image: '/images/coin_small.png',
@@ -24,8 +24,8 @@ export const PRODUCTS: Product[] = [
   },
   {
     id: 'coin_pack_medium',
-    name: 'Coin Bag',
-    description: 'A bag full of coins for serious battlers.',
+    name: 'Credit Bag',
+    description: 'A bag full of credits for serious battlers.',
     price: 500,
     currency: 'jpy',
     image: '/images/coin_medium.png',
@@ -35,8 +35,8 @@ export const PRODUCTS: Product[] = [
   },
   {
     id: 'coin_pack_large',
-    name: 'Coin Chest',
-    description: 'A treasure chest overflowing with coins!',
+    name: 'Credit Chest',
+    description: 'A treasure chest overflowing with credits!',
     price: 980,
     currency: 'jpy',
     image: '/images/coin_large.png',

@@ -277,8 +277,8 @@ export const translations = {
     seo_shop_desc: "ロボットを強化するためのアイテムやカスタマイズパーツを手に入れよう。",
 
     // Shop
-    shop_coins_title: "コイン購入",
-    shop_coins_unit: "コイン",
+    shop_coins_title: "クレジット購入",
+    shop_coins_unit: "クレジット",
     shop_items_title: "アイテムショップ",
     shop_buy: "購入",
     shop_craft: "クラフト",
@@ -862,7 +862,8 @@ export const translations = {
     seo_shop_desc: "Get items and customization parts to strengthen your robots.",
 
     // Shop
-    shop_coins_title: "Buy Coins",
+    shop_coins_title: "Purchase Credits",
+    shop_coins_unit: "Credits",
     shop_items_title: "Item Shop",
     shop_buy: "Buy",
     shop_craft: "Craft",
