@@ -171,7 +171,7 @@ export default function Home() {
     // Play welcome BGM (bgm_menu contains the voice) only once per session
     const hasPlayedWelcome = sessionStorage.getItem(`welcome_played_${user.uid}`);
     if (!hasPlayedWelcome) {
-      playBGM('bgm_menu'); // Play once
+      playBGM('bgm_menu', false); // Play once, do not loop
       sessionStorage.setItem(`welcome_played_${user.uid}`, 'true');
     }
   }, [user, playBGM]);
