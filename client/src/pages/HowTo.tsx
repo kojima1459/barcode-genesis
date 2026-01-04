@@ -117,17 +117,17 @@ export default function HowTo() {
               <div className="p-3 rounded-lg bg-pink-500/10 border border-pink-500/20 text-xs text-pink-200/90 space-y-2">
                 <div className="font-bold flex items-center gap-1.5 text-pink-300">
                   <Zap className="w-3.5 h-3.5" />
-                  必殺技（Overdrive）
+                  ひっさつわざ (Overdrive)
                 </div>
                 <p>
-                  作戦開始前の「必殺技準備完了」スイッチをONにすると、バトル中にゲージが溜まったタイミングで強力な必殺技が発動します。
+                  バトルがはじまるまえに「ひっさつわざ」をONにしよう。ゲージがたまったときに、すごいわざが はつどうするよ！
                 </p>
                 <div className="font-bold flex items-center gap-1.5 text-pink-300 pt-1">
                   <Users className="w-3.5 h-3.5" />
-                  支援プロトコル（Support）
+                  サポート (Support)
                 </div>
                 <p>
-                  バトル開始前に「応援プロトコル」を要請すると、味方ロボットのステータスが強化されます。強敵との戦いで活用しましょう。
+                  「おうえんプロトコル」をつかうと、ロボットの ステータスが パワーアップするよ！ つよいあいてと たたかうときに つかってみよう。
                 </p>
               </div>
               <Link href="/battle">
