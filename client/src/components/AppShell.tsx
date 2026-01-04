@@ -191,11 +191,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
                     {t('footer_privacy')}
                   </Link>
                 </div>
-                {/* Footer links - Row 2: Premium centered */}
-                <Link href="/premium" className="text-yellow-500 hover:text-yellow-400 transition-colors flex items-center gap-1 font-bold text-lg">
-                  <Crown className="h-5 w-5" />
-                  {t('premium')}
-                </Link>
+
               </div>
               <div className="text-center text-xs text-muted mt-4">
                 © 2024 Barcode Genesis. All rights reserved. v{APP_VERSION}

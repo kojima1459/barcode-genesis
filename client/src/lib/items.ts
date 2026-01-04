@@ -1,3 +1,5 @@
+import { getCachedLanguage } from '@/contexts/LanguageContext';
+
 export type ShopItemCategory = 'boost' | 'battle' | 'cosmetic';
 
 export type ShopItem = {
@@ -179,23 +181,26 @@ export const SHOP_ITEMS: ShopItem[] = [
   }
 ];
 
-export const getItemLabel = (itemId: string, lang: 'en' | 'ja' = 'ja') => {
+export const getItemLabel = (itemId: string, lang?: 'en' | 'ja') => {
   const item = SHOP_ITEMS.find((entry) => entry.id === itemId);
   if (!item) return itemId;
-  return lang === 'ja' ? item.nameJa : item.name;
+  const actualLang = lang ?? getCachedLanguage();
+  return actualLang === 'ja' ? item.nameJa : item.name;
 };
 
-export const getItemDescription = (itemId: string, lang: 'en' | 'ja' = 'ja') => {
+export const getItemDescription = (itemId: string, lang?: 'en' | 'ja') => {
   const item = SHOP_ITEMS.find((entry) => entry.id === itemId);
   if (!item) return '';
-  return lang === 'ja' ? item.descriptionJa : item.description;
+  const actualLang = lang ?? getCachedLanguage();
+  return actualLang === 'ja' ? item.descriptionJa : item.description;
 };
 
-export const getCategoryLabel = (category: ShopItemCategory, lang: 'en' | 'ja' = 'ja') => {
+export const getCategoryLabel = (category: ShopItemCategory, lang?: 'en' | 'ja') => {
   const labels: Record<ShopItemCategory, { en: string; ja: string }> = {
     boost: { en: 'Robot Upgrades', ja: 'ロボット強化' },
     battle: { en: 'Battle Items', ja: 'バトルアイテム' },
     cosmetic: { en: 'Cosmetics', ja: 'カスタマイズ' }
   };
-  return labels[category]?.[lang] || category;
+  const actualLang = lang ?? getCachedLanguage();
+  return labels[category]?.[actualLang] || category;
 };

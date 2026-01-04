@@ -83,7 +83,9 @@ function createTranslateFunction(language: Language) {
         console.warn(`[i18n] Missing translation key: "${key}"`);
         return `【未翻訳:${key}】`;
       }
-      return key;  // 本番ではキー名を返す
+      // Production: Show visible missing key to catch issues
+      console.error(`[i18n] MISSING KEY IN PRODUCTION: "${key}"`);
+      return `[[未翻訳:${key}]]`;
     }
 
     // パラメータ置換 (例: {name} -> "太郎")

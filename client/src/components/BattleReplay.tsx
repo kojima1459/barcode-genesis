@@ -171,6 +171,45 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
     useEffect(() => {
         if (!mountedRef.current) return;
         const generated = generateBattleEvents(result.logs, p1.id, p2.id);
+
+        // FEATURE: Ensure at least one Special Cut-in per battle for excitement
+        const hasSpecial = generated.some(e => e.specialTriggered || e.overdriveTriggered);
+        if (!hasSpecial && generated.length > 5) {
+            // Find a suitable moment (Turn 3+ hit)
+            const climaxIdx = generated.findIndex(e =>
+                e.type === 'ATTACK_IMPACT' &&
+                !e.isMiss &&
+                e.turn && e.turn >= 3 &&
+                (e.isCritical || (e.damage && e.damage > 50))
+            );
+
+            if (climaxIdx !== -1) {
+                const targetEvent = generated[climaxIdx];
+                const isP1 = targetEvent.attackerId === p1.id;
+                const robotHeight = isP1 ? p1.stats?.height : p2.stats?.height;
+                const robotWeight = isP1 ? p1.stats?.weight : p2.stats?.weight;
+
+                // Inject Fake Special
+                generated.splice(climaxIdx, 0, {
+                    type: 'SPECIAL_CUT_IN',
+                    attackerId: targetEvent.attackerId,
+                    defenderId: targetEvent.defenderId,
+                    specialTriggered: true,
+                    specialName: "LIMIT BREAK", // Generic cool name
+                    specialRoleName: "OVERDRIVE",
+                    specialImpact: 'heavy',
+                    delay: 1500
+                });
+
+                // Upgrade the impact event log type
+                const impactEvent = generated[climaxIdx + 1];
+                if (impactEvent) {
+                    impactEvent.specialTriggered = true; // For shake effect
+                    impactEvent.logType = 'CLIMAX'; // For slow-mo
+                }
+            }
+        }
+
         setEvents(generated);
         setCurrentEventIndex(0);
         setHp({ [p1.id]: p1.baseHp, [p2.id]: p2.baseHp });
@@ -204,86 +243,6 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
             clearTimeout(devCrashTimeoutRef.current);
         }
         devCrashTimeoutRef.current = scheduleTimeout(() => setDevCrashNotice(null), 3000);
-    };
-
-    const getAudioContext = () => {
-        if (audioContextRef.current || typeof AudioContext === 'undefined') {
-            return audioContextRef.current;
-        }
-        audioContextRef.current = new AudioContext();
-        return audioContextRef.current;
-    };
-
-    const playMiniSfx = (type: 'hit' | 'crit' | 'special') => {
-        if (isMuted) return;
-        try {
-            const ctx = getAudioContext();
-            if (!ctx) return;
-            if (ctx.state === 'suspended') {
-                ctx.resume().catch(() => { });
-            }
-            const now = ctx.currentTime;
-
-            if (type === 'hit') {
-                const osc = ctx.createOscillator();
-                const gain = ctx.createGain();
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(180, now);
-                osc.frequency.exponentialRampToValueAtTime(120, now + 0.08);
-                gain.gain.setValueAtTime(0.12, now);
-                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
-                osc.connect(gain);
-                gain.connect(ctx.destination);
-                osc.start(now);
-                osc.stop(now + 0.1);
-                return;
-            }
-
-            if (type === 'crit') {
-                const playBeep = (time: number) => {
-                    const osc = ctx.createOscillator();
-                    const gain = ctx.createGain();
-                    osc.type = 'triangle';
-                    osc.frequency.setValueAtTime(820, time);
-                    gain.gain.setValueAtTime(0.1, time);
-                    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.07);
-                    osc.connect(gain);
-                    gain.connect(ctx.destination);
-                    osc.start(time);
-                    osc.stop(time + 0.08);
-                };
-                playBeep(now);
-                playBeep(now + 0.1);
-                return;
-            }
-
-            if (type === 'special') {
-                const sweep = ctx.createOscillator();
-                const sweepGain = ctx.createGain();
-                sweep.type = 'sawtooth';
-                sweep.frequency.setValueAtTime(900, now);
-                sweep.frequency.exponentialRampToValueAtTime(180, now + 0.35);
-                sweepGain.gain.setValueAtTime(0.12, now);
-                sweepGain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
-                sweep.connect(sweepGain);
-                sweepGain.connect(ctx.destination);
-                sweep.start(now);
-                sweep.stop(now + 0.36);
-
-                const thump = ctx.createOscillator();
-                const thumpGain = ctx.createGain();
-                thump.type = 'square';
-                thump.frequency.setValueAtTime(70, now + 0.06);
-                thumpGain.gain.setValueAtTime(0.16, now + 0.06);
-                thumpGain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
-                thump.connect(thumpGain);
-                thumpGain.connect(ctx.destination);
-                thump.start(now + 0.06);
-                thump.stop(now + 0.2);
-            }
-        } catch {
-            // Ignore audio failures
-        }
     };
 
     const isImportantEvent = (event: BattleEvent) => Boolean(
@@ -404,7 +363,7 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
         let delay = (event.delay || 0) / speed;
         if (!isSkipped) {
             if (event.logType === 'NORMAL') {
-                delay *= 0.7;
+                delay *= 0.55; // Faster normal hits
             }
             if (isImportantEvent(event)) {
                 delay = Math.max(delay, 500);
@@ -412,8 +371,8 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
         }
 
         // Critical Hit Slow-mo Logic
-        if (event.type === 'ATTACK_IMPACT' && event.isCritical && !isSkipped) {
-            delay *= 3; // 3x duration for impact
+        if (event.type === 'ATTACK_IMPACT' && (event.isCritical || event.specialTriggered) && !isSkipped) {
+            delay *= 2.5; // Slow-mo for impact
             if (!mountedRef.current) return;
             setIsCriticalMoment(true);
             scheduleTimeout(() => setIsCriticalMoment(false), delay);
@@ -444,8 +403,8 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
                             specialHits: event.specialHits
                         });
                         setShowCutIn(true);
-                        // Play special SFX (generated)
-                        playMiniSfx('special');
+                        // Play special SFX
+                        playSfx('ult');
                         shake({ intensity: 'medium', duration: 400 });
                         // Auto-hide after delay
                         scheduleTimeout(() => setShowCutIn(false), (event.delay || 650) / speed);
@@ -503,13 +462,14 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
                             }
 
                             if (event.isMiss) {
-                                playGenerated('miss');
+                                // Miss SFX - reuse UI click or similar if no dedicated miss
+                                playSfx('guard', { volume: 0.5, playbackRate: 2.0 });
                             } else if (event.specialTriggered || event.overdriveTriggered) {
-                                playMiniSfx('special');
+                                playSfx('ult', { volume: 0.8 });
                             } else if (event.isCritical) {
-                                playMiniSfx('crit');
+                                playSfx('crit', { volume: 0.7 });
                             } else {
-                                playMiniSfx('hit');
+                                playSfx('hit', { volume: 0.6 });
                             }
 
                             if (event.cheerApplied) {

@@ -157,50 +157,61 @@ const BattleHUDExtended = memo(({
     }, [currentEvent, nextHitKills, t]);
 
     return (
-        <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
-            {/* A. Advantage Indicator */}
-            <div className={`px-2 py-0.5 rounded-full ${advantage.bg} border border-white/10 transition-all`}>
-                <span className={`text-[9px] font-black italic tracking-wider ${advantage.color}`}>
-                    {advantage.text}
-                </span>
-            </div>
-
-            {/* A2. HP Diff */}
-            <div className="px-2 py-0.5 rounded-full bg-black/40 border border-white/10">
-                <span className={`text-[9px] font-black italic ${hpDiff >= 0 ? "text-cyan-400" : "text-pink-400"}`}>
-                    HP差 {hpDiff >= 0 ? "+" : ""}{Math.abs(hpDiff)}
-                </span>
-            </div>
-
-            {/* A3. Next Actor */}
-            {nextActor && (
-                <div className="px-2 py-0.5 rounded-full bg-black/40 border border-white/10">
-                    <span className="text-[9px] font-black italic text-white/70">
-                        次: {nextActor}
+        <div className="flex flex-col items-center w-full mt-2">
+            {/* A. Visual Advantage Bar */}
+            < div className="w-full max-w-[200px] mb-1" >
+                <div className="flex justify-between text-[8px] font-black italic text-white/30 px-1 mb-0.5 font-orbitron">
+                    <span>ENEMY ADV</span>
+                    <span>EVEN</span>
+                    <span>YOU ADV</span>
+                </div>
+                <div className="h-1.5 bg-black/60 rounded-full border border-white/10 relative overflow-hidden">
+                    <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-white/20 -translate-x-1/2" />
+                    {/* Indicator */}
+                    <div
+                        className={`absolute top-0 bottom-0 w-1.5 rounded-full shadow-[0_0_5px_currentColor] transition-all duration-500 ease-out ${advantage.color.replace('text-', 'bg-')
+                            }`}
+                        style={{
+                            left: `${50 + (Math.max(-1, Math.min(1,
+                                ((currentHp[p1Id] ?? p1MaxHp) / p1MaxHp) - ((currentHp[p2Id] ?? p2MaxHp) / p2MaxHp)
+                            )) * 45)}%`
+                        }}
+                    />
+                </div>
+                {/* Numeric Diff */}
+                <div className="text-center mt-0.5">
+                    <span className={`text-[9px] font-black italic ${hpDiff >= 0 ? "text-cyan-400" : "text-pink-400"}`}>
+                        {hpDiff > 0 ? "+" : ""}{hpDiff}
                     </span>
                 </div>
-            )}
+            </div >
 
-            {/* B. Stance Visualization */}
-            {stanceInfo && (
-                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-black/40 border border-white/10">
-                    <span className="flex items-center gap-0.5 text-[9px] font-mono text-cyan-400">
-                        {stanceInfo.attackerIcon}
-                        <span>{stanceInfo.attacker?.slice(0, 3)}</span>
-                    </span>
-                    <span className="text-[8px] text-white/40">vs</span>
-                    <span className="flex items-center gap-0.5 text-[9px] font-mono text-pink-400">
-                        <span>{stanceInfo.defender?.slice(0, 3)}</span>
-                        {stanceInfo.defenderIcon}
-                    </span>
-                    <span className={`text-[9px] font-black italic ml-1 ${stanceInfo.outcomeColor}`}>
-                        {stanceInfo.outcome}
-                    </span>
-                </div>
-            )}
+            {/* A3. Next Action / Stance Status Line */}
+            < div className="w-full flex justify-center mb-1" >
+                {
+                    stanceInfo ? (
+                        <div className="flex items-center gap-2 px-3 py-1 rounded bg-black/60 border border-white/10 animate-in fade-in slide-in-from-bottom-2" >
+                            <span className="flex items-center gap-1 text-[10px] font-mono font-bold text-cyan-400">
+                                {stanceInfo.attackerIcon}
+                                {stanceInfo.attacker}
+                            </span>
+                            <span className="text-[8px] text-white/30">vs</span>
+                            <span className="flex items-center gap-1 text-[10px] font-mono font-bold text-pink-400">
+                                {stanceInfo.defenderIcon}
+                                {stanceInfo.defender}
+                            </span>
+                        </div>
+                    ) : nextActor ? (
+                        <div className="px-3 py-1 rounded bg-black/40 border border-white/5 text-[10px] font-mono text-white/50">
+                            Targeting: <span className="text-white/80 font-bold">{nextActor === p1Name ? "PLAYER" : "OPPONENT"}</span>
+                        </div>
+                    ) : (
+                        <div className="h-6" /> // Spacer
+                    )}
+            </div >
 
             {/* C. Overdrive Gauges */}
-            <div className="flex items-center gap-2 px-2 py-0.5 rounded-full bg-black/40 border border-white/10">
+            < div className="flex items-center gap-2 px-2 py-0.5 rounded-full bg-black/40 border border-white/10" >
                 <span className="text-[8px] font-black italic text-white/50">必殺</span>
                 {/* P1 Gauge */}
                 <div className="flex items-center gap-1">
@@ -225,23 +236,25 @@ const BattleHUDExtended = memo(({
                     </div>
                     <Zap className="w-3 h-3 text-pink-400" />
                 </div>
-            </div>
+            </div >
 
             {/* D. Status Flags */}
-            {statusFlags.length > 0 && (
-                <div className="flex items-center gap-1">
-                    {statusFlags.map((flag, i) => (
-                        <div
-                            key={i}
-                            className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold ${flag.color} border border-white/10`}
-                        >
-                            {flag.icon}
-                            <span>{flag.label}</span>
-                        </div>
-                    ))}
-                </div>
-            )}
-        </div>
+            {
+                statusFlags.length > 0 && (
+                    <div className="flex flex-wrap justify-center gap-1 mt-1 w-full max-w-md">
+                        {statusFlags.map((flag, i) => (
+                            <div
+                                key={i}
+                                className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold ${flag.color} border border-white/10 animate-in zoom-in duration-300`}
+                            >
+                                {flag.icon}
+                                <span>{flag.label}</span>
+                            </div>
+                        ))}
+                    </div>
+                )
+            }
+        </div >
     );
 });
 

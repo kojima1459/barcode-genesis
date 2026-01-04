@@ -21,6 +21,7 @@ import { GlobalHeader } from "@/components/GlobalHeader";
 import { useUserData } from "@/hooks/useUserData";
 // [REFACTOR 1.1] Import compressImage and validation from imageUtils
 import { compressImage, validateImageFile } from "@/lib/imageUtils";
+import { PremiumCard } from "@/components/PremiumCard";
 
 // [REFACTOR 3.1] Constants for name validation
 const MAX_NAME_LENGTH = 20;
@@ -407,6 +408,9 @@ export default function Profile() {
             </Button>
           </CardContent>
         </Card>
+
+        {/* Premium Card */}
+        <PremiumCard />
       </main>
     </div>
   );

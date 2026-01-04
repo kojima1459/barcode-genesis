@@ -11,7 +11,10 @@ import { SfxName } from '@/lib/sfx';
 /**
  * Base timing for log step progression (milliseconds)
  */
-export const PLAY_STEP_MS = 500;
+/**
+ * Base timing for log step progression (milliseconds)
+ */
+export const PLAY_STEP_MS = 400;
 
 /**
  * Additional delay for important events (ms) - reduced for snappy feel
@@ -30,9 +33,9 @@ export type LogType = 'NORMAL' | 'HIGHLIGHT' | 'CLIMAX';
  * Tempo multipliers per log type
  */
 export const TEMPO_MULTIPLIERS: Record<LogType, number> = {
-    NORMAL: 0.6,
+    NORMAL: 0.45,  // Much faster non-highlight events
     HIGHLIGHT: 0.85,
-    CLIMAX: 1.1,
+    CLIMAX: 1.2,
 };
 
 /**

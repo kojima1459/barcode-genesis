@@ -44,6 +44,7 @@ import { levelFromXp } from "@/lib/level";
 import BattleReplay from "@/components/BattleReplay";
 import { useBattleLogic } from "@/hooks/useBattleLogic";
 import SEO from "@/components/SEO";
+import { PremiumCard } from "@/components/PremiumCard";
 
 class ReplayErrorBoundary extends Component<{ onReset: () => void; children: ReactNode }, { hasError: boolean }> {
   state = { hasError: false };
@@ -740,6 +741,7 @@ export default function Battle() {
                     />
                   )}
                 </Interactive>
+                <PremiumCard className="w-full max-w-md" />
                 <AdBanner />
               </div>
             </div>

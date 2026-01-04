@@ -20,7 +20,8 @@
     "check-no-math-random": "! grep -v -E '^\\s*(//|\\*)' client/src/lib/battleEngine.ts | grep -E 'Math\\.random'",
     "analyze": "npm run build && open dist/public/stats.html",
     "lint": "eslint client/src",
-    "lint:fix": "eslint client/src --fix"
+    "lint:fix": "eslint client/src --fix",
+    "i18n:check": "node scripts/check-i18n.js"
   },
   "dependencies": {
     "@ericblade/quagga2": "^1.12.1",

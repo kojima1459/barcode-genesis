@@ -21,11 +21,11 @@ export function GlobalHeader({ className, missions }: GlobalHeaderProps) {
 
     const { userData } = useUserData();
     const rankLabel = userData ? (
-        userData.level >= 30 ? "LEGEND" :
-            userData.level >= 20 ? "ACE" :
-                userData.level >= 10 ? "VETERAN" :
-                    userData.level >= 5 ? "SOLDIER" : "ROOKIE"
-    ) : "ROOKIE";
+        userData.level >= 30 ? t('rank_legend') :
+            userData.level >= 20 ? t('rank_ace') :
+                userData.level >= 10 ? t('rank_veteran') :
+                    userData.level >= 5 ? t('rank_soldier') : t('rank_rookie')
+    ) : t('rank_rookie');
 
     const streak = userData?.loginStreak || 0;
 

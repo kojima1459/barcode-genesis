@@ -1,160 +1,142 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, ScanLine, Gamepad2, Trophy, Shield, Lock, Heart, ChevronDown } from "lucide-react";
+import {
+    ArrowRight,
+    ScanLine,
+    Zap,
+    Trophy,
+    ShieldCheck,
+    Lock,
+    Wallet,
+    ChevronRight,
+    QrCode
+} from "lucide-react";
 import SEO from "@/components/SEO";
+
+// ============================================
+// Shared Components
+// ============================================
+const SectionTitle = ({ title, subtitle }: { title: string; subtitle: string }) => (
+    <div className="text-center mb-10 px-4">
+        <h2 className="text-2xl font-bold text-white mb-3 tracking-tight font-display">{title}</h2>
+        <p className="text-sm text-slate-400 font-body leading-relaxed max-w-md mx-auto">{subtitle}</p>
+    </div>
+);
 
 // ============================================
 // Hero Section
 // ============================================
 const Hero = () => {
-    const scrollToFeatures = () => {
-        document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' });
-    };
-
     return (
-        <section className="relative min-h-[100dvh] w-full flex flex-col items-center justify-center px-4 pt-[env(safe-area-inset-top)] pb-16 overflow-hidden bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
-            {/* Background - Lightweight CSS Grid */}
+        <section className="relative min-h-[100dvh] w-full flex flex-col items-center justify-center px-6 pt-[env(safe-area-inset-top)] pb-20 overflow-hidden bg-slate-950">
+            {/* Background - Lightweight Grid */}
             <div
-                className="absolute inset-0 opacity-[0.04] pointer-events-none"
+                className="absolute inset-0 opacity-[0.03] pointer-events-none"
                 style={{
                     backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',
-                    backgroundSize: '32px 32px'
+                    backgroundSize: '40px 40px',
+                    maskImage: 'radial-gradient(circle at center, black 40%, transparent 100%)'
                 }}
             />
 
-            {/* Subtle glow */}
-            <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[300px] h-[300px] bg-cyan-500/10 rounded-full blur-[100px] pointer-events-none" />
+            {/* Subtle Aurora Glow */}
+            <div className="absolute top-[-20%] left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-cyan-500/10 rounded-full blur-[120px] pointer-events-none" />
 
-            <div className="relative z-10 text-center max-w-lg mx-auto">
+            <div className="relative z-10 text-center w-full max-w-md mx-auto">
                 {/* Badge */}
-                <div className="inline-block mb-6 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-sm text-cyan-300 tracking-wide">
-                    身の回りのバーコードがロボットに
+                <div className="inline-flex items-center gap-2 mb-8 px-4 py-1.5 rounded-full bg-cyan-950/30 border border-cyan-800/30 backdrop-blur-sm">
+                    <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
+                    </span>
+                    <span className="text-xs font-medium text-cyan-300 tracking-wide font-body">NEW GENERATION BARCODE BATTLES</span>
                 </div>
 
                 {/* Title */}
-                <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4 text-white leading-tight">
-                    バーコード
+                <h1 className="text-[2.75rem] leading-[1.1] font-bold tracking-tighter mb-6 text-white font-display">
+                    BARCODE
                     <br />
-                    ジェネシス
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">
+                        GENESIS
+                    </span>
                 </h1>
 
                 {/* Description */}
-                <p className="text-base text-slate-300 mb-8 leading-relaxed max-w-sm mx-auto">
-                    バーコードをスキャンすると、
-                    <br className="sm:hidden" />
-                    世界に一つだけのロボットが生まれます。
-                    <br />
-                    集めて、育てて、バトルで競おう。
+                <p className="text-base text-slate-300 mb-10 leading-relaxed font-body">
+                    あなたの日常が、戦場になる。<br />
+                    バーコードをスキャンして、<br />
+                    最強の相棒を見つけ出せ。
                 </p>
 
-                {/* CTA Buttons */}
-                <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                {/* CTA Buttons - Mobile Optimized Size */}
+                <div className="flex flex-col gap-4 w-full px-2">
                     <Link href="/auth">
                         <Button
                             size="lg"
-                            className="h-12 px-8 text-base rounded-full bg-cyan-500 hover:bg-cyan-400 text-slate-900 font-semibold transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-cyan-500/20"
+                            className="w-full h-14 text-base rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold transition-all shadow-lg shadow-cyan-500/20 active:scale-[0.98]"
                         >
-                            無料で始める
-                            <ArrowRight className="ml-2 w-4 h-4" />
+                            <QrCode className="mr-2 w-5 h-5 opacity-80" />
+                            無料でスキャン開始
                         </Button>
                     </Link>
                     <Button
                         variant="ghost"
                         size="lg"
-                        onClick={scrollToFeatures}
-                        className="h-12 px-6 text-base rounded-full text-slate-300 hover:text-white hover:bg-white/5 transition-all"
+                        onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
+                        className="w-full h-12 text-sm rounded-xl text-slate-400 hover:text-white hover:bg-white/5 font-medium"
                     >
                         詳しく見る
+                        <ChevronRight className="ml-1 w-4 h-4 opacity-70" />
                     </Button>
                 </div>
             </div>
-
-            {/* Scroll indicator */}
-            <button
-                onClick={scrollToFeatures}
-                className="absolute bottom-8 left-1/2 -translate-x-1/2 text-slate-500 hover:text-slate-300 transition-colors animate-bounce"
-                aria-label="下にスクロール"
-            >
-                <ChevronDown className="w-6 h-6" />
-            </button>
         </section>
     );
 };
 
 // ============================================
-// Feature Card Component
-// ============================================
-interface FeatureCardProps {
-    icon: React.ElementType;
-    title: string;
-    description: string;
-}
-
-const FeatureCard = ({ icon: Icon, title, description }: FeatureCardProps) => (
-    <div className="p-6 bg-white/[0.03] border border-white/10 rounded-2xl hover:border-cyan-500/30 hover:bg-white/[0.05] transition-all duration-300">
-        <div className="w-12 h-12 rounded-xl bg-cyan-500/10 flex items-center justify-center mb-4">
-            <Icon className="w-6 h-6 text-cyan-400" />
-        </div>
-        <h3 className="text-lg font-semibold text-white mb-2">{title}</h3>
-        <p className="text-sm text-slate-400 leading-relaxed">{description}</p>
-    </div>
-);
-
-// ============================================
 // Features Section
 // ============================================
 const Features = () => (
-    <section id="features" className="py-20 px-4 bg-slate-950">
-        <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-12">
-                <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3">3つの楽しみ方</h2>
-                <p className="text-slate-400">シンプルだけど奥深い、バーコードゲームの世界</p>
-            </div>
+    <section id="features" className="py-24 px-4 bg-slate-950 border-t border-white/5">
+        <div className="max-w-lg mx-auto">
+            <SectionTitle
+                title="GAME FEATURES"
+                subtitle="シンプルかつ奥深い。3つのステップで広がる世界。"
+            />
 
-            <div className="grid sm:grid-cols-3 gap-4">
-                <FeatureCard
-                    icon={ScanLine}
-                    title="スキャンで誕生"
-                    description="お菓子、飲み物、本…身の回りのバーコードをスキャンすると、そのコードに応じたロボットが生まれます。"
-                />
-                <FeatureCard
-                    icon={Gamepad2}
-                    title="集めて育てる"
-                    description="レアなロボットを集めたり、合成で強化したり。自分だけの最強チームを作りましょう。"
-                />
-                <FeatureCard
-                    icon={Trophy}
-                    title="バトルで競う"
-                    description="育てたロボットでバトル。デイリーボスに挑んだり、ランキングを目指したり。"
-                />
-            </div>
-        </div>
-    </section>
-);
-
-// ============================================
-// How To Play Section (3 Steps)
-// ============================================
-const HowToPlay = () => (
-    <section className="py-20 px-4 bg-gradient-to-b from-slate-950 to-slate-900">
-        <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-12">
-                <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3">遊び方</h2>
-                <p className="text-slate-400">3ステップで簡単スタート</p>
-            </div>
-
-            <div className="grid sm:grid-cols-3 gap-6">
+            <div className="space-y-4">
                 {[
-                    { step: 1, title: "バーコードをスキャン", desc: "カメラでバーコードを読み取るだけ" },
-                    { step: 2, title: "ロボットをカスタマイズ", desc: "育成・合成で自分好みに強化" },
-                    { step: 3, title: "バトルで勝利", desc: "ボスに挑戦してランキング上位へ" },
-                ].map(({ step, title, desc }) => (
-                    <div key={step} className="text-center">
-                        <div className="w-14 h-14 rounded-full bg-cyan-500/20 border-2 border-cyan-500/50 flex items-center justify-center mx-auto mb-4">
-                            <span className="text-xl font-bold text-cyan-400">{step}</span>
+                    {
+                        icon: ScanLine,
+                        title: "スキャン",
+                        desc: "商品のバーコードが、あなただけのロボットに変換されます。",
+                        color: "text-cyan-400",
+                        bg: "bg-cyan-500/10"
+                    },
+                    {
+                        icon: Zap,
+                        title: "育成・合成",
+                        desc: "手に入れたロボットを強化。パーツを組み合わせて最強を目指そう。",
+                        color: "text-yellow-400",
+                        bg: "bg-yellow-500/10"
+                    },
+                    {
+                        icon: Trophy,
+                        title: "ランキングバトル",
+                        desc: "育てた機体でライバルたちと競争。デイリー報酬を勝ち取れ。",
+                        color: "text-purple-400",
+                        bg: "bg-purple-500/10"
+                    }
+                ].map((item, i) => (
+                    <div key={i} className="flex items-start gap-5 p-5 bg-white/[0.02] border border-white/5 rounded-2xl hover:bg-white/[0.04] transition-colors">
+                        <div className={`mt-1 w-10 h-10 shrink-0 rounded-lg ${item.bg} flex items-center justify-center`}>
+                            <item.icon className={`w-5 h-5 ${item.color}`} />
                         </div>
-                        <h3 className="text-base font-semibold text-white mb-2">{title}</h3>
-                        <p className="text-sm text-slate-400">{desc}</p>
+                        <div>
+                            <h3 className="text-base font-bold text-white mb-1.5 font-display">{item.title}</h3>
+                            <p className="text-sm text-slate-400 leading-relaxed font-body">{item.desc}</p>
+                        </div>
                     </div>
                 ))}
             </div>
@@ -163,64 +145,80 @@ const HowToPlay = () => (
 );
 
 // ============================================
-// Parental Safety Section
+// How To Play Section
 // ============================================
-const ParentalSafety = () => (
-    <section className="py-20 px-4 bg-slate-900">
-        <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-12">
-                <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3">保護者の方へ</h2>
-                <p className="text-slate-400">お子様にも安心してお使いいただけます</p>
+const HowToPlay = () => (
+    <section className="py-24 px-4 bg-slate-900 border-t border-white/5">
+        <div className="max-w-md mx-auto">
+            <SectionTitle
+                title="HOW TO START"
+                subtitle="始めるのに必要なのは、スマホと少しの好奇心だけ。"
+            />
+
+            <div className="relative space-y-8">
+                {/* Connecting Line */}
+                <div className="absolute left-[27px] top-8 bottom-8 w-0.5 bg-gradient-to-b from-cyan-500/50 to-transparent pointer-events-none" />
+
+                {[
+                    { step: "01", title: "アカウント登録", desc: "メールアドレスかGoogleアカウントで、30秒で完了。" },
+                    { step: "02", title: "最初のスキャン", desc: "近くにあるお菓子や飲み物のバーコードを読み取ってみよう。" },
+                    { step: "03", title: "デッキ編成", desc: "生まれたロボットを編成して、バトルへ出撃！" },
+                ].map((item, i) => (
+                    <div key={i} className="relative flex items-start gap-6">
+                        <div className="relative z-10 flex items-center justify-center w-14 h-14 shrink-0 rounded-xl bg-slate-800 border-2 border-slate-700 shadow-xl">
+                            <span className="text-lg font-bold text-cyan-400 font-display">{item.step}</span>
+                        </div>
+                        <div className="pt-2">
+                            <h3 className="text-base font-bold text-white mb-1">{item.title}</h3>
+                            <p className="text-sm text-slate-400 font-body leading-relaxed">{item.desc}</p>
+                        </div>
+                    </div>
+                ))}
             </div>
 
-            <div className="grid sm:grid-cols-3 gap-4">
-                <div className="p-6 bg-white/[0.03] border border-white/10 rounded-2xl text-center">
-                    <div className="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center mx-auto mb-4">
-                        <Heart className="w-6 h-6 text-green-400" />
-                    </div>
-                    <h3 className="text-base font-semibold text-white mb-2">基本無料</h3>
-                    <p className="text-sm text-slate-400">課金なしでも十分楽しめます。有料機能は任意です。</p>
-                </div>
-                <div className="p-6 bg-white/[0.03] border border-white/10 rounded-2xl text-center">
-                    <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center mx-auto mb-4">
-                        <Shield className="w-6 h-6 text-blue-400" />
-                    </div>
-                    <h3 className="text-base font-semibold text-white mb-2">安全設計</h3>
-                    <p className="text-sm text-slate-400">チャット機能なし。個人情報の入力も最小限です。</p>
-                </div>
-                <div className="p-6 bg-white/[0.03] border border-white/10 rounded-2xl text-center">
-                    <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center mx-auto mb-4">
-                        <Lock className="w-6 h-6 text-purple-400" />
-                    </div>
-                    <h3 className="text-base font-semibold text-white mb-2">プライバシー保護</h3>
-                    <p className="text-sm text-slate-400">カメラはバーコード読み取りのみに使用します。</p>
-                </div>
+            <div className="mt-12 text-center">
+                <Link href="/auth">
+                    <Button size="lg" className="w-full h-12 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-cyan-900/50">
+                        今すぐ始める
+                        <ArrowRight className="ml-2 w-4 h-4" />
+                    </Button>
+                </Link>
             </div>
         </div>
     </section>
 );
 
 // ============================================
-// Final CTA Section
+// Trust & Safety Section
 // ============================================
-const FinalCTA = () => (
-    <section className="py-20 px-4 bg-gradient-to-b from-slate-900 to-slate-950 text-center">
+const Trust = () => (
+    <section className="py-20 px-4 bg-slate-950 border-t border-white/5">
         <div className="max-w-lg mx-auto">
-            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4">
-                さあ、始めよう
-            </h2>
-            <p className="text-slate-400 mb-8">
-                アカウント作成は無料。すぐに遊び始められます。
-            </p>
-            <Link href="/auth">
-                <Button
-                    size="lg"
-                    className="h-12 px-10 text-base rounded-full bg-cyan-500 hover:bg-cyan-400 text-slate-900 font-semibold transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-cyan-500/20"
-                >
-                    無料で始める
-                    <ArrowRight className="ml-2 w-4 h-4" />
-                </Button>
-            </Link>
+            <div className="p-8 rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 border border-white/5 text-center">
+                <ShieldCheck className="w-12 h-12 text-cyan-500 mx-auto mb-6 opacity-80" />
+                <h2 className="text-xl font-bold text-white mb-6 font-display">安心・安全への取り組み</h2>
+
+                <div className="grid gap-4 sm:grid-cols-2 text-left">
+                    <div className="p-4 rounded-xl bg-black/20 border border-white/5">
+                        <div className="flex items-center gap-2 mb-2 text-cyan-400 font-bold text-sm">
+                            <Wallet className="w-4 h-4" />
+                            <span>基本無料</span>
+                        </div>
+                        <p className="text-xs text-slate-400 leading-relaxed">
+                            ガチャ等の射幸心を煽る高額課金はありません。無料でも最後まで遊べます。
+                        </p>
+                    </div>
+                    <div className="p-4 rounded-xl bg-black/20 border border-white/5">
+                        <div className="flex items-center gap-2 mb-2 text-cyan-400 font-bold text-sm">
+                            <Lock className="w-4 h-4" />
+                            <span>プライバシー</span>
+                        </div>
+                        <p className="text-xs text-slate-400 leading-relaxed">
+                            カメラはバーコード認識のみに使用。画像は保存されません。
+                        </p>
+                    </div>
+                </div>
+            </div>
         </div>
     </section>
 );
@@ -229,19 +227,21 @@ const FinalCTA = () => (
 // Footer
 // ============================================
 const Footer = () => (
-    <footer className="py-12 px-4 bg-slate-950 border-t border-white/5">
-        <div className="max-w-4xl mx-auto">
-            <div className="flex flex-col sm:flex-row justify-between items-center gap-6">
-                <div className="text-center sm:text-left">
-                    <div className="font-semibold text-white mb-1">バーコードジェネシス</div>
-                    <div className="text-sm text-slate-500">© 2025 All rights reserved.</div>
-                </div>
+    <footer className="py-12 px-6 bg-slate-950 border-t border-white/5 text-center">
+        <div className="max-w-md mx-auto">
+            <div className="mb-8">
+                <h3 className="text-lg font-bold text-white tracking-tight font-display mb-1">BARCODE GENESIS</h3>
+                <p className="text-xs text-slate-500">Since 2025</p>
+            </div>
 
-                <div className="flex flex-wrap justify-center gap-4 text-sm text-slate-400">
-                    <Link href="/terms" className="hover:text-white transition-colors">利用規約</Link>
-                    <Link href="/privacy" className="hover:text-white transition-colors">プライバシー</Link>
-                    <Link href="/law" className="hover:text-white transition-colors">特定商取引法</Link>
-                </div>
+            <div className="flex flex-wrap justify-center gap-x-6 gap-y-3 mb-8 text-xs font-medium text-slate-400">
+                <Link href="/terms" className="hover:text-cyan-400 transition-colors">利用規約</Link>
+                <Link href="/privacy" className="hover:text-cyan-400 transition-colors">プライバシーポリシー</Link>
+                <Link href="/law" className="hover:text-cyan-400 transition-colors">特定商取引法に基づく表記</Link>
+            </div>
+
+            <div className="text-[10px] text-slate-600 font-body">
+                &copy; 2025 Kojima Production. All rights reserved.
             </div>
         </div>
     </footer>
@@ -252,16 +252,15 @@ const Footer = () => (
 // ============================================
 export default function LandingPage() {
     return (
-        <div className="min-h-screen bg-slate-950 text-white selection:bg-cyan-500 selection:text-slate-900">
+        <div className="min-h-screen bg-slate-950 text-white font-sans selection:bg-cyan-500/30">
             <SEO
-                title="バーコードジェネシス | 身の回りのバーコードがロボットに"
-                description="バーコードをスキャンして世界に一つだけのロボットを生成。集めて、育てて、バトルで競おう。基本無料で遊べます。"
+                title="BARCODE GENESIS | そのバーコードに、命が宿る"
+                description="身の回りのバーコードから世界に一つだけのロボットを生成。集めて、育てて、バトルで競う。基本プレイ無料の次世代バーコードバトラー。"
             />
             <Hero />
             <Features />
             <HowToPlay />
-            <ParentalSafety />
-            <FinalCTA />
+            <Trust />
             <Footer />
         </div>
     );
