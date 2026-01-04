@@ -100,6 +100,7 @@ export const translations = {
     guide_badge: "GUIDE",
 
     // Main Menu
+    menu_home: "ホーム",
     menu_scan: "スキャン",
     menu_battle: "バトル",
     menu_craft: "クラフト",
