@@ -10,7 +10,8 @@ import { CountUp } from "@/components/ui/CountUp";
 import { Button } from "@/components/ui/button";
 import Interactive from "@/components/ui/interactive";
 import ShareButton from "@/components/ShareButton";
-import { Zap, Volume2, VolumeX } from "lucide-react";
+import { Zap, Volume2, VolumeX, ShoppingBag, Hammer, ScanLine } from "lucide-react";
+import { useLocation } from "wouter";
 import { playGenerated, setMuted as setGlobalMuted, getMuted } from "@/lib/sound";
 import { AnimatedHPBar } from "@/components/AnimatedHPBar";
 import { VictoryEffect, DefeatEffect } from "@/components/BattleResultEffects";
@@ -322,7 +323,9 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
     const { playSE, playBGM, stopBGM } = useSound();
     const { t } = useLanguage();
     const { fx } = useRobotFx();
+
     const { shake, shakeStyle } = useScreenShake();
+    const [, setLocation] = useLocation();
 
     // Sound - sync with both old and new systems
     const [isMuted, setIsMuted] = useState(() => getMuted() || getSfxMuted());
@@ -1257,6 +1260,21 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
                                 <Button size="lg" onClick={onComplete} className="w-full bg-neon-cyan text-black hover:bg-white font-bold h-12 text-lg">
                                     {t('continue_button').toUpperCase()}
                                 </Button>
+
+                                <div className="flex gap-2 justify-center mt-4 border-t border-white/10 pt-4">
+                                    {result.winnerId === p1.id ? (
+                                        <Button variant="outline" size="sm" className="flex-1 text-xs border-white/20 hover:bg-white/10 text-white/70 hover:text-white" onClick={() => setLocation("/shop")}>
+                                            <ShoppingBag className="w-3 h-3 mr-1" /> SHOP
+                                        </Button>
+                                    ) : (
+                                        <Button variant="outline" size="sm" className="flex-1 text-xs border-white/20 hover:bg-white/10 text-white/70 hover:text-white" onClick={() => setLocation("/workshop")}>
+                                            <Hammer className="w-3 h-3 mr-1" /> WORKSHOP
+                                        </Button>
+                                    )}
+                                    <Button variant="outline" size="sm" className="flex-1 text-xs border-white/20 hover:bg-white/10 text-white/70 hover:text-white" onClick={() => setLocation("/scan")}>
+                                        <ScanLine className="w-3 h-3 mr-1" /> SCAN
+                                    </Button>
+                                </div>
                             </motion.div>
                         </motion.div>
                     </>
