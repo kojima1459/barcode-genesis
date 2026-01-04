@@ -31,14 +31,28 @@ function getInitialLanguage(): Language {
 
   try {
     const stored = localStorage.getItem(LANGUAGE_STORAGE_KEY);
-    if (stored) return normalizeLanguage(stored);
+    if (stored) {
+      const normalized = normalizeLanguage(stored);
+      cachedLanguage = normalized;
+      return normalized;
+    }
     const legacy = localStorage.getItem(LEGACY_LANGUAGE_STORAGE_KEY);
-    if (legacy) return normalizeLanguage(legacy);
+    if (legacy) {
+      const normalized = normalizeLanguage(legacy);
+      // Migrate legacy key to new key
+      localStorage.setItem(LANGUAGE_STORAGE_KEY, normalized);
+      localStorage.removeItem(LEGACY_LANGUAGE_STORAGE_KEY);
+      cachedLanguage = normalized;
+      return normalized;
+    }
+    // No stored value: default to 'ja' and persist it
+    localStorage.setItem(LANGUAGE_STORAGE_KEY, 'ja');
+    cachedLanguage = 'ja';
   } catch {
-    // localStorage アクセス失敗時は ja にフォールバック
+    // localStorage access failed: use 'ja' fallback
   }
 
-  return 'ja'; // デフォルトは常に日本語
+  return 'ja'; // Default is always Japanese
 }
 
 /**
@@ -84,7 +98,8 @@ function createTranslateFunction(language: Language) {
 }
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [language, setLanguageState] = useState<Language>('ja');
+  // Use getInitialLanguage as initializer to avoid flash-of-wrong-language
+  const [language, setLanguageState] = useState<Language>(getInitialLanguage);
 
   // Ensure localStorage is normalized and the single source of truth
   useEffect(() => {
