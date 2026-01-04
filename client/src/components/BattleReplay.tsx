@@ -95,11 +95,31 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
     const [events, setEvents] = useState<BattleEvent[]>([]);
     const [currentEventIndex, setCurrentEventIndex] = useState(0);
 
-    // Game State - use safe defaults (use optional chaining for safety)
+    // Extract START log to determine definitive Max HP (Server Source of Truth)
+    const startLog = useMemo(() => result.logs.find(l => l.action === 'START'), [result]);
+
+    const p1MaxHp = useMemo(() => {
+        if (startLog && p1?.id) {
+            if (startLog.attackerId === p1.id) return startLog.attackerHp;
+            if (startLog.defenderId === p1.id) return startLog.defenderHp;
+        }
+        return p1?.baseHp ?? 1000;
+    }, [startLog, p1]);
+
+    const p2MaxHp = useMemo(() => {
+        if (startLog && p2?.id) {
+            if (startLog.attackerId === p2.id) return startLog.attackerHp;
+            if (startLog.defenderId === p2.id) return startLog.defenderHp;
+        }
+        return p2?.baseHp ?? 1000;
+    }, [startLog, p2]);
+
+    // Game State
     const [hp, setHp] = useState<Record<string, number>>({
-        [p1?.id ?? 'p1']: p1?.baseHp ?? 1000,
-        [p2?.id ?? 'p2']: p2?.baseHp ?? 1000
+        [p1?.id ?? 'p1']: p1MaxHp,
+        [p2?.id ?? 'p2']: p2MaxHp
     });
+
     const [activeMessage, setActiveMessage] = useState<string>("");
     const [isFinished, setIsFinished] = useState(false);
 
@@ -125,7 +145,8 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
     const [flashP1, setFlashP1] = useState(false);
     const [flashP2, setFlashP2] = useState(false);
     const [showResultsOnly, setShowResultsOnly] = useState(false);
-    const [lastHp, setLastHp] = useState<Record<string, number>>({ [p1?.id ?? 'p1']: p1?.baseHp ?? 1000, [p2?.id ?? 'p2']: p2?.baseHp ?? 1000 });
+    const [lastHp, setLastHp] = useState<Record<string, number>>({ [p1?.id ?? 'p1']: p1MaxHp, [p2?.id ?? 'p2']: p2MaxHp });
+
 
     // Extended HUD State
     const [currentEvent, setCurrentEvent] = useState<BattleEvent | null>(null);
@@ -178,7 +199,9 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
     // Initial Setup
     useEffect(() => {
         if (!mountedRef.current) return;
-        const generated = generateBattleEvents(result.logs, p1.id, p2.id);
+        // Filter out START log for visual timeline
+        const filteredLogs = result.logs.filter(l => l.action !== 'START');
+        const generated = generateBattleEvents(filteredLogs, p1.id, p2.id);
 
         // FEATURE: Ensure at least one Special Cut-in per battle for excitement
         const hasSpecial = generated.some(e => e.specialTriggered || e.overdriveTriggered);
@@ -220,7 +243,8 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
 
         setEvents(generated);
         setCurrentEventIndex(0);
-        setHp({ [p1.id]: p1.baseHp, [p2.id]: p2.baseHp });
+        setHp({ [p1?.id ?? 'p1']: p1MaxHp, [p2?.id ?? 'p2']: p2MaxHp });
+
 
         // playBGM('bgm_battle'); // Disabled per user request
         if (!isMuted) playGenerated('ui_click');
@@ -967,7 +991,7 @@ const RobotCard = memo(({ robot, hpPercent, currentHp, isShaking, isLunging, isP
                 />
             </div>
             <div className={`text-right text-xs font-mono mt-1 font-semibold ${isPlayer ? 'text-neon-cyan' : 'text-neon-pink'} tabular-nums`}>
-                HP: <span className="text-white text-lg font-orbitron">{Math.floor(currentHp ?? 0)}</span> / {robot.baseHp} <span className="text-xs text-white/60 ml-1">({Math.floor(hpPercent)}%)</span>
+                HP: <span className="text-white text-lg font-orbitron">{Math.floor(currentHp ?? 0)}</span> / {isPlayer ? p1MaxHp : p2MaxHp} <span className="text-xs text-white/60 ml-1">({Math.floor(hpPercent)}%)</span>
             </div>
 
             {/* Enhanced Damage Numbers */}

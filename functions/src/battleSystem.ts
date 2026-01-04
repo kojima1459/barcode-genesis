@@ -135,6 +135,20 @@ export const simulateBattle = (
   let hp1 = maxHp1;
   let hp2 = maxHp2;
   const logs: BattleLog[] = [];
+
+  // Inject explicit START log for client-side MaxHP integrity
+  logs.push({
+    turn: 0,
+    action: "START",
+    attackerId: robot1.id ?? "p1",
+    defenderId: robot2.id ?? "p2",
+    damage: 0,
+    isCritical: false,
+    attackerHp: maxHp1,
+    defenderHp: maxHp2,
+    message: "バトル開始",
+  });
+
   let turn = 1;
   const robot1Skills = resolveSkills(robot1.skills);
   const robot2Skills = resolveSkills(robot2.skills);

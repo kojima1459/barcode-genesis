@@ -3540,10 +3540,10 @@ function generateWeeklyBoss(weekKey: string) {
   const weekNum = parseInt(weekKey.split('-')[1] || '1', 10);
   const difficultyMultiplier = 1 + (weekNum % 10) * 0.05;
 
-  const baseHp = Math.floor(100 * difficultyMultiplier);
-  const baseAtk = Math.floor(18 * difficultyMultiplier);
-  const baseDef = Math.floor(14 * difficultyMultiplier);
-  const baseSpd = Math.floor(12 * difficultyMultiplier);
+  const baseHp = Math.floor(8000 * difficultyMultiplier);
+  const baseAtk = Math.floor(300 * difficultyMultiplier);
+  const baseDef = Math.floor(150 * difficultyMultiplier);
+  const baseSpd = Math.floor(100 * difficultyMultiplier);
 
   const bossNames = [
     'COLOSSUS', 'TITAN', 'LEVIATHAN', 'BEHEMOTH',

@@ -100,8 +100,8 @@ const BOSS_NAMES: string[] = [
 
 // Base stats for boss (before type multipliers)
 const BASE_BOSS_STATS = {
-    hp: 12000,
-    attack: 350,
+    hp: 4500,
+    attack: 250,
     defense: 120,
     speed: 90,
 };
