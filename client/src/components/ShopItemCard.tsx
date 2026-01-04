@@ -30,7 +30,7 @@ export function ShopItemCard({ item, ownedCount, credits, scanTokens, onPurchase
 
     const isCraftItem = typeof item.tokenCost === "number";
     const totalCost = item.price * qty;
-    const totalTokenCost = (item.tokenCost || 0) * qty;
+    const totalTokenCost = (typeof item.tokenCost === 'number' ? item.tokenCost : 0) * qty;
 
     const canAffordCredits = credits >= totalCost;
     const canAffordTokens = !isCraftItem || scanTokens >= totalTokenCost;

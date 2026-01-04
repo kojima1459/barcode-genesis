@@ -113,29 +113,29 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
                                 const data = snapshot.data();
                                 // Normalize data to ensure types
                                 setUserData({
-                                    credits: typeof data.credits === "number" ? data.credits : 0,
-                                    scanTokens: typeof data.scanTokens === "number" ? data.scanTokens : 0,
-                                    xp: typeof data.xp === "number" ? data.xp : 0,
-                                    level: typeof data.level === "number" ? data.level : 1,
+                                    credits: Number(data.credits) || 0,
+                                    scanTokens: Number(data.scanTokens) || 0,
+                                    xp: Number(data.xp) || 0,
+                                    level: Number(data.level) || 1,
                                     isPremium: !!data.isPremium,
-                                    loginStreak: typeof data.loginStreak === "number" ? data.loginStreak : 0,
+                                    loginStreak: Number(data.loginStreak) || 0,
                                     displayName: data.displayName,
                                     photoURL: data.photoURL,
                                     photoURLUpdatedAt: typeof data.photoURLUpdatedAt === "number" ? data.photoURLUpdatedAt : (data.photoURLUpdatedAt?.toMillis?.() ?? undefined),
-                                    wins: typeof data.wins === "number" ? data.wins : 0,
-                                    battles: typeof data.battles === "number" ? data.battles : 0,
-                                    workshopLines: typeof data.workshopLines === "number" ? data.workshopLines : 1,
+                                    wins: Number(data.wins) || 0,
+                                    battles: Number(data.battles) || 0,
+                                    workshopLines: Number(data.workshopLines) || 1,
                                     createdAt: data.createdAt,
                                     lastLogin: data.lastLogin,
                                     activeUnitId: typeof data.activeUnitId === "string" ? data.activeUnitId : undefined,
                                     badgeIds: Array.isArray(data.badgeIds) ? data.badgeIds : [],
                                     titleId: typeof data.titleId === "string" ? data.titleId : undefined,
                                     lastFreeVariantDate: typeof data.lastFreeVariantDate === "string" ? data.lastFreeVariantDate : undefined,
-                                    variantCount: typeof data.variantCount === "number" ? data.variantCount : 0,
+                                    variantCount: Number(data.variantCount) || 0,
                                     // New fields
-                                    dailyGenerationCount: typeof data.dailyGenerationCount === "number" ? data.dailyGenerationCount : 0,
+                                    dailyGenerationCount: Number(data.dailyGenerationCount) || 0,
                                     lastGenerationDateKey: typeof data.lastGenerationDateKey === "string" ? data.lastGenerationDateKey : undefined,
-                                    totalRobots: typeof data.totalRobots === "number" ? data.totalRobots : 0,
+                                    totalRobots: Number(data.totalRobots) || 0,
                                 });
                             } else {
                                 // User document doesn't exist yet (might be creating)
