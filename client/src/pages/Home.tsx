@@ -173,6 +173,9 @@ export default function Home() {
     if (!hasPlayedWelcome) {
       playBGM('bgm_menu', false); // Play once, do not loop
       sessionStorage.setItem(`welcome_played_${user.uid}`, 'true');
+    } else {
+      // Safety: ensure current BGM is not looping if it is bgm_menu
+      playBGM('bgm_menu', false);
     }
   }, [user, playBGM]);
 

@@ -104,7 +104,7 @@ export function useBattleLogic({
         if (!selectedRobotId || (isTrainingMode && !enemyRobotIdForTraining)) return;
 
         unlockBattleSfx();
-        playBattleSfx("battle_start", { throttleMs: 0 });
+        // playBattleSfx("battle_start", { throttleMs: 0 }); // Removed to prevent potential looping/overlap
         playBGM('bgm_battle');
 
         setIsBattling(true);

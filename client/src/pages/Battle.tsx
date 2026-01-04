@@ -757,7 +757,7 @@ export default function Battle() {
               result={battleResult!}
               onComplete={() => {
                 resetBattleState();
-                playBGM('bgm_menu');
+                playBGM('bgm_menu', false);
               }}
             />
           </ReplayErrorBoundary>
