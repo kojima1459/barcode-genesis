@@ -149,7 +149,7 @@ const formatHpText = (current: number, max: number): { text: string; percent: nu
 };
 
 // --- (D) Delay Calculation (single source) ---
-const BASE_DELAY_MS = 650;
+const BASE_DELAY_MS = 1000; // Slower base for visibility (Task E)
 
 const getDelayMs = (
     event: BattleEvent,
@@ -167,12 +167,12 @@ const getDelayMs = (
 
     // Bonus for important events
     if (event.specialTriggered || event.overdriveTriggered || event.finisherApplied) {
-        delay += 150;
+        delay += 300; // Extra time to read special moves
     }
 
     // Critical/special slow-mo
     if (event.type === 'ATTACK_IMPACT' && (event.isCritical || event.specialTriggered)) {
-        delay *= 1.8;
+        delay *= 2.0;
     }
 
     return Math.max(delay, 20);
@@ -249,7 +249,7 @@ const loadSpeed = (): 1 | 2 | 3 => {
         const saved = localStorage.getItem(SPEED_STORAGE_KEY);
         if (saved === '1' || saved === '2' || saved === '3') return parseInt(saved) as 1 | 2 | 3;
     } catch { /* ignore */ }
-    return 2; // Default 2x
+    return 1; // Default 1x (Slower for Task D)
 };
 
 const saveSpeed = (speed: 1 | 2 | 3): void => {
@@ -358,7 +358,14 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
     // Pacing - Default 2x, persisted via localStorage (using pure function)
     const [speed, setSpeed] = useState<1 | 2 | 3>(loadSpeed);
     const [isSkipped, setIsSkipped] = useState(false);
+    const [isAutoMode, setIsAutoMode] = useState(true); // Task G: Manual Mode
     const lastSfxKeyRef = useRef<string | null>(null); // SE deduplication
+
+    const handleNextEvent = () => {
+        if (!isAutoMode && currentEventIndex < events.length) {
+            setCurrentEventIndex(prev => prev + 1);
+        }
+    };
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
     const hasEndedRef = useRef(false);
 
@@ -629,6 +636,11 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
         // === DELAY CALCULATION (using pure function) ===
         let delay = getDelayMs(event, speed, isSkipped);
 
+        // Task G: In manual mode, reduce pre-event delay so tap feels responsive
+        if (!isAutoMode && !isSkipped) {
+            delay = 50;
+        }
+
         // Critical Hit Slow-mo Logic (visual enhancement, not part of pure function)
         if (event.type === 'ATTACK_IMPACT' && (event.isCritical || event.specialTriggered) && !isSkipped) {
             delay *= 2.5; // Slow-mo for impact
@@ -636,7 +648,6 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
             setIsCriticalMoment(true);
             scheduleTimeout(() => setIsCriticalMoment(false), delay);
         }
-
 
         const execute = () => {
             try {
@@ -816,15 +827,17 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
                         break;
                 }
 
-                // Next event
-                setCurrentEventIndex(prev => prev + 1);
+                // Next event (Modified for Task G)
+                if (isAutoMode || isSkipped) {
+                    setCurrentEventIndex(prev => prev + 1);
+                }
             } catch (error) {
                 handleReplayError(error);
             }
         };
 
         timeoutRef.current = scheduleTimeout(execute, delay);
-    }, [currentEventIndex, events, speed, isSkipped, showSpecialOverlay, replayError, pauseTick]);
+    }, [currentEventIndex, events, speed, isSkipped, showSpecialOverlay, replayError, pauseTick, isAutoMode]);
 
 
     const handleBattleEnd = () => {
@@ -1044,10 +1057,22 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
             {!isFinished && <div className="h-20 sm:h-24" />}
 
             {/* NEW: Improved Pacing Controls */}
+            {/* Manual Mode Click Overlay */}
+            {!isAutoMode && !isFinished && (
+                <div
+                    className="fixed inset-0 z-40 cursor-pointer flex items-center justify-center pb-20"
+                    onClick={handleNextEvent}
+                >
+                    <div className="absolute bottom-48 left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur-md px-8 py-3 rounded-full border border-white/30 text-white font-black animate-pulse pointer-events-none shadow-xl tracking-widest text-lg">
+                        TAP TO NEXT ⏩
+                    </div>
+                </div>
+            )}
+
             {/* NEW: Improved Pacing Controls */}
             {!isFinished && (
-                <div className="fixed bottom-32 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-1.5 px-4 py-2 rounded-2xl glass-panel border border-white/10 shadow-2xl pb-[env(safe-area-inset-bottom)]">
-                    <div className="flex gap-1 bg-black/40 p-1 rounded-xl border border-white/5">
+                <div className="fixed bottom-32 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-1.5 px-3 py-2 rounded-2xl glass-panel border border-white/10 shadow-2xl pb-[env(safe-area-inset-bottom)] max-w-[95vw] overflow-x-auto">
+                    <div className="flex gap-1 bg-black/40 p-1 rounded-xl border border-white/5 shrink-0">
                         {([1, 2, 3] as const).map(s => (
                             <Interactive
                                 key={s}
@@ -1064,20 +1089,30 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
                         ))}
                     </div>
 
-                    <div className="w-px h-6 bg-white/10 mx-1" />
+                    <div className="w-px h-6 bg-white/10 mx-1 shrink-0" />
+
+                    {/* Auto/Manual Toggle */}
+                    <Interactive
+                        onClick={() => setIsAutoMode(!isAutoMode)}
+                        className={`text-[10px] font-black h-9 px-3 rounded-xl border transition-all shrink-0 flex items-center ${isAutoMode
+                            ? "bg-green-500/10 border-green-500/30 text-green-400"
+                            : "bg-yellow-500/20 border-yellow-500/50 text-yellow-300 animate-pulse shadow-[0_0_10px_rgba(255,200,0,0.3)]"}`}
+                    >
+                        {isAutoMode ? "AUTO" : "MANUAL"}
+                    </Interactive>
 
                     <Interactive
                         onClick={handleSkip}
-                        className="text-[10px] font-black italic h-10 px-4 rounded-xl bg-orange-500/10 border border-orange-500/30 text-orange-400 hover:bg-orange-500 hover:text-black transition-all"
+                        className="text-[10px] font-black italic h-9 px-3 rounded-xl bg-orange-500/10 border border-orange-500/30 text-orange-400 hover:bg-orange-500 hover:text-black transition-all shrink-0 flex items-center"
                     >
-                        FAST_FORWARD
+                        SKIP
                     </Interactive>
 
                     <Interactive
                         onClick={handleResultsOnly}
-                        className="text-[10px] font-black italic h-10 px-4 rounded-xl bg-white/5 border border-white/5 text-white/60 hover:text-white hover:bg-white/10 transition-all font-mono"
+                        className="text-[10px] font-black italic h-9 px-3 rounded-xl bg-white/5 border border-white/5 text-white/60 hover:text-white hover:bg-white/10 transition-all font-mono shrink-0 flex items-center"
                     >
-                        SKIP_TO_RESULT
+                        END
                     </Interactive>
                 </div>
             )}

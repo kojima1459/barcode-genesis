@@ -47,14 +47,14 @@ export function AnimatedHPBar({
 
     const hpPercent = Math.max(0, Math.min(100, (current / max) * 100));
 
-    // Color gradient based on HP percentage
+    // Color gradient based on HP percentage (Game Standard: >50% Green, 20-50% Yellow, <20% Red)
     const getHPColor = (percent: number) => {
-        if (percent > 70) {
+        if (percent > 50) {
             return "from-green-500 to-emerald-400";
-        } else if (percent > 30) {
-            return "from-yellow-500 to-amber-400";
+        } else if (percent > 20) {
+            return "from-yellow-400 to-orange-500"; // Brighter yellow/orange
         } else {
-            return "from-red-500 to-rose-400";
+            return "from-red-600 to-red-500 animate-pulse"; // Flashing red
         }
     };
 
