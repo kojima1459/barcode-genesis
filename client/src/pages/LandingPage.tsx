@@ -33,7 +33,7 @@ const SectionTitle = ({ title, subtitle }: { title: string; subtitle: string }) 
                 {title}
             </h2>
         </div>
-        <p className="text-sm text-slate-400 font-body leading-relaxed max-w-md mx-auto tracking-wide">
+        <p className="text-xs sm:text-sm text-slate-400 font-body leading-relaxed max-w-md mx-auto tracking-wide">
             {subtitle}
         </p>
     </div>
@@ -144,7 +144,7 @@ const Features = () => (
         <div className="max-w-lg mx-auto">
             <SectionTitle
                 title="SYSTEM FEATURES"
-                subtitle="シンプルで奥深い。3つのステップで広がる世界。"
+                subtitle="シンプルで奥深い。3ステップで広がる世界。"
             />
 
             <div className="space-y-5">
@@ -212,7 +212,7 @@ const HowToPlay = () => (
         <div className="max-w-md mx-auto relative z-10">
             <SectionTitle
                 title="INITIALIZE"
-                subtitle="始めるのに必要なのはスマホと少しの好奇心だけ。"
+                subtitle="必要なのはスマホと少しの好奇心だけ。"
             />
 
             <div className="relative space-y-10">
