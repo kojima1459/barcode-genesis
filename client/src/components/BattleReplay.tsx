@@ -897,6 +897,9 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
                         isPlayer={true}
                         fx={fx}
                         popups={p1Popups}
+                        battleStatus={battleStatus}
+                        hpDeltas={hpDeltas}
+                        maxHp={p1MaxHp}
                     />
                 </div>
 
@@ -916,6 +919,9 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
                         isPlayer={false}
                         fx={fx}
                         popups={p2Popups}
+                        battleStatus={battleStatus}
+                        hpDeltas={hpDeltas}
+                        maxHp={p2MaxHp}
                     />
                 </div>
             </div>
@@ -1032,7 +1038,7 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
     );
 }
 
-const RobotCard = memo(({ robot, hpPercent, currentHp, isShaking, isLunging, isPlayer, fx, popups }: any) => {
+const RobotCard = memo(({ robot, hpPercent, currentHp, isShaking, isLunging, isPlayer, fx, popups, battleStatus, hpDeltas, maxHp }: any) => {
     const { t } = useLanguage();
     // Determine visuals
     const borderColor = isShaking ? 'border-red-500' : (isPlayer ? 'border-neon-cyan' : 'border-neon-pink');
@@ -1041,6 +1047,10 @@ const RobotCard = memo(({ robot, hpPercent, currentHp, isShaking, isLunging, isP
     // Animation variants
     const shakeAnim = { x: [-10, 10, -10, 10, 0], rotate: isPlayer ? [-2, 2, -2, 2, 0] : [2, -2, 2, -2, 0] };
     const lungeAnim = { x: isPlayer ? 50 : -50, scale: 1.1 };
+
+    // Safe battleStatus access
+    const status = battleStatus || {};
+    const deltas = hpDeltas || {};
 
     return (
         <motion.div
@@ -1069,7 +1079,7 @@ const RobotCard = memo(({ robot, hpPercent, currentHp, isShaking, isLunging, isP
             <div className="w-full mt-4 bg-panel/80 h-4 rounded-full overflow-hidden border border-white/20 relative">
                 <motion.div
                     className={`h-full ${isPlayer ? 'bg-linear-to-r from-neon-cyan to-blue-600' : 'bg-linear-to-r from-neon-pink to-red-600'}`}
-                    animate={{ width: `${hpPercent}%` }}
+                    animate={{ width: `${Math.max(0, Math.min(100, hpPercent))}%` }}
                     transition={{ type: "spring", stiffness: 100, damping: 20 }}
                 />
             </div>
@@ -1078,57 +1088,46 @@ const RobotCard = memo(({ robot, hpPercent, currentHp, isShaking, isLunging, isP
                     <span className="text-white text-lg font-orbitron font-bold">
                         {Math.floor(currentHp ?? 0)}
                         <span className="text-sm font-normal text-white/70 mx-1">/</span>
-                        {isPlayer ? p1MaxHp : p2MaxHp}
+                        {maxHp ?? robot.baseHp}
                     </span>
-                    <span className="text-xs text-white/60">({Math.floor(hpPercent)}%)</span>
+                    <span className="text-xs text-white/60">({Math.max(0, Math.min(100, Math.floor(hpPercent)))}%)</span>
                 </div>
 
-                {/* Status Badges */}
-                {robot?.id && (battleStatus.attackerId === robot.id || battleStatus.defenderId === robot.id || true) && (
-                    <div className="flex flex-wrap justify-end gap-1 mt-1">
-                        {/* We show status if it relates to this robot or global battle state. 
-                             Ideally we filter by ID, but currentStatus is single object. 
-                             Assuming single turn context, we show relevant flags. */}
-                        {battleStatus.stunned && (battleStatus.defenderId === robot.id) && (
-                            <span className="px-1.5 py-0.5 bg-yellow-500/80 text-black text-[10px] rounded font-bold animate-pulse">⚡STUN</span>
-                        )}
-                        {battleStatus.guarded && (battleStatus.defenderId === robot.id) && (
-                            <span className="px-1.5 py-0.5 bg-blue-500/80 text-white text-[10px] rounded font-bold">🛡️GUARD x{battleStatus.guardMultiplier}</span>
-                        )}
-                        {battleStatus.bossShieldRemaining !== undefined && robot.role?.includes('BOSS') && (battleStatus.bossShieldRemaining > 0) && (
-                            <span className="px-1.5 py-0.5 bg-purple-500/80 text-white text-[10px] rounded font-bold">🔰SHIELD {battleStatus.bossShieldRemaining}</span>
-                        )}
-                        {battleStatus.cheerApplied && (battleStatus.cheerSide === (isPlayer ? 'P1' : 'P2')) && (
-                            <span className="px-1.5 py-0.5 bg-orange-500/80 text-white text-[10px] rounded font-bold">📣CHEER x{battleStatus.cheerMultiplier}</span>
-                        )}
-                        {battleStatus.stanceOutcome && (battleStatus.stanceAttacker === (isPlayer ? 'ATTACK' : 'GUARD') /* simplified logic */) && (
-                            /* Show stance result only if relevant... maybe too complex to filter perfectly here. 
-                               Displaying Global Stance Outcome if involved */
-                            (battleStatus.attackerId === robot.id || battleStatus.defenderId === robot.id) &&
-                            <span className="px-1.5 py-0.5 bg-gray-700/80 text-white text-[10px] rounded font-bold">{battleStatus.stanceOutcome}</span>
-                        )}
-                    </div>
-                )}
+                {/* Status Badges - Only show if status relates to this robot */}
+                <div className="flex flex-wrap justify-end gap-1 mt-1">
+                    {status.stunned && status.defenderId === robot.id && (
+                        <span className="px-1.5 py-0.5 bg-yellow-500/80 text-black text-[10px] rounded font-bold animate-pulse">⚡STUN</span>
+                    )}
+                    {status.guarded && status.defenderId === robot.id && status.guardMultiplier && (
+                        <span className="px-1.5 py-0.5 bg-blue-500/80 text-white text-[10px] rounded font-bold">🛡️x{status.guardMultiplier}</span>
+                    )}
+                    {status.bossShieldRemaining !== undefined && status.bossShieldRemaining > 0 && !isPlayer && (
+                        <span className="px-1.5 py-0.5 bg-purple-500/80 text-white text-[10px] rounded font-bold">🔰{status.bossShieldRemaining}</span>
+                    )}
+                    {status.cheerApplied && status.cheerSide === (isPlayer ? 'P1' : 'P2') && status.cheerMultiplier && (
+                        <span className="px-1.5 py-0.5 bg-orange-500/80 text-white text-[10px] rounded font-bold">📣x{status.cheerMultiplier}</span>
+                    )}
+                </div>
             </div>
 
             {/* HP Delta Flash */}
             <AnimatePresence>
-                {robot?.id && hpDeltas[robot.id] && (
+                {robot?.id && deltas[robot.id] && (
                     <motion.div
-                        key={hpDeltas[robot.id]?.id}
+                        key={deltas[robot.id]?.id}
                         initial={{ opacity: 0, y: 0, scale: 0.5 }}
-                        animate={{ opacity: 1, y: -20, scale: hpDeltas[robot.id]?.isCritical ? 1.5 : 1.2 }}
+                        animate={{ opacity: 1, y: -20, scale: deltas[robot.id]?.isCritical ? 1.5 : 1.2 }}
                         exit={{ opacity: 0, y: -40 }}
-                        transition={{ duration: 0.8, ease: "out" }}
+                        transition={{ duration: 0.8, ease: "easeOut" }}
                         className={`absolute top-0 ${isPlayer ? 'right-0' : 'left-0'} z-50 pointer-events-none font-orbitron font-bold drop-shadow-md whitespace-nowrap`}
                         style={{
-                            color: hpDeltas[robot.id]?.type === 'damage' ? '#ff3333' : '#33ff33',
-                            fontSize: hpDeltas[robot.id]?.isCritical ? '24px' : '18px',
+                            color: deltas[robot.id]?.type === 'damage' ? '#ff3333' : '#33ff33',
+                            fontSize: deltas[robot.id]?.isCritical ? '24px' : '18px',
                             textShadow: '0 0 5px black'
                         }}
                     >
-                        {hpDeltas[robot.id]?.value! > 0 ? '+' : ''}{hpDeltas[robot.id]?.value}
-                        {hpDeltas[robot.id]?.isCritical && <span className="text-yellow-400 text-xs block text-center">CRIT</span>}
+                        {deltas[robot.id]?.value! > 0 ? '+' : ''}{deltas[robot.id]?.value}
+                        {deltas[robot.id]?.isCritical && <span className="text-yellow-400 text-xs block text-center">CRIT</span>}
                     </motion.div>
                 )}
             </AnimatePresence>
