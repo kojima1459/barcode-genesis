@@ -314,6 +314,7 @@ export default function BossBattle({ modeOverride }: { modeOverride?: "weekly" |
                                         logs: battleResult.logs || [],
                                         rewards: battleResult.rewards || { exp: 0, coins: 0 },
                                     }}
+                                    showResultOverlay={false}
                                     onComplete={() => {
                                         // Battle replay finished - allow user to see result
                                     }}

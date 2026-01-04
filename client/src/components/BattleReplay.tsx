@@ -76,9 +76,14 @@ interface BattleReplayProps {
     p2: RobotData;
     result: BattleResult;
     onComplete: () => void;
+    initialSpeed?: 1 | 2 | 3;
+    p1OverdriveGauge?: number;
+    p2OverdriveGauge?: number;
+    // New prop to control result overlay visibility
+    showResultOverlay?: boolean;
 }
 
-export default function BattleReplay({ p1, p2, result, onComplete }: BattleReplayProps) {
+export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed = 1, showResultOverlay = true, p1OverdriveGauge: initialP1Overdrive = 0, p2OverdriveGauge: initialP2Overdrive = 0 }: BattleReplayProps) {
     const { playSE, playBGM } = useSound();
     const { t } = useLanguage();
     const { fx } = useRobotFx();
@@ -869,7 +874,7 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
 
             {/* Result Overlay */}
             <AnimatePresence>
-                {isFinished && (
+                {isFinished && showResultOverlay && (
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
