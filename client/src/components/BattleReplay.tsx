@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useMemo, memo } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { BattleResult, RobotData } from "@/types/shared";
+import { BattleResult, RobotData, BattleLog } from "@/types/shared";
 import { BattleEvent, generateBattleEvents } from "@/lib/battleReplay";
 import RobotSVG from "@/components/RobotSVG";
 import { useSound } from "@/contexts/SoundContext";
@@ -16,10 +16,211 @@ import { AnimatedHPBar } from "@/components/AnimatedHPBar";
 import { VictoryEffect, DefeatEffect } from "@/components/BattleResultEffects";
 import { useScreenShake } from "@/hooks/useScreenShake";
 import { EnhancedDamageNumber } from "@/components/EnhancedDamageNumber";
-import { playSfx, setMuted as setSfxMuted, getMuted as getSfxMuted } from "@/lib/sfx";
+import { playSfx, setMuted as setSfxMuted, getMuted as getSfxMuted, setSkipMode, clearPlayedKeys, SfxName } from "@/lib/sfx";
 import { PLAY_STEP_MS, IMPORTANT_EVENT_BONUS_MS, getImpactIntensity, isImportantLog } from "@/lib/battleFx";
 import SpecialCutIn from "@/components/SpecialCutIn";
 import BattleHUDExtended from "@/components/BattleHUDExtended";
+
+// ============================================================
+// PURE FUNCTIONS - Single source of truth for HP/Summary/Status/Delay/SE
+// ============================================================
+
+// --- (A) START Log & MaxHP ---
+const getStartLog = (logs: BattleLog[]): BattleLog | undefined =>
+    logs.find(l => l.action === 'START');
+
+const getMaxHpFromStart = (
+    startLog: BattleLog | undefined,
+    p1Id: string,
+    p2Id: string,
+    fallbackP1: number,
+    fallbackP2: number
+): { p1Max: number; p2Max: number } => {
+    if (!startLog) return { p1Max: fallbackP1, p2Max: fallbackP2 };
+
+    let p1Max = fallbackP1;
+    let p2Max = fallbackP2;
+
+    if (startLog.attackerId === p1Id) {
+        p1Max = startLog.attackerHp;
+        p2Max = startLog.defenderHp;
+    } else if (startLog.defenderId === p1Id) {
+        p1Max = startLog.defenderHp;
+        p2Max = startLog.attackerHp;
+    }
+
+    return { p1Max, p2Max };
+};
+
+// --- (B) HP Normalization (attacker/defender swap-safe) ---
+const getNormalizedHp = (
+    log: BattleLog | BattleEvent | undefined,
+    p1Id: string,
+    p2Id: string,
+    prevP1: number,
+    prevP2: number
+): { p1Hp: number; p2Hp: number } => {
+    if (!log) return { p1Hp: prevP1, p2Hp: prevP2 };
+
+    // If log has currentHp map (from BattleEvent), use it directly
+    if ('currentHp' in log && log.currentHp) {
+        return {
+            p1Hp: log.currentHp[p1Id] ?? prevP1,
+            p2Hp: log.currentHp[p2Id] ?? prevP2
+        };
+    }
+
+    // Otherwise use attackerHp/defenderHp with ID matching
+    if ('attackerId' in log && 'attackerHp' in log) {
+        if (log.attackerId === p1Id) {
+            return { p1Hp: log.attackerHp, p2Hp: log.defenderHp };
+        } else if (log.defenderId === p1Id) {
+            return { p1Hp: log.defenderHp, p2Hp: log.attackerHp };
+        }
+    }
+
+    return { p1Hp: prevP1, p2Hp: prevP2 };
+};
+
+// --- (C) Summary & Status Generation (Japanese only, never undefined) ---
+const makeSummaryJa = (event: BattleEvent): string => {
+    if (!event) return "バトル中...";
+
+    // Priority order
+    if (event.specialTriggered && event.specialName) {
+        return `必殺技「${event.specialName}」発動！`;
+    }
+    if (event.overdriveTriggered) {
+        return event.overdriveMessage || "オーバードライブ発動！";
+    }
+    if (event.bossShieldBroken) {
+        return "ボスシールド破壊！";
+    }
+    if (event.stunApplied || event.stunned) {
+        return "スタン発生！";
+    }
+    if (event.itemApplied && event.itemType) {
+        return `アイテム「${event.itemType}」使用`;
+    }
+    if (event.cheerApplied) {
+        return `応援効果発動！（x${event.cheerMultiplier ?? 1.2}）`;
+    }
+    if (event.isCritical) {
+        return `クリティカルヒット！ ${event.damage ?? 0}ダメージ`;
+    }
+    if (event.guarded) {
+        return `ガード成功（x${event.guardMultiplier ?? 0.5}）`;
+    }
+    if (event.isMiss) {
+        return "攻撃ミス！";
+    }
+    if (event.damage && event.damage > 0) {
+        return `攻撃 ${event.damage}ダメージ`;
+    }
+    if (event.message) {
+        // Fallback to message, but sanitize English keys
+        const msg = event.message;
+        if (/^[a-z_]+$/.test(msg)) return "行動中...";
+        return msg;
+    }
+
+    return "行動中...";
+};
+
+const makeStatusChipsJa = (event: BattleEvent): string[] => {
+    const chips: string[] = [];
+    if (!event) return chips;
+
+    if (event.stunned) chips.push("⚡スタン");
+    if (event.guarded && event.guardMultiplier) chips.push(`🛡x${event.guardMultiplier}`);
+    if (event.bossShieldRemaining !== undefined && event.bossShieldRemaining > 0) {
+        chips.push(`🔰シールド${event.bossShieldRemaining}`);
+    }
+    if (event.cheerApplied && event.cheerMultiplier) chips.push(`📣x${event.cheerMultiplier}`);
+
+    return chips;
+};
+
+const formatHpText = (current: number, max: number): { text: string; percent: number } => {
+    const safeCurrent = Math.max(0, Math.floor(current ?? 0));
+    const safeMax = Math.max(1, max);
+    const percent = Math.max(0, Math.min(100, (safeCurrent / safeMax) * 100));
+    return { text: `${safeCurrent}/${safeMax}`, percent: Math.floor(percent) };
+};
+
+// --- (D) Delay Calculation (single source) ---
+const BASE_DELAY_MS = 650;
+
+const getDelayMs = (
+    event: BattleEvent,
+    speed: 1 | 2 | 3,
+    isSkipping: boolean
+): number => {
+    if (isSkipping) return 20;
+
+    let delay = (event.delay || BASE_DELAY_MS) / speed;
+
+    // Slower for normal hits (user requested)
+    if (event.logType === 'NORMAL') {
+        delay *= 2.0;
+    }
+
+    // Bonus for important events
+    if (event.specialTriggered || event.overdriveTriggered || event.finisherApplied) {
+        delay += 150;
+    }
+
+    // Critical/special slow-mo
+    if (event.type === 'ATTACK_IMPACT' && (event.isCritical || event.specialTriggered)) {
+        delay *= 1.8;
+    }
+
+    return Math.max(delay, 20);
+};
+
+// --- (E) SE Selection (priority-based) ---
+const getSfxKey = (event: BattleEvent, idx: number): string =>
+    `${idx}-${event.type}-${event.attackerId}-${event.damage}`;
+
+const pickSfxForLog = (event: BattleEvent): SfxName | null => {
+    if (!event) return null;
+
+    // Special/Overdrive highest priority
+    if (event.specialTriggered || event.overdriveTriggered) return 'ult';
+
+    // Stun
+    if (event.stunApplied || event.stunned) return 'stun';
+
+    // Guard
+    if (event.guarded) return 'guard';
+
+    // Attack impacts
+    if (event.type === 'ATTACK_IMPACT') {
+        if (event.isMiss) return 'guard';  // Miss sound
+        if (event.isCritical) return 'crit';
+        return 'hit';
+    }
+
+    // Attack prepare
+    if (event.type === 'ATTACK_PREPARE') return 'attack';
+
+    return null;
+};
+
+// --- Speed persistence (localStorage) ---
+const SPEED_STORAGE_KEY = 'battle_speed';
+
+const loadSpeed = (): 1 | 2 | 3 => {
+    try {
+        const saved = localStorage.getItem(SPEED_STORAGE_KEY);
+        if (saved === '1' || saved === '2' || saved === '3') return parseInt(saved) as 1 | 2 | 3;
+    } catch { /* ignore */ }
+    return 2; // Default 2x
+};
+
+const saveSpeed = (speed: 1 | 2 | 3): void => {
+    try { localStorage.setItem(SPEED_STORAGE_KEY, String(speed)); } catch { /* ignore */ }
+};
 
 // Deterministic PRNG based on LCG (Linear Congruential Generator)
 const createPRNG = (seed: string) => {
@@ -95,24 +296,12 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
     const [events, setEvents] = useState<BattleEvent[]>([]);
     const [currentEventIndex, setCurrentEventIndex] = useState(0);
 
-    // Extract START log to determine definitive Max HP (Server Source of Truth)
-    const startLog = useMemo(() => result.logs.find(l => l.action === 'START'), [result]);
-
-    const p1MaxHp = useMemo(() => {
-        if (startLog && p1?.id) {
-            if (startLog.attackerId === p1.id) return startLog.attackerHp;
-            if (startLog.defenderId === p1.id) return startLog.defenderHp;
-        }
-        return p1?.baseHp ?? 1000;
-    }, [startLog, p1]);
-
-    const p2MaxHp = useMemo(() => {
-        if (startLog && p2?.id) {
-            if (startLog.attackerId === p2.id) return startLog.attackerHp;
-            if (startLog.defenderId === p2.id) return startLog.defenderHp;
-        }
-        return p2?.baseHp ?? 1000;
-    }, [startLog, p2]);
+    // Extract START log and MaxHP using pure functions
+    const startLog = useMemo(() => getStartLog(result.logs), [result]);
+    const { p1Max: p1MaxHp, p2Max: p2MaxHp } = useMemo(() =>
+        getMaxHpFromStart(startLog, p1?.id ?? '', p2?.id ?? '', p1?.baseHp ?? 1000, p2?.baseHp ?? 1000),
+        [startLog, p1?.id, p2?.id, p1?.baseHp, p2?.baseHp]
+    );
 
     // Game State
     const [hp, setHp] = useState<Record<string, number>>({
@@ -132,15 +321,10 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
     // NEW: Critical Slow-mo state
     const [isCriticalMoment, setIsCriticalMoment] = useState(false);
 
-    // Pacing - Default 2x, persisted via localStorage
-    const [speed, setSpeed] = useState<1 | 2 | 3>(() => {
-        try {
-            const saved = localStorage.getItem('battle_speed');
-            if (saved === '1' || saved === '2' || saved === '3') return parseInt(saved) as 1 | 2 | 3;
-        } catch { /* ignore */ }
-        return 2; // Default 2x
-    });
+    // Pacing - Default 2x, persisted via localStorage (using pure function)
+    const [speed, setSpeed] = useState<1 | 2 | 3>(loadSpeed);
     const [isSkipped, setIsSkipped] = useState(false);
+    const lastSfxKeyRef = useRef<string | null>(null); // SE deduplication
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
     const hasEndedRef = useRef(false);
 
@@ -210,6 +394,11 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
     // Initial Setup
     useEffect(() => {
         if (!mountedRef.current) return;
+
+        // Reset SFX state for new battle
+        clearPlayedKeys();
+        setSkipMode(false);
+
         // Filter out START log for visual timeline
         const filteredLogs = result.logs.filter(l => l.action !== 'START');
         const generated = generateBattleEvents(filteredLogs, p1.id, p2.id);
@@ -642,6 +831,9 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
         // Stop battle music
         stopBGM();
 
+        // Reset skip mode to allow victory/defeat SE
+        setSkipMode(false);
+
         const isWin = result.winnerId === p1.id;
         // Play victory/defeat SFX
         if (isWin) {
@@ -655,6 +847,7 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
     const handleSkip = () => {
         if (!mountedRef.current) return;
         setIsSkipped(true);
+        setSkipMode(true);  // Suppress SE during skip
         if (specialOverlayTimeoutRef.current) {
             clearTimeout(specialOverlayTimeoutRef.current);
         }
@@ -856,7 +1049,7 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
                                 key={s}
                                 onClick={() => {
                                     setSpeed(s);
-                                    try { localStorage.setItem('battle_speed', String(s)); } catch { /* ignore */ }
+                                    saveSpeed(s);  // Use pure function
                                     playSfx('ui');
                                 }}
                                 className={`text-[10px] font-black italic h-8 px-3 rounded-lg transition-all ${speed === s ? "bg-primary text-black shadow-[0_0_10px_rgba(0,243,255,0.3)]" : "text-white/40 hover:text-white"
