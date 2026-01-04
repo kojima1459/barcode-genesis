@@ -178,7 +178,41 @@ const getDelayMs = (
     return Math.max(delay, 20);
 };
 
-// --- (E) SE Selection (priority-based) ---
+// --- (E) Overdrive Gauge Extraction (pure) ---
+interface OverdriveUpdates {
+    p1Gauge?: number;
+    p2Gauge?: number;
+}
+
+const getOverdriveUpdates = (
+    event: BattleEvent,
+    p1Id: string,
+    p2Id: string
+): OverdriveUpdates => {
+    const updates: OverdriveUpdates = {};
+
+    // Check attacker gauge
+    if (event.attackerOverdriveGauge !== undefined && event.attackerId) {
+        if (event.attackerId === p1Id) {
+            updates.p1Gauge = event.attackerOverdriveGauge;
+        } else if (event.attackerId === p2Id) {
+            updates.p2Gauge = event.attackerOverdriveGauge;
+        }
+    }
+
+    // Check defender gauge
+    if (event.defenderOverdriveGauge !== undefined && event.defenderId) {
+        if (event.defenderId === p1Id) {
+            updates.p1Gauge = event.defenderOverdriveGauge;
+        } else if (event.defenderId === p2Id) {
+            updates.p2Gauge = event.defenderOverdriveGauge;
+        }
+    }
+
+    return updates;
+};
+
+// --- (F) SE Selection (priority-based) ---
 const getSfxKey = (event: BattleEvent, idx: number): string =>
     `${idx}-${event.type}-${event.attackerId}-${event.damage}`;
 
@@ -592,17 +626,10 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
             }
         }
 
-        let delay = (event.delay || 0) / speed;
-        if (!isSkipped) {
-            if (event.logType === 'NORMAL') {
-                delay *= 3.0; // Slower normal hits (1/2 of previous 1.5 speed request)
-            }
-            if (isImportantEvent(event)) {
-                delay = Math.max(delay, 500);
-            }
-        }
+        // === DELAY CALCULATION (using pure function) ===
+        let delay = getDelayMs(event, speed, isSkipped);
 
-        // Critical Hit Slow-mo Logic
+        // Critical Hit Slow-mo Logic (visual enhancement, not part of pure function)
         if (event.type === 'ATTACK_IMPACT' && (event.isCritical || event.specialTriggered) && !isSkipped) {
             delay *= 2.5; // Slow-mo for impact
             if (!mountedRef.current) return;
@@ -610,8 +637,6 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
             scheduleTimeout(() => setIsCriticalMoment(false), delay);
         }
 
-        if (isSkipped) delay = 20;
-        delay = Math.max(delay, 20);
 
         const execute = () => {
             try {
@@ -668,21 +693,10 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
                         if (event.attackerId) {
                             setCurrentAttackerId(event.attackerId);
                         }
-                        // Update overdrive gauges from LOG_MESSAGE events
-                        if (event.attackerOverdriveGauge !== undefined) {
-                            if (event.attackerId === p1?.id) {
-                                setP1OverdriveGauge(event.attackerOverdriveGauge);
-                            } else {
-                                setP2OverdriveGauge(event.attackerOverdriveGauge);
-                            }
-                        }
-                        if (event.defenderOverdriveGauge !== undefined) {
-                            if (event.defenderId === p1?.id) {
-                                setP1OverdriveGauge(event.defenderOverdriveGauge);
-                            } else {
-                                setP2OverdriveGauge(event.defenderOverdriveGauge);
-                            }
-                        }
+                        // Update overdrive gauges using pure function
+                        const odUpdates = getOverdriveUpdates(event, p1?.id || '', p2?.id || '');
+                        if (odUpdates.p1Gauge !== undefined) setP1OverdriveGauge(odUpdates.p1Gauge);
+                        if (odUpdates.p2Gauge !== undefined) setP2OverdriveGauge(odUpdates.p2Gauge);
                         break;
 
                     case 'ATTACK_PREPARE':
@@ -709,14 +723,15 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
                             }
 
                             if (event.isMiss) {
-                                // Miss SFX - reuse UI click or similar if no dedicated miss
+                                // Miss SFX - reuse guard sound with high pitch
                                 playSfx('guard', { volume: 0.5, playbackRate: 2.0 });
-                            } else if (event.specialTriggered || event.overdriveTriggered) {
-                                playSfx('ult', { volume: 0.8 });
-                            } else if (event.isCritical) {
-                                playSfx('crit', { volume: 0.7 });
                             } else {
-                                playSfx('hit', { volume: 0.6 });
+                                // Use pure function for SFX selection
+                                const sfxName = pickSfxForLog(event);
+                                if (sfxName) {
+                                    const volume = (sfxName === 'ult') ? 0.8 : (sfxName === 'crit') ? 0.7 : 0.6;
+                                    playSfx(sfxName, { volume });
+                                }
                             }
 
                             if (event.cheerApplied) {
@@ -790,21 +805,10 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
                             setLastHp(event.currentHp);
                             setHp(prev => ({ ...prev, ...event.currentHp }));
                         }
-                        // Also update gauges from HP_UPDATE
-                        if (event.attackerOverdriveGauge !== undefined && event.attackerId) {
-                            if (event.attackerId === p1?.id) {
-                                setP1OverdriveGauge(event.attackerOverdriveGauge);
-                            } else {
-                                setP2OverdriveGauge(event.attackerOverdriveGauge);
-                            }
-                        }
-                        if (event.defenderOverdriveGauge !== undefined && event.defenderId) {
-                            if (event.defenderId === p1?.id) {
-                                setP1OverdriveGauge(event.defenderOverdriveGauge);
-                            } else {
-                                setP2OverdriveGauge(event.defenderOverdriveGauge);
-                            }
-                        }
+                        // Update overdrive gauges using pure function
+                        const odUpdatesHp = getOverdriveUpdates(event, p1?.id || '', p2?.id || '');
+                        if (odUpdatesHp.p1Gauge !== undefined) setP1OverdriveGauge(odUpdatesHp.p1Gauge);
+                        if (odUpdatesHp.p2Gauge !== undefined) setP2OverdriveGauge(odUpdatesHp.p2Gauge);
                         break;
 
                     case 'PHASE_START':
