@@ -2961,10 +2961,23 @@ export async function resolveFighterData(
       transaction ? transaction.get(p2Ref) : p2Ref.get()
     ]);
 
-    if (!p1.exists || !p2.exists) throw new functions.https.HttpsError('failed-precondition', 'Parent robot missing');
+    // Fallback defaults for missing parent robots
+    const defaultRobot = {
+      baseHp: 100,
+      baseAttack: 50,
+      baseDefense: 30,
+      baseSpeed: 50,
+      level: 1,
+      skills: []
+    };
 
-    const rA = { ...p1.data(), id: p1.id } as any;
-    const rB = { ...p2.data(), id: p2.id } as any;
+    const rA = p1.exists ? { ...p1.data(), id: p1.id } as any : { ...defaultRobot, id: vData.parentRobotIds[0] };
+    const rB = p2.exists ? { ...p2.data(), id: p2.id } as any : { ...defaultRobot, id: vData.parentRobotIds[1] };
+
+    // Log warning if using fallback
+    if (!p1.exists || !p2.exists) {
+      console.warn(`[resolveFighterData] Variant ${id} has missing parent(s). Using fallback stats.`);
+    }
 
     const stats = resolveVariantStats(rA, rB);
     const appearance = resolveVariantAppearance(vData.appearanceRecipe, rA, rB);
@@ -2972,12 +2985,12 @@ export async function resolveFighterData(
     return {
       id: vData.id,
       userId: uid,
-      name: `Variant ${vData.id?.slice(0, 4)}`,
+      name: vData.name || `Variant ${vData.id?.slice(0, 4)}`,
       sourceBarcode: 'FUSION',
       ...stats,
-      parts: appearance.parts,
-      colors: appearance.colors,
-      skills: rA.skills,
+      parts: vData.parts || appearance.parts,
+      colors: vData.colors || appearance.colors,
+      skills: rA.skills || [],
       isVariant: true,
       variantId: vData.id,
       totalBattles: 0,

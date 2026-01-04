@@ -2501,13 +2501,24 @@ async function resolveFighterData(uid, ref, transaction) {
             transaction ? transaction.get(p1Ref) : p1Ref.get(),
             transaction ? transaction.get(p2Ref) : p2Ref.get()
         ]);
-        if (!p1.exists || !p2.exists)
-            throw new functions.https.HttpsError('failed-precondition', 'Parent robot missing');
-        const rA = Object.assign(Object.assign({}, p1.data()), { id: p1.id });
-        const rB = Object.assign(Object.assign({}, p2.data()), { id: p2.id });
+        // Fallback defaults for missing parent robots
+        const defaultRobot = {
+            baseHp: 100,
+            baseAttack: 50,
+            baseDefense: 30,
+            baseSpeed: 50,
+            level: 1,
+            skills: []
+        };
+        const rA = p1.exists ? Object.assign(Object.assign({}, p1.data()), { id: p1.id }) : Object.assign(Object.assign({}, defaultRobot), { id: vData.parentRobotIds[0] });
+        const rB = p2.exists ? Object.assign(Object.assign({}, p2.data()), { id: p2.id }) : Object.assign(Object.assign({}, defaultRobot), { id: vData.parentRobotIds[1] });
+        // Log warning if using fallback
+        if (!p1.exists || !p2.exists) {
+            console.warn(`[resolveFighterData] Variant ${id} has missing parent(s). Using fallback stats.`);
+        }
         const stats = (0, variantSystem_1.resolveVariantStats)(rA, rB);
         const appearance = (0, variantSystem_1.resolveVariantAppearance)(vData.appearanceRecipe, rA, rB);
-        return Object.assign(Object.assign({ id: vData.id, userId: uid, name: `Variant ${(_a = vData.id) === null || _a === void 0 ? void 0 : _a.slice(0, 4)}`, sourceBarcode: 'FUSION' }, stats), { parts: appearance.parts, colors: appearance.colors, skills: rA.skills, isVariant: true, variantId: vData.id, totalBattles: 0, totalWins: 0, isFavorite: false, level: rA.level || 1, xp: 0 });
+        return Object.assign(Object.assign({ id: vData.id, userId: uid, name: vData.name || `Variant ${(_a = vData.id) === null || _a === void 0 ? void 0 : _a.slice(0, 4)}`, sourceBarcode: 'FUSION' }, stats), { parts: vData.parts || appearance.parts, colors: vData.colors || appearance.colors, skills: rA.skills || [], isVariant: true, variantId: vData.id, totalBattles: 0, totalWins: 0, isFavorite: false, level: rA.level || 1, xp: 0 });
     }
 }
 exports.resolveFighterData = resolveFighterData;
