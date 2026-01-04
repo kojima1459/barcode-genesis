@@ -2501,14 +2501,23 @@ async function resolveFighterData(uid, ref, transaction) {
             transaction ? transaction.get(p1Ref) : p1Ref.get(),
             transaction ? transaction.get(p2Ref) : p2Ref.get()
         ]);
-        // Fallback defaults for missing parent robots
+        // Fallback defaults for missing parent robots (include parts/colors for resolveVariantAppearance)
+        const defaultParts = {
+            head: 1, face: 1, body: 1, armLeft: 1, armRight: 1,
+            legLeft: 1, legRight: 1, backpack: 1, weapon: 1, accessory: 1
+        };
+        const defaultColors = {
+            primary: '#666666', secondary: '#888888', accent: '#00f3ff', glow: '#00f3ff'
+        };
         const defaultRobot = {
             baseHp: 100,
             baseAttack: 50,
             baseDefense: 30,
             baseSpeed: 50,
             level: 1,
-            skills: []
+            skills: [],
+            parts: defaultParts,
+            colors: defaultColors
         };
         const rA = p1.exists ? Object.assign(Object.assign({}, p1.data()), { id: p1.id }) : Object.assign(Object.assign({}, defaultRobot), { id: vData.parentRobotIds[0] });
         const rB = p2.exists ? Object.assign(Object.assign({}, p2.data()), { id: p2.id }) : Object.assign(Object.assign({}, defaultRobot), { id: vData.parentRobotIds[1] });

@@ -438,6 +438,8 @@ export const translations = {
     bingo_cond_japan_range: "日本JAN",
 
     // Workshop
+    workshop: "工房",
+    workshop_desc: "2体のロボットを合成して、新しい見た目のバリアントを作成できます。",
     workshop_title: "融合ワークショップ",
     workshop_description: "Combine robots to create cosmetic variants.",
     workshop_create_variant: "製造バリアント作成",
@@ -922,6 +924,8 @@ export const translations = {
     premium_desc: "Upgrade your system to expand base capabilities.",
 
     // Workshop
+    workshop: "Workshop",
+    workshop_desc: "Combine two robots to create a new cosmetic variant.",
     workshop_title: "Fusion Workshop",
     workshop_description: "Combine robots to create cosmetic variants.",
     workshop_create_variant: "Create Variant",
