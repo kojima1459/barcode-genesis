@@ -361,7 +361,7 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
     // Pacing - Default 2x, persisted via localStorage (using pure function)
     const [speed, setSpeed] = useState<1 | 2 | 3>(loadSpeed);
     const [isSkipped, setIsSkipped] = useState(false);
-    const [isAutoMode, setIsAutoMode] = useState(true); // Task G: Manual Mode
+    const [isAutoMode, setIsAutoMode] = useState(false); // Task G: Manual Mode (Default Off)
     const lastSfxKeyRef = useRef<string | null>(null); // SE deduplication
 
     const handleNextEvent = () => {

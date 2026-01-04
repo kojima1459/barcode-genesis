@@ -23,6 +23,10 @@ export interface UserData {
     titleId?: string;
     lastFreeVariantDate?: string;
     variantCount?: number;
+    // Scan Limit Tracking
+    dailyGenerationCount?: number;
+    lastGenerationDateKey?: string;
+    totalRobots?: number;
 }
 
 interface UserDataResult {
@@ -40,6 +44,9 @@ interface UserDataResult {
     titleId: string | null;
     badgeIds: string[];
     activeUnitId: string | null;
+    // New accessors
+    dailyGenerationCount: number;
+    lastGenerationDateKey: string | null;
 }
 
 const UserDataContext = createContext<UserDataResult>({
@@ -56,6 +63,8 @@ const UserDataContext = createContext<UserDataResult>({
     titleId: null,
     badgeIds: [],
     activeUnitId: null,
+    dailyGenerationCount: 0,
+    lastGenerationDateKey: null,
 });
 
 export function UserDataProvider({ children }: { children: ReactNode }) {
@@ -123,6 +132,10 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
                                     titleId: typeof data.titleId === "string" ? data.titleId : undefined,
                                     lastFreeVariantDate: typeof data.lastFreeVariantDate === "string" ? data.lastFreeVariantDate : undefined,
                                     variantCount: typeof data.variantCount === "number" ? data.variantCount : 0,
+                                    // New fields
+                                    dailyGenerationCount: typeof data.dailyGenerationCount === "number" ? data.dailyGenerationCount : 0,
+                                    lastGenerationDateKey: typeof data.lastGenerationDateKey === "string" ? data.lastGenerationDateKey : undefined,
+                                    totalRobots: typeof data.totalRobots === "number" ? data.totalRobots : 0,
                                 });
                             } else {
                                 // User document doesn't exist yet (might be creating)
@@ -176,6 +189,8 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
         titleId: userData?.titleId ?? null,
         badgeIds: userData?.badgeIds ?? [],
         activeUnitId: userData?.activeUnitId ?? null,
+        dailyGenerationCount: userData?.dailyGenerationCount ?? 0,
+        lastGenerationDateKey: userData?.lastGenerationDateKey ?? null,
     };
 
     return (

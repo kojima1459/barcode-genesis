@@ -15,6 +15,7 @@ import { Link, useLocation } from "wouter";
 import { useLanguage } from "@/contexts/LanguageContext";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { useNotification } from "@/hooks/useNotification";
+import { useNotifications } from "@/contexts/NotificationContext";
 import { useUserData } from "@/hooks/useUserData";
 import { selectActiveRobot } from "@/lib/selectActiveRobot";
 import ShareButton from "@/components/ShareButton";
@@ -57,6 +58,7 @@ export default function Home() {
   const { playBGM, playSE } = useSound();
   const { user, logout } = useAuth();
   const { permission, requestPermission } = useNotification();
+  const { badges } = useNotifications();
   const [mode, setMode] = useState<'menu' | 'scan' | 'result'>('menu');
   const [isGenerating, setIsGenerating] = useState(false);
   const [robot, setRobot] = useState<RobotData | null>(null);
@@ -494,6 +496,7 @@ export default function Home() {
                   {/* SCAN - Full Width */}
                   <Link href="/scan" className="col-span-2">
                     <div className="relative h-24 bg-linear-to-r from-cyan-900/40 to-black border-l-4 border-l-cyan-500 border-y border-r border-white/10 rounded-r-lg flex items-center px-6 overflow-hidden group hover:bg-cyan-900/60 transition-all active:scale-[0.99] cursor-pointer">
+                      {badges.scan && <span className="absolute top-3 right-3 w-3 h-3 rounded-full bg-red-500 border border-white/20 shadow-[0_0_10px_rgba(239,68,68,0.8)] animate-pulse z-20" />}
                       {/* Background Icon */}
                       <ScanBarcode className="absolute -right-4 -bottom-4 w-32 h-32 text-cyan-500/10 group-hover:text-cyan-500/20 group-hover:scale-110 transition-all duration-500 rotate-[-10deg]" />
 
@@ -544,6 +547,7 @@ export default function Home() {
                   {/* WORKSHOP */}
                   <Link href="/workshop">
                     <div className="relative h-20 bg-linear-to-br from-orange-900/40 to-black border-l-4 border-l-orange-500 border-y border-r border-white/10 rounded-r-lg flex items-center px-4 overflow-hidden group hover:bg-orange-900/60 transition-all active:scale-[0.98] cursor-pointer">
+                      {badges.workshop && <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-red-500 border border-white/20 shadow-[0_0_8px_rgba(239,68,68,0.8)] animate-pulse z-20" />}
                       <Factory className="absolute -right-2 -bottom-2 w-24 h-24 text-orange-500/10 group-hover:text-orange-500/20 group-hover:scale-110 transition-transform duration-500" />
                       <div className="relative z-10 flex items-center gap-3">
                         <div className="w-10 h-10 rounded bg-orange-500/20 flex items-center justify-center border border-orange-500/50">
@@ -625,6 +629,7 @@ export default function Home() {
                   <h3 className="text-xs font-bold text-muted-foreground tracking-widest flex items-center gap-2">
                     <Trophy className="w-3 h-3 text-yellow-500" />
                     DAILY ORDERS
+                    {badges.mission && <span className="ml-2 w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)] animate-pulse" />}
                   </h3>
                   <span className="text-[10px] text-muted-foreground/60">RESET: 00:00 JST</span>
                 </div>

@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { collection, getDocs, orderBy, query, doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { Loader2, Swords, Factory, ChevronDown, ChevronRight, ScanBarcode, Star, HelpCircle, Filter } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserData } from "@/hooks/useUserData";
@@ -233,6 +234,8 @@ export default function Dex() {
   // Filters
   const [filterRole, setFilterRole] = useState<string>("ALL");
   const [filterRarity, setFilterRarity] = useState<string>("ALL");
+
+  const [hintSlot, setHintSlot] = useState<DexSlot | null>(null);
 
   const filteredRobots = useMemo(() => {
     if (filterRole === "ALL" && filterRarity === "ALL") return robots;
@@ -527,15 +530,20 @@ export default function Dex() {
                           const placeholders = slotPlaceholders.get(slot.id);
 
                           return (
-                            <CollectionSlot
+                            <Interactive
                               key={slot.id}
-                              role={slot.role}
-                              rarity={slot.rarity}
-                              robot={robot}
-                              unlocked={unlocked}
-                              placeholderParts={placeholders?.parts}
-                              placeholderColors={placeholders?.colors}
-                            />
+                              className="rounded-xl overflow-hidden h-full"
+                              onClick={() => !unlocked && setHintSlot(slot)}
+                            >
+                              <CollectionSlot
+                                role={slot.role}
+                                rarity={slot.rarity}
+                                robot={robot}
+                                unlocked={unlocked}
+                                placeholderParts={placeholders?.parts}
+                                placeholderColors={placeholders?.colors}
+                              />
+                            </Interactive>
                           );
                         })}
                       </div>
@@ -782,6 +790,42 @@ export default function Dex() {
           </TabsContent>
         </Tabs>
         <AdBanner />
+
+        {/* Hint Dialog */}
+        <Dialog open={!!hintSlot} onOpenChange={(open) => !open && setHintSlot(null)}>
+          <DialogContent className="bg-card border-neon-cyan text-foreground max-w-sm">
+            <DialogHeader>
+              <DialogTitle className="text-neon-cyan flex items-center gap-2">
+                <HelpCircle className="w-5 h-5" />
+                {t('dex_hint_title') || "未発見のユニット"}
+              </DialogTitle>
+              <DialogDescription className="text-muted-foreground pt-2">
+                {hintSlot && (hintSlot.rarity <= 2
+                  ? (t('dex_hint_scan') || "このロボットはスキャンで発見できるかも！？\n色々なバーコードを試してみよう！")
+                  : (t('dex_hint_workshop') || "このレアなロボットはワークショップで\n合体してゲットできるかも！？")
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="flex-col sm:flex-row gap-2 mt-4">
+              {hintSlot && (
+                <Button
+                  className="w-full bg-neon-cyan text-black hover:bg-neon-cyan/80 font-bold"
+                  onClick={() => {
+                    setLocation(hintSlot.rarity <= 2 ? '/scan' : '/workshop');
+                    setHintSlot(null);
+                  }}
+                >
+                  {hintSlot.rarity <= 2
+                    ? (t('dex_btn_scan') || "スキャンへ移動")
+                    : (t('dex_btn_workshop') || "ワークショップへ移動")}
+                </Button>
+              )}
+              <Button variant="ghost" className="w-full sm:w-auto" onClick={() => setHintSlot(null)}>
+                {t('close') || "閉じる"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );

@@ -2,11 +2,13 @@ import { Link, useLocation } from "wouter";
 import { BattleIcon, HomeIcon, ProfileIcon, ShopIcon, UnitsIcon } from "@/components/icons/AppIcons";
 import { useSound } from "@/contexts/SoundContext";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useNotifications } from "@/contexts/NotificationContext";
 
 export default function BottomNav() {
     const [location] = useLocation();
     const { playSE } = useSound();
     const { t } = useLanguage();
+    const { badges } = useNotifications();
 
     // Hide on LP, Auth, Legal pages
     const hiddenPaths = ["/lp", "/auth", "/privacy", "/terms", "/law", "/404"];
@@ -35,6 +37,9 @@ export default function BottomNav() {
             >
                 {navItems.map((item) => {
                     const isActive = location === item.path;
+                    const hasBadge = (item.path === "/" && (badges.scan || badges.mission || badges.workshop)) ||
+                        (item.path === "/shop" && badges.shop);
+
                     return (
                         <Link
                             key={item.path}
@@ -44,13 +49,16 @@ export default function BottomNav() {
                             aria-current={isActive ? "page" : undefined}
                         >
                             <div
-                                className={`flex flex-col items-center gap-1 transition-all duration-300 min-w-[48px] min-h-[48px] justify-center ${isActive ? "text-primary scale-110" : "text-muted-foreground hover:text-foreground"
+                                className={`flex flex-col items-center gap-1 transition-all duration-300 min-w-[48px] min-h-[48px] justify-center relative ${isActive ? "text-primary scale-110" : "text-muted-foreground hover:text-foreground"
                                     }`}
                             >
                                 <item.icon
                                     className={`h-5 w-5 ${isActive ? "neon-text-cyan drop-shadow-[0_0_8px_rgba(62,208,240,0.5)]" : ""}`}
                                     aria-hidden="true"
                                 />
+                                {hasBadge && (
+                                    <span className="absolute top-1 right-2 w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)] animate-pulse" />
+                                )}
                                 <span className={`text-[10px] font-orbitron tracking-[0.02em] ${isActive ? "text-primary neon-text-cyan" : ""}`}>
                                     {item.label}
                                 </span>

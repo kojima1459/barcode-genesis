@@ -78,9 +78,9 @@ export function GlobalHeader({ className, missions }: GlobalHeaderProps) {
                 {/* Right: Credits & Shop */}
                 <div className="flex items-center gap-3">
                     {/* Credits */}
-                    <div className="hidden sm:flex flex-col items-end px-3 py-1 rounded-lg bg-white/5 border border-white/5">
-                        <span className="text-[9px] text-muted-foreground/60 font-orbitron tracking-widest leading-none mb-1 uppercase">{t('credits')}</span>
-                        <div className="text-sm font-bold font-mono text-neon-cyan leading-none flex items-center gap-1 tabular-nums">
+                    <div className="flex flex-col items-end px-2 sm:px-3 py-1 rounded-lg bg-white/5 border border-white/5">
+                        <span className="hidden sm:block text-[9px] text-muted-foreground/60 font-orbitron tracking-widest leading-none mb-1 uppercase">{t('credits')}</span>
+                        <div className="text-xs sm:text-sm font-bold font-mono text-neon-cyan leading-none flex items-center gap-1 tabular-nums">
                             <Coins className="w-3 h-3" />
                             {userData?.credits.toLocaleString() || 0}
                         </div>

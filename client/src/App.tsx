@@ -19,6 +19,7 @@ import { Loader2 } from "lucide-react";
 import AppShell from "@/components/AppShell";
 import { SystemSkeleton } from "@/components/ui/SystemSkeleton";
 import { APP_VERSION } from "./version";
+import { NotificationProvider } from "@/contexts/NotificationContext";
 import { registerGlobalErrorHandlers } from "@/lib/errorLog";
 
 const DEV_RENDER_PHASE_KEY = "__lastRenderPhase";
@@ -281,19 +282,21 @@ function App() {
                 <HapticProvider>
                   <TooltipProvider delayDuration={0}>
                     <UserDataProvider>
-                      <TutorialProvider>
-                        <div className="min-h-screen bg-background text-foreground font-sans selection:bg-neon-cyan/30">
-                          <OfflineBanner />
-                          <TutorialOverlay />
-                          {import.meta.env.DEV && devCrashNotice && (
-                            <div className="fixed top-2 left-1/2 -translate-x-1/2 z-50 rounded bg-red-900/80 px-3 py-1 text-[10px] font-mono text-white shadow-lg">
-                              {devCrashNotice}
-                            </div>
-                          )}
-                          <Toaster />
-                          <Router />
-                        </div>
-                      </TutorialProvider>
+                      <NotificationProvider>
+                        <TutorialProvider>
+                          <div className="min-h-screen bg-background text-foreground font-sans selection:bg-neon-cyan/30">
+                            <OfflineBanner />
+                            <TutorialOverlay />
+                            {import.meta.env.DEV && devCrashNotice && (
+                              <div className="fixed top-2 left-1/2 -translate-x-1/2 z-50 rounded bg-red-900/80 px-3 py-1 text-[10px] font-mono text-white shadow-lg">
+                                {devCrashNotice}
+                              </div>
+                            )}
+                            <Toaster />
+                            <Router />
+                          </div>
+                        </TutorialProvider>
+                      </NotificationProvider>
                     </UserDataProvider>
                   </TooltipProvider>
                 </HapticProvider>

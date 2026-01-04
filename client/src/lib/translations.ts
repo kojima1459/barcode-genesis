@@ -684,6 +684,13 @@ export const translations = {
     // HowTo: Workshop Expansion
     howto_expansion_title: "ロボットを もっともちたい！",
     howto_expansion_desc: "プレイヤーのレベルがあがると、もてる ロボットの かずが ふえるよ！",
+
+    // Dex Hints (Kids Friendly)
+    dex_hint_title: "未発見のユニット",
+    dex_hint_scan: "このロボットはスキャンで発見できるかも！？\n色々なバーコードを試してみよう！",
+    dex_hint_workshop: "このレアなロボットはワークショップで\n合体してゲットできるかも！？",
+    dex_btn_scan: "スキャンへ移動",
+    dex_btn_workshop: "ワークショップへ移動",
   },
   en: {
     // Common
@@ -1156,5 +1163,12 @@ export const translations = {
     // HowTo: Workshop Expansion
     howto_expansion_title: "Workshop Expansion (Promotion Exam)",
     howto_expansion_desc: "Reach certain levels to unlock 'Promotion Exam' on Home. Defeat the boss to increase workshop capacity.",
+
+    // Dex Hints
+    dex_hint_title: "Undiscovered Unit",
+    dex_hint_scan: "You might find this robot by scanning barcodes!\nTry scanning various items!",
+    dex_hint_workshop: "You might craft this rare robot in the Workshop\nby combining others!",
+    dex_btn_scan: "Go to Scan",
+    dex_btn_workshop: "Go to Workshop",
   }
 };
