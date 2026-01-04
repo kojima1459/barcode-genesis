@@ -835,11 +835,11 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
         setSkipMode(false);
 
         const isWin = result.winnerId === p1.id;
-        // Play victory/defeat SFX
+        // Play victory/defeat SFX (with uniqueKey to prevent duplicate plays)
         if (isWin) {
-            playSfx('win', { volume: 0.8 });
+            playSfx('win', { volume: 0.8, uniqueKey: `battle-${result.battleId}-win` });
         } else {
-            playSfx('lose', { volume: 0.7 });
+            playSfx('lose', { volume: 0.7, uniqueKey: `battle-${result.battleId}-lose` });
         }
         setIsFinished(true);
     };
