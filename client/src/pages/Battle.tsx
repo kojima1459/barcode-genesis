@@ -30,7 +30,7 @@ import {
   unlock as unlockBattleSfx,
   playGenerated,
 } from "@/lib/sound";
-import { getItemLabel } from "@/lib/items";
+import { getItemLabel, getItemDescription } from "@/lib/items";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { useRobotFx } from "@/hooks/useRobotFx";
@@ -460,6 +460,11 @@ export default function Battle() {
                       <Zap className="w-3.5 h-3.5" />
                     </div>
                   </div>
+                  {selectedItemId && (
+                    <div className="text-[10px] text-gray-400 mt-1.5 pl-1 font-mono">
+                      {getItemDescription(selectedItemId)}
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

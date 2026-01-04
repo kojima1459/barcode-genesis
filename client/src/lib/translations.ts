@@ -338,7 +338,7 @@ export const translations = {
     no_data: "データなし",
     no_variants: "バリアントなし",
     fused_unit: "融合機体",
-    support_module: "支援モジュール",
+    support_module: "バトルアイテム",
     none_selected: "未選択",
     tab_versus: "対戦",
     tab_online: "オンライン",
