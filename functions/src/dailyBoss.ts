@@ -100,10 +100,10 @@ const BOSS_NAMES: string[] = [
 
 // Base stats for boss (before type multipliers)
 const BASE_BOSS_STATS = {
-    hp: 800,
-    attack: 120,
-    defense: 100,
-    speed: 80,
+    hp: 12000,
+    attack: 350,
+    defense: 120,
+    speed: 90,
 };
 
 // SHIELD HP range (only for SHIELD type)

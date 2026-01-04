@@ -371,7 +371,7 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
         let delay = (event.delay || 0) / speed;
         if (!isSkipped) {
             if (event.logType === 'NORMAL') {
-                delay *= 1.5; // Slower normal hits (1/3 speed request)
+                delay *= 3.0; // Slower normal hits (1/2 of previous 1.5 speed request)
             }
             if (isImportantEvent(event)) {
                 delay = Math.max(delay, 500);
@@ -967,7 +967,7 @@ const RobotCard = memo(({ robot, hpPercent, currentHp, isShaking, isLunging, isP
                 />
             </div>
             <div className={`text-right text-xs font-mono mt-1 font-semibold ${isPlayer ? 'text-neon-cyan' : 'text-neon-pink'} tabular-nums`}>
-                HP: <span className="text-white text-lg font-orbitron">{Math.floor(currentHp ?? 0)}</span> / {robot.baseHp}
+                HP: <span className="text-white text-lg font-orbitron">{Math.floor(currentHp ?? 0)}</span> / {robot.baseHp} <span className="text-xs text-white/60 ml-1">({Math.floor(hpPercent)}%)</span>
             </div>
 
             {/* Enhanced Damage Numbers */}
