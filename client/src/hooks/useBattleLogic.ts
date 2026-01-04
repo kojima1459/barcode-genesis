@@ -33,7 +33,7 @@ export function useBattleLogic({
     variants,
     robots
 }: UseBattleLogicProps) {
-    const { playSE, playBGM } = useSound();
+    const { playSE, playBGM, stopBGM } = useSound();
 
     // -- State --
     const [isMatchmaking, setIsMatchmaking] = useState(false);
@@ -105,7 +105,7 @@ export function useBattleLogic({
 
         unlockBattleSfx();
         // playBattleSfx("battle_start", { throttleMs: 0 }); // Removed to prevent potential looping/overlap
-        playBGM('bgm_battle');
+        stopBGM();
 
         setIsBattling(true);
         setBattleResult(null);

@@ -222,7 +222,7 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
         setCurrentEventIndex(0);
         setHp({ [p1.id]: p1.baseHp, [p2.id]: p2.baseHp });
 
-        playBGM('bgm_battle');
+        // playBGM('bgm_battle'); // Disabled per user request
         if (!isMuted) playGenerated('ui_click');
     }, [result, p1.id, p2.id]);
 
@@ -371,7 +371,7 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
         let delay = (event.delay || 0) / speed;
         if (!isSkipped) {
             if (event.logType === 'NORMAL') {
-                delay *= 0.55; // Faster normal hits
+                delay *= 1.5; // Slower normal hits (1/3 speed request)
             }
             if (isImportantEvent(event)) {
                 delay = Math.max(delay, 500);
