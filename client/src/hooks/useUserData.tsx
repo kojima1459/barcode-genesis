@@ -11,6 +11,7 @@ export interface UserData {
     loginStreak: number;
     displayName?: string;
     photoURL?: string;
+    photoURLUpdatedAt?: number; // Timestamp for cache busting
     wins: number;
     battles: number;
     workshopLines: number;
@@ -111,6 +112,7 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
                                     loginStreak: typeof data.loginStreak === "number" ? data.loginStreak : 0,
                                     displayName: data.displayName,
                                     photoURL: data.photoURL,
+                                    photoURLUpdatedAt: typeof data.photoURLUpdatedAt === "number" ? data.photoURLUpdatedAt : (data.photoURLUpdatedAt?.toMillis?.() ?? undefined),
                                     wins: typeof data.wins === "number" ? data.wins : 0,
                                     battles: typeof data.battles === "number" ? data.battles : 0,
                                     workshopLines: typeof data.workshopLines === "number" ? data.workshopLines : 1,

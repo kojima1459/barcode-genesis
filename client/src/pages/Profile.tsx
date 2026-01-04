@@ -132,7 +132,8 @@ export default function Profile() {
       const downloadURL = await getDownloadURL(storageRef);
 
       await updateDoc(doc(getDb(), "users", user.uid), {
-        photoURL: downloadURL
+        photoURL: downloadURL,
+        photoURLUpdatedAt: Date.now(), // For cache busting in Header
       });
 
       // useUserData will auto-update

@@ -44,7 +44,16 @@ export function GlobalHeader({ className, missions }: GlobalHeaderProps) {
                     }}
                 >
                     <div className="w-9 h-9 rounded-lg border border-white/10 glass flex items-center justify-center relative overflow-hidden group-hover:border-neon-cyan/50 transition-colors">
-                        <User className="w-4 h-4 text-muted-foreground group-hover:text-neon-cyan transition-colors" />
+                        {userData?.photoURL ? (
+                            <img
+                                src={`${userData.photoURL}${userData.photoURL.includes('?') ? '&' : '?'}v=${userData.photoURLUpdatedAt ?? Date.now()}`}
+                                alt="Avatar"
+                                className="w-full h-full object-cover"
+                                loading="eager"
+                            />
+                        ) : (
+                            <User className="w-4 h-4 text-muted-foreground group-hover:text-neon-cyan transition-colors" />
+                        )}
                         <div className="absolute bottom-0 inset-x-0 h-1 bg-neon-cyan/30 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left" />
                     </div>
                     <div className="flex flex-col">
