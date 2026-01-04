@@ -34,7 +34,8 @@ describe('Role Determinism', () => {
             '8801234567891',
         ];
 
-        const validRoles = ['ATTACKER', 'TANK', 'SPEED', 'BALANCE', 'TRICKY'];
+        // Phase B role system uses lowercase role names
+        const validRoles = ['striker', 'tank', 'speed', 'support', 'balanced'];
 
         for (const barcode of barcodes) {
             const robot = generateRobotData(barcode, 'testUser');
@@ -44,13 +45,13 @@ describe('Role Determinism', () => {
         }
     });
 
-    it('name includes role title prefix', () => {
+    it('name includes epithet prefix', () => {
         const barcode = '4901234567890';
         const robot = generateRobotData(barcode, 'testUser');
 
-        expect(robot.name).toContain('・');
-        // New format: Epithet + Role + Core
-        expect(robot.name).toContain(robot.roleTitle!);
+        // New format: Epithet + Name (e.g., "無双のカイドン")
+        // Epithet ends with の
+        expect(robot.name).toMatch(/^\S+の\S+$/);
     });
 });
 
@@ -181,14 +182,13 @@ describe('Visual Variety & Rarity', () => {
         expect(robot1.name).toBe(robot2.name);
     });
 
-    it('name follows 3-layer format', () => {
+    it('name follows epithet + name format', () => {
         const barcode = '4901234567890';
         const robot = generateRobotData(barcode, 'testUser');
-        // Format: Epithet + RoleTitle + "・" + CoreName
-        // e.g. "灼熱の突撃・ゴーストナイト"
+        // Format: Epithet + Name (e.g., "無双のカイドン")
         console.log(`Generated Name: ${robot.name}`);
-        expect(robot.name).toMatch(/^(.*)・(.*)$/);
-        expect(robot.name).toContain(robot.roleTitle!);
+        expect(robot.name).toMatch(/^\S+の\S+$/);
+        expect(robot.name.length).toBeGreaterThan(3);
     });
 
     it('produces different visuals for differnet barcodes', () => {
@@ -201,5 +201,153 @@ describe('Visual Variety & Rarity', () => {
         const r1Json = JSON.stringify(r1.visuals);
         const r2Json = JSON.stringify(r2.visuals);
         expect(r1Json).not.toBe(r2Json);
+    });
+});
+
+// ============================================
+// New Tests: Invalid Inputs & Edge Cases
+// ============================================
+
+describe('Invalid Barcode Handling', () => {
+    it('throws InvalidBarcodeError for 8-digit barcode (not normalized)', () => {
+        // Note: 8-digit barcodes should be normalized to 13-digit by client before calling this
+        expect(() => generateRobotData('12345678', 'testUser')).toThrow();
+    });
+
+    it('throws InvalidBarcodeError for 7-digit barcode (too short)', () => {
+        expect(() => generateRobotData('1234567', 'testUser')).toThrow();
+    });
+
+    it('throws InvalidBarcodeError for 14-digit barcode (too long)', () => {
+        expect(() => generateRobotData('12345678901234', 'testUser')).toThrow();
+    });
+
+    it('throws InvalidBarcodeError for empty string', () => {
+        expect(() => generateRobotData('', 'testUser')).toThrow();
+    });
+
+    it('throws InvalidBarcodeError for barcode with letters', () => {
+        expect(() => generateRobotData('abcd12345678', 'testUser')).toThrow();
+    });
+
+    it('throws InvalidBarcodeError for 12-digit barcode (UPC-A not normalized)', () => {
+        expect(() => generateRobotData('012345678905', 'testUser')).toThrow();
+    });
+});
+
+describe('Leading Zeros Handling', () => {
+    it('correctly handles barcode starting with zeros', () => {
+        const barcode = '0000000000017'; // Valid 13-digit with leading zeros
+        const robot = generateRobotData(barcode, 'testUser');
+
+        // Should generate valid robot without crashing
+        expect(robot).toBeDefined();
+        expect(robot.name).toBeDefined();
+        expect(robot.baseHp).toBeGreaterThan(0);
+        expect(robot.sourceBarcode).toBe(barcode);
+    });
+
+    it('treats leading zeros as string, not parsed integer', () => {
+        const barcode1 = '0000000000017';
+        const barcode2 = '0000000000017'; // Same barcode
+
+        const robot1 = generateRobotData(barcode1, 'user1');
+        const robot2 = generateRobotData(barcode2, 'user2');
+
+        // Should be deterministic - same barcode = same robot
+        expect(robot1.name).toBe(robot2.name);
+        expect(robot1.role).toBe(robot2.role);
+        expect(robot1.baseHp).toBe(robot2.baseHp);
+    });
+
+    it('generates different robots for 0001234... vs 1234000...', () => {
+        const b1 = '0001234567890';
+        const b2 = '1234000005678';
+
+        const r1 = generateRobotData(b1, 'u1');
+        const r2 = generateRobotData(b2, 'u1');
+
+        // At least one property should be different
+        const sameStats = r1.baseHp === r2.baseHp && r1.baseAttack === r2.baseAttack;
+        const sameName = r1.name === r2.name;
+        expect(sameStats && sameName).toBe(false);
+    });
+});
+
+describe('EAN-8 Normalized to EAN-13 (00000 prefix)', () => {
+    // EAN-8 barcodes are normalized to EAN-13 with "00000" prefix by client
+    it('generates valid robot from normalized EAN-8 (00000 + 7 digits + check)', () => {
+        // EAN-8: 49123456 → EAN-13: 0000049123452 (normalized)
+        const normalizedEan8 = '0000049123452'; // "00000" + "4912345" + checkdigit
+        const robot = generateRobotData(normalizedEan8, 'testUser');
+
+        expect(robot).toBeDefined();
+        expect(robot.name).toBeDefined();
+        expect(robot.baseHp).toBeGreaterThan(0);
+        expect(robot.parts.head).toBeGreaterThanOrEqual(1);
+    });
+
+    it('normalized EAN-8 produces deterministic results', () => {
+        const normalizedEan8 = '0000049123452';
+
+        const r1 = generateRobotData(normalizedEan8, 'u1');
+        const r2 = generateRobotData(normalizedEan8, 'u2');
+
+        expect(r1.name).toBe(r2.name);
+        expect(r1.role).toBe(r2.role);
+        expect(r1.rarity).toBe(r2.rarity);
+        expect(r1.baseHp).toBe(r2.baseHp);
+    });
+});
+
+describe('Return Value Validation', () => {
+    it('returns non-null, non-undefined robot', () => {
+        const robot = generateRobotData('4901234567890', 'testUser');
+
+        expect(robot).not.toBeNull();
+        expect(robot).not.toBeUndefined();
+    });
+
+    it('contains all required fields', () => {
+        const robot = generateRobotData('4901234567890', 'testUser');
+
+        // Essential fields
+        expect(robot.name).toBeDefined();
+        expect(typeof robot.name).toBe('string');
+        expect(robot.name.length).toBeGreaterThan(0);
+
+        expect(robot.role).toBeDefined();
+        expect(robot.rarity).toBeDefined();
+        expect(robot.rarity).toBeGreaterThanOrEqual(1);
+        expect(robot.rarity).toBeLessThanOrEqual(5);
+
+        // Stats
+        expect(robot.baseHp).toBeGreaterThan(0);
+        expect(robot.baseAttack).toBeGreaterThan(0);
+        expect(robot.baseDefense).toBeGreaterThan(0);
+        expect(robot.baseSpeed).toBeGreaterThan(0);
+
+        // Parts
+        expect(robot.parts).toBeDefined();
+        expect(robot.parts.head).toBeGreaterThanOrEqual(1);
+        expect(robot.parts.body).toBeGreaterThanOrEqual(1);
+
+        // Source tracking
+        expect(robot.sourceBarcode).toBe('4901234567890');
+        expect(robot.userId).toBe('testUser');
+    });
+
+    it('returns same structure for different valid barcodes', () => {
+        const barcodes = ['4901234567890', '9781234567890', '0000000000017'];
+
+        for (const barcode of barcodes) {
+            const robot = generateRobotData(barcode, 'testUser');
+
+            // All should have same structure
+            expect(Object.keys(robot)).toContain('name');
+            expect(Object.keys(robot)).toContain('role');
+            expect(Object.keys(robot)).toContain('parts');
+            expect(Object.keys(robot)).toContain('colors');
+        }
     });
 });
