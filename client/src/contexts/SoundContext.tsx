@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 
 type SoundType = 'bgm_menu' | 'bgm_battle' | 'se_click' | 'se_scan' | 'se_attack' | 'se_win' | 'se_lose' | 'se_levelup' | 'se_equip' | 'se_reveal' | 'se_rare' | 'se_hit_heavy' | 'se_hit_light' | 'se_miss' | 'se_battle_start';
 
@@ -61,7 +61,7 @@ export function SoundProvider({ children }: { children: React.ReactNode }) {
     });
   }, [volume, isMuted]);
 
-  const playBGM = (type: 'bgm_menu' | 'bgm_battle', loop: boolean = true) => {
+  const playBGM = useCallback((type: 'bgm_menu' | 'bgm_battle', loop: boolean = true) => {
     // If same BGM is already playing...
     if (currentBGM === type && bgmRef.current) {
       // Update loop setting if changed
@@ -87,17 +87,17 @@ export function SoundProvider({ children }: { children: React.ReactNode }) {
 
     bgmRef.current = audio;
     setCurrentBGM(type);
-  };
+  }, [currentBGM, isMuted, volume]);
 
-  const stopBGM = () => {
+  const stopBGM = useCallback(() => {
     if (bgmRef.current) {
       bgmRef.current.pause();
       bgmRef.current = null;
       setCurrentBGM(null);
     }
-  };
+  }, []);
 
-  const playSE = (type: 'se_click' | 'se_scan' | 'se_attack' | 'se_win' | 'se_lose' | 'se_levelup' | 'se_equip' | 'se_reveal' | 'se_rare' | 'se_hit_heavy' | 'se_hit_light' | 'se_miss' | 'se_battle_start') => {
+  const playSE = useCallback((type: 'se_click' | 'se_scan' | 'se_attack' | 'se_win' | 'se_lose' | 'se_levelup' | 'se_equip' | 'se_reveal' | 'se_rare' | 'se_hit_heavy' | 'se_hit_light' | 'se_miss' | 'se_battle_start') => {
     const audio = seRefs.current.get(type);
     if (audio) {
       audio.currentTime = 0;
@@ -109,9 +109,9 @@ export function SoundProvider({ children }: { children: React.ReactNode }) {
       newAudio.volume = isMuted ? 0 : volume;
       newAudio.play().catch(e => console.log('SE play failed:', e));
     }
-  };
+  }, [isMuted, volume]);
 
-  const toggleMute = () => setIsMuted(!isMuted);
+  const toggleMute = useCallback(() => setIsMuted(prev => !prev), []);
 
   return (
     <SoundContext.Provider value={{ playBGM, stopBGM, playSE, volume, setVolume, isMuted, toggleMute }}>
