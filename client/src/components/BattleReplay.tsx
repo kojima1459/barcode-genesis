@@ -182,6 +182,11 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
     const [lastDamage, setLastDamage] = useState(0);
     const [lastDamageTargetId, setLastDamageTargetId] = useState<string | null>(null);
 
+    // Instant Readability UI State
+    const [battleStatus, setBattleStatus] = useState<Partial<BattleEvent>>({});
+    const [hpDeltas, setHpDeltas] = useState<Record<string, { value: number, isCritical: boolean, type: 'damage' | 'heal', id: number } | null>>({});
+    const [summaryText, setSummaryText] = useState("");
+
     // Memoized filtered popups (must be before any conditional returns)
     const p1Popups = useMemo(() => p1?.id ? popups.filter(p => p.targetId === p1.id) : [], [popups, p1?.id]);
     const p2Popups = useMemo(() => p2?.id ? popups.filter(p => p.targetId === p2.id) : [], [popups, p2?.id]);
@@ -444,7 +449,21 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
                     }
 
                     case 'LOG_MESSAGE':
+                        // Update Context for Status Bar
+                        setBattleStatus({
+                            guarded: event.guarded,
+                            guardMultiplier: event.guardMultiplier,
+                            stunned: event.stunned,
+                            cheerApplied: event.cheerApplied,
+                            cheerMultiplier: event.cheerMultiplier,
+                            itemApplied: event.itemApplied,
+                            itemType: event.itemType,
+                            bossShieldRemaining: event.bossShieldRemaining,
+                            stanceOutcome: event.stanceOutcome,
+                            stanceMultiplier: event.stanceMultiplier,
+                        });
                         if (event.message) {
+                            setSummaryText(event.message);
                             const isHighlight = event.logType === 'HIGHLIGHT' || event.logType === 'CLIMAX' || isHighlightLog(event.message);
                             if (isHighlight) {
                                 setActiveMessage(event.message);
@@ -456,14 +475,14 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
                         }
                         // Update overdrive gauges from LOG_MESSAGE events
                         if (event.attackerOverdriveGauge !== undefined) {
-                            if (event.attackerId === p1.id) {
+                            if (event.attackerId === p1?.id) {
                                 setP1OverdriveGauge(event.attackerOverdriveGauge);
                             } else {
                                 setP2OverdriveGauge(event.attackerOverdriveGauge);
                             }
                         }
                         if (event.defenderOverdriveGauge !== undefined) {
-                            if (event.defenderId === p1.id) {
+                            if (event.defenderId === p1?.id) {
                                 setP1OverdriveGauge(event.defenderOverdriveGauge);
                             } else {
                                 setP2OverdriveGauge(event.defenderOverdriveGauge);
@@ -538,27 +557,54 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
 
                     case 'HP_UPDATE':
                         if (event.currentHp) {
-                            if (event.currentHp[p1.id] < (lastHp[p1.id] ?? p1.baseHp)) {
-                                setFlashP1(true);
-                                scheduleTimeout(() => setFlashP1(false), 300);
+                            // Calculate Deltas for Flash UI
+                            const checkDelta = (id: string, newHp: number, oldHp: number) => {
+                                const diff = newHp - oldHp;
+                                if (diff !== 0) {
+                                    setHpDeltas(prev => ({
+                                        ...prev,
+                                        [id]: {
+                                            value: diff,
+                                            isCritical: Boolean(currentEvent?.isCritical || currentEvent?.specialTriggered),
+                                            type: diff < 0 ? 'damage' : 'heal',
+                                            id: Date.now()
+                                        }
+                                    }));
+                                    // Auto clear delta after 1s
+                                    scheduleTimeout(() => {
+                                        setHpDeltas(prev => ({ ...prev, [id]: null }));
+                                    }, 1000);
+                                }
+                            };
+
+                            if (p1?.id && event.currentHp[p1.id] !== undefined) {
+                                checkDelta(p1.id, event.currentHp[p1.id], lastHp[p1.id] ?? p1.baseHp);
+                                if (event.currentHp[p1.id] < (lastHp[p1.id] ?? p1.baseHp)) {
+                                    setFlashP1(true);
+                                    scheduleTimeout(() => setFlashP1(false), 300);
+                                }
                             }
-                            if (event.currentHp[p2.id] < (lastHp[p2.id] ?? p2.baseHp)) {
-                                setFlashP2(true);
-                                scheduleTimeout(() => setFlashP2(false), 300);
+                            if (p2?.id && event.currentHp[p2.id] !== undefined) {
+                                checkDelta(p2.id, event.currentHp[p2.id], lastHp[p2.id] ?? p2.baseHp);
+                                if (event.currentHp[p2.id] < (lastHp[p2.id] ?? p2.baseHp)) {
+                                    setFlashP2(true);
+                                    scheduleTimeout(() => setFlashP2(false), 300);
+                                }
                             }
+
                             setLastHp(event.currentHp);
                             setHp(prev => ({ ...prev, ...event.currentHp }));
                         }
                         // Also update gauges from HP_UPDATE
                         if (event.attackerOverdriveGauge !== undefined && event.attackerId) {
-                            if (event.attackerId === p1.id) {
+                            if (event.attackerId === p1?.id) {
                                 setP1OverdriveGauge(event.attackerOverdriveGauge);
                             } else {
                                 setP2OverdriveGauge(event.attackerOverdriveGauge);
                             }
                         }
                         if (event.defenderOverdriveGauge !== undefined && event.defenderId) {
-                            if (event.defenderId === p1.id) {
+                            if (event.defenderId === p1?.id) {
                                 setP1OverdriveGauge(event.defenderOverdriveGauge);
                             } else {
                                 setP2OverdriveGauge(event.defenderOverdriveGauge);
@@ -945,6 +991,23 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            {/* Summary Bar - Fixed Bottom (Safe Area) */}
+            <div className="fixed bottom-0 left-0 right-0 z-[70] pointer-events-none pb-[env(safe-area-inset-bottom)]">
+                <div className="bg-black/80 backdrop-blur-sm border-t border-white/10 px-4 py-2 text-center">
+                    <AnimatePresence mode="wait">
+                        <motion.div
+                            key={summaryText}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="text-white/90 font-mono text-sm md:text-base font-semibold truncate leading-tight"
+                        >
+                            {summaryText || t('battleWait')}
+                        </motion.div>
+                    </AnimatePresence>
+                </div>
+            </div>
         </div>
     );
 }
@@ -990,13 +1053,70 @@ const RobotCard = memo(({ robot, hpPercent, currentHp, isShaking, isLunging, isP
                     transition={{ type: "spring", stiffness: 100, damping: 20 }}
                 />
             </div>
-            <div className={`text-right text-xs font-mono mt-1 font-semibold ${isPlayer ? 'text-neon-cyan' : 'text-neon-pink'} tabular-nums`}>
-                HP: <span className="text-white text-lg font-orbitron">{Math.floor(currentHp ?? 0)}</span> / {isPlayer ? p1MaxHp : p2MaxHp} <span className="text-xs text-white/60 ml-1">({Math.floor(hpPercent)}%)</span>
+            <div className={`text-right text-xs font-mono mt-1 font-semibold ${isPlayer ? 'text-neon-cyan' : 'text-neon-pink'} tabular-nums flex flex-col items-end`}>
+                <div className="flex items-center gap-2">
+                    <span className="text-white text-lg font-orbitron font-bold">
+                        {Math.floor(currentHp ?? 0)}
+                        <span className="text-sm font-normal text-white/70 mx-1">/</span>
+                        {isPlayer ? p1MaxHp : p2MaxHp}
+                    </span>
+                    <span className="text-xs text-white/60">({Math.floor(hpPercent)}%)</span>
+                </div>
+
+                {/* Status Badges */}
+                {robot?.id && (battleStatus.attackerId === robot.id || battleStatus.defenderId === robot.id || true) && (
+                    <div className="flex flex-wrap justify-end gap-1 mt-1">
+                        {/* We show status if it relates to this robot or global battle state. 
+                             Ideally we filter by ID, but currentStatus is single object. 
+                             Assuming single turn context, we show relevant flags. */}
+                        {battleStatus.stunned && (battleStatus.defenderId === robot.id) && (
+                            <span className="px-1.5 py-0.5 bg-yellow-500/80 text-black text-[10px] rounded font-bold animate-pulse">⚡STUN</span>
+                        )}
+                        {battleStatus.guarded && (battleStatus.defenderId === robot.id) && (
+                            <span className="px-1.5 py-0.5 bg-blue-500/80 text-white text-[10px] rounded font-bold">🛡️GUARD x{battleStatus.guardMultiplier}</span>
+                        )}
+                        {battleStatus.bossShieldRemaining !== undefined && robot.role?.includes('BOSS') && (battleStatus.bossShieldRemaining > 0) && (
+                            <span className="px-1.5 py-0.5 bg-purple-500/80 text-white text-[10px] rounded font-bold">🔰SHIELD {battleStatus.bossShieldRemaining}</span>
+                        )}
+                        {battleStatus.cheerApplied && (battleStatus.cheerSide === (isPlayer ? 'P1' : 'P2')) && (
+                            <span className="px-1.5 py-0.5 bg-orange-500/80 text-white text-[10px] rounded font-bold">📣CHEER x{battleStatus.cheerMultiplier}</span>
+                        )}
+                        {battleStatus.stanceOutcome && (battleStatus.stanceAttacker === (isPlayer ? 'ATTACK' : 'GUARD') /* simplified logic */) && (
+                            /* Show stance result only if relevant... maybe too complex to filter perfectly here. 
+                               Displaying Global Stance Outcome if involved */
+                            (battleStatus.attackerId === robot.id || battleStatus.defenderId === robot.id) &&
+                            <span className="px-1.5 py-0.5 bg-gray-700/80 text-white text-[10px] rounded font-bold">{battleStatus.stanceOutcome}</span>
+                        )}
+                    </div>
+                )}
             </div>
+
+            {/* HP Delta Flash */}
+            <AnimatePresence>
+                {robot?.id && hpDeltas[robot.id] && (
+                    <motion.div
+                        key={hpDeltas[robot.id]?.id}
+                        initial={{ opacity: 0, y: 0, scale: 0.5 }}
+                        animate={{ opacity: 1, y: -20, scale: hpDeltas[robot.id]?.isCritical ? 1.5 : 1.2 }}
+                        exit={{ opacity: 0, y: -40 }}
+                        transition={{ duration: 0.8, ease: "out" }}
+                        className={`absolute top-0 ${isPlayer ? 'right-0' : 'left-0'} z-50 pointer-events-none font-orbitron font-bold drop-shadow-md whitespace-nowrap`}
+                        style={{
+                            color: hpDeltas[robot.id]?.type === 'damage' ? '#ff3333' : '#33ff33',
+                            fontSize: hpDeltas[robot.id]?.isCritical ? '24px' : '18px',
+                            textShadow: '0 0 5px black'
+                        }}
+                    >
+                        {hpDeltas[robot.id]?.value! > 0 ? '+' : ''}{hpDeltas[robot.id]?.value}
+                        {hpDeltas[robot.id]?.isCritical && <span className="text-yellow-400 text-xs block text-center">CRIT</span>}
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Enhanced Damage Numbers */}
             <AnimatePresence>
-                {popups.map((p: any) => (
+                {/* Popups must come from props, loop over them */}
+                {popups && popups.map((p: any) => (
                     <EnhancedDamageNumber
                         key={p.id}
                         value={p.value}
@@ -1009,7 +1129,7 @@ const RobotCard = memo(({ robot, hpPercent, currentHp, isShaking, isLunging, isP
                     />
                 ))}
             </AnimatePresence>
-        </motion.div>
+        </motion.div >
     );
 });
 RobotCard.displayName = 'RobotCard';

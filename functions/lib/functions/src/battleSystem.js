@@ -83,7 +83,7 @@ const getElementMultiplier = (attacker, defender) => {
 };
 const simulateBattle = (robot1, robot2, battleId, robot1Items = [], cheer, battleItems, specialInput, bossTraits // NEW: Boss traits for PvE boss battles
 ) => {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e, _f;
     // Terrain System: Deterministic terrain selection from barcodes
     const terrain = (0, battleTerrain_1.getTerrainFromBarcode)(robot1.sourceBarcode || robot2.sourceBarcode || '');
     // Phase B: Level-based stat scaling with role awareness
@@ -104,10 +104,22 @@ const simulateBattle = (robot1, robot2, battleId, robot1Items = [], cheer, battl
     let hp1 = maxHp1;
     let hp2 = maxHp2;
     const logs = [];
+    // Inject explicit START log for client-side MaxHP integrity
+    logs.push({
+        turn: 0,
+        action: "START",
+        attackerId: (_c = robot1.id) !== null && _c !== void 0 ? _c : "p1",
+        defenderId: (_d = robot2.id) !== null && _d !== void 0 ? _d : "p2",
+        damage: 0,
+        isCritical: false,
+        attackerHp: maxHp1,
+        defenderHp: maxHp2,
+        message: "バトル開始",
+    });
     let turn = 1;
     const robot1Skills = resolveSkills(robot1.skills);
     const robot2Skills = resolveSkills(robot2.skills);
-    const rng = new seededRandom_1.SeededRandom(battleId !== null && battleId !== void 0 ? battleId : `${(_c = robot1.id) !== null && _c !== void 0 ? _c : "robot1"}-${(_d = robot2.id) !== null && _d !== void 0 ? _d : "robot2"}`);
+    const rng = new seededRandom_1.SeededRandom(battleId !== null && battleId !== void 0 ? battleId : `${(_e = robot1.id) !== null && _e !== void 0 ? _e : "robot1"}-${(_f = robot2.id) !== null && _f !== void 0 ? _f : "robot2"}`);
     // BattleEngine v2: Initialize overdrive states
     let overdrive1 = (0, battleOverdrive_1.createOverdriveState)();
     let overdrive2 = (0, battleOverdrive_1.createOverdriveState)();
