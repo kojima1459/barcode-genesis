@@ -482,7 +482,8 @@ export default function BossBattle({ modeOverride }: { modeOverride?: "weekly" |
                         )}
                     >
                         <span className="text-lg">🎉</span>
-                        <div className="text-xs mt-1">声援</div>
+                        <div className="text-xs mt-1 font-bold">応援プロトコル</div>
+                        <div className="text-[10px] text-yellow-500/80 scale-90">全ステータス強化</div>
                     </Interactive>
                     <Interactive
                         onClick={() => setUseSpecial(!useSpecial)}
@@ -492,7 +493,8 @@ export default function BossBattle({ modeOverride }: { modeOverride?: "weekly" |
                         )}
                     >
                         <Zap className="w-5 h-5 mx-auto text-neon-cyan" />
-                        <div className="text-xs mt-1">必殺技</div>
+                        <div className="text-xs mt-1 font-bold">必殺技</div>
+                        <div className="text-[10px] text-neon-cyan/80 scale-90">ゲージMAXで発動</div>
                     </Interactive>
                 </div>
 
