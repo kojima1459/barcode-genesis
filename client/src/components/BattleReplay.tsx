@@ -222,7 +222,7 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
         setCurrentEventIndex(0);
         setHp({ [p1.id]: p1.baseHp, [p2.id]: p2.baseHp });
 
-        playBGM('bgm_battle', false);
+        playBGM('bgm_battle');
         if (!isMuted) playGenerated('ui_click');
     }, [result, p1.id, p2.id]);
 

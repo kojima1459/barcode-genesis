@@ -105,7 +105,7 @@ export function useBattleLogic({
 
         unlockBattleSfx();
         // playBattleSfx("battle_start", { throttleMs: 0 }); // Removed to prevent potential looping/overlap
-        playBGM('bgm_battle', false);
+        playBGM('bgm_battle');
 
         setIsBattling(true);
         setBattleResult(null);
