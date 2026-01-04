@@ -121,7 +121,16 @@ export default function Scan() {
                 setMode('scan');
             }
         } catch (error: any) {
-            console.error('generateRobot error:', error);
+            // Detailed error logging for debugging
+            console.error('[Scan] generateRobot error:', {
+                name: error?.name,
+                message: error?.message,
+                code: error?.code,
+                httpStatus: error?.httpStatus,
+                details: error?.details,
+                rawBody: error?.rawBody?.slice?.(0, 500),
+                stack: error?.stack,
+            });
             // Even if error, we waited for animation. 
             // UX decision: show error after animation or interrupt?
             // Current code waits. So error appears after "Reveal" phase which might be weird if "Reveal" shows nothing.
@@ -130,6 +139,7 @@ export default function Scan() {
 
             const code = error?.code;
             const message = error?.message || 'Unknown error';
+            const httpStatus = error?.httpStatus;
 
             if (code === 'resource-exhausted') {
                 setLimitMessage(message);
@@ -149,7 +159,9 @@ export default function Scan() {
                 userMessage = t('scan_robot_exists');
             }
 
-            toast.error(userMessage, { duration: 5000 });
+            // Add technical details for debugging (visible to user)
+            const techDetails = httpStatus ? ` [${httpStatus}${code ? '/' + code : ''}]` : (code ? ` [${code}]` : '');
+            toast.error(userMessage + techDetails, { duration: 5000 });
             setMode('scan');
         } finally {
             setIsGenerating(false);

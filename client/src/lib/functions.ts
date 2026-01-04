@@ -23,18 +23,54 @@ export async function callGenerateRobot(barcode: string) {
             body: JSON.stringify({ data: { barcode } }),
         });
 
+        // Always log response for debugging
+        const responseText = await response.text();
+        let responseData: any = {};
+        try {
+            responseData = JSON.parse(responseText);
+        } catch {
+            // Response was not JSON
+        }
+
+        console.log('[generateRobot] Response:', {
+            status: response.status,
+            statusText: response.statusText,
+            ok: response.ok,
+            contentType: response.headers.get('content-type'),
+            bodyPreview: responseText.slice(0, 500),
+        });
+
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            // Firebase HTTPS callable error standard: { error: { message, status, ... } }
-            const error = new Error(errorData.error?.message || `HTTP ${response.status}`);
-            (error as any).code = errorData.error?.status?.toLowerCase() || 'unknown';
+            // Firebase HTTPS callable error standard: { error: { message, status, details, ... } }
+            const errorInfo = responseData.error || {};
+            const error = new Error(errorInfo.message || `HTTP ${response.status}: ${response.statusText}`);
+            (error as any).code = errorInfo.status?.toLowerCase() || 'unknown';
+            (error as any).httpStatus = response.status;
+            (error as any).details = errorInfo.details;
+            (error as any).rawBody = responseText;
+
+            console.error('[generateRobot] API Error:', {
+                httpStatus: response.status,
+                code: (error as any).code,
+                message: error.message,
+                details: errorInfo.details,
+                rawBody: responseText.slice(0, 1000),
+            });
+
             throw error;
         }
 
-        const result = await response.json();
-        return result.result as GenerateRobotResponse;
+        return responseData.result as GenerateRobotResponse;
     } catch (error: any) {
-        console.error("callGenerateRobot error:", error);
+        // Detailed error logging
+        console.error('[generateRobot] Error:', {
+            name: error?.name,
+            message: error?.message,
+            code: error?.code,
+            httpStatus: error?.httpStatus,
+            details: error?.details,
+            stack: error?.stack,
+        });
         throw error;
     }
 }
