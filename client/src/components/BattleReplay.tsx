@@ -132,8 +132,14 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
     // NEW: Critical Slow-mo state
     const [isCriticalMoment, setIsCriticalMoment] = useState(false);
 
-    // Pacing
-    const [speed, setSpeed] = useState<1 | 2 | 3>(1);
+    // Pacing - Default 2x, persisted via localStorage
+    const [speed, setSpeed] = useState<1 | 2 | 3>(() => {
+        try {
+            const saved = localStorage.getItem('battle_speed');
+            if (saved === '1' || saved === '2' || saved === '3') return parseInt(saved) as 1 | 2 | 3;
+        } catch { /* ignore */ }
+        return 2; // Default 2x
+    });
     const [isSkipped, setIsSkipped] = useState(false);
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
     const hasEndedRef = useRef(false);
@@ -848,7 +854,11 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
                         {([1, 2, 3] as const).map(s => (
                             <Interactive
                                 key={s}
-                                onClick={() => { setSpeed(s); playGenerated('ui_click'); }}
+                                onClick={() => {
+                                    setSpeed(s);
+                                    try { localStorage.setItem('battle_speed', String(s)); } catch { /* ignore */ }
+                                    playSfx('ui');
+                                }}
                                 className={`text-[10px] font-black italic h-8 px-3 rounded-lg transition-all ${speed === s ? "bg-primary text-black shadow-[0_0_10px_rgba(0,243,255,0.3)]" : "text-white/40 hover:text-white"
                                     }`}
                             >
@@ -948,47 +958,57 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
             {/* Result Overlay */}
             <AnimatePresence>
                 {isFinished && showResultOverlay && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className={`absolute inset-0 z-50 flex items-center justify-center backdrop-blur-md rounded-lg p-4 ${result.winnerId === p1.id ? "battle-win-overlay" : "battle-lose-overlay"}`}
-                    >
+                    <>
+                        {/* Result Flash Overlay */}
+                        <div
+                            className={`fixed inset-0 z-[55] pointer-events-none ${result.winnerId === p1.id
+                                ? 'bg-cyan-400/60 result-flash-win'
+                                : 'bg-red-500/50 result-flash-lose'
+                                }`}
+                        />
                         <motion.div
-                            initial={{ scale: 0.5, y: 50 }}
-                            animate={{ scale: 1, y: 0 }}
-                            className="text-center space-y-8 p-10 glass-panel border-neon-cyan shadow-[0_0_50px_rgba(0,243,255,0.2)] max-w-md w-full relative overflow-hidden"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className={`absolute inset-0 z-50 flex items-center justify-center backdrop-blur-md rounded-lg p-4 ${result.winnerId === p1.id ? "battle-win-overlay" : "battle-lose-overlay"
+                                } ${result.winnerId !== p1.id ? 'result-shake' : ''}`}
                         >
-                            <h2 className={`text-5xl md:text-7xl font-black italic tracking-tighter ${result.winnerId === p1.id ? "text-neon-cyan neon-text-cyan" : "text-red-500"}`}>
-                                {result.winnerId === p1.id ? t('win') : t('lose')}
-                            </h2>
+                            <motion.div
+                                initial={{ scale: 0.5, y: 50 }}
+                                animate={{ scale: 1, y: 0 }}
+                                className="text-center space-y-8 p-10 glass-panel border-neon-cyan shadow-[0_0_50px_rgba(0,243,255,0.2)] max-w-md w-full relative overflow-hidden"
+                            >
+                                <h2 className={`text-5xl md:text-7xl font-black italic tracking-tighter result-banner ${result.winnerId === p1.id ? "text-neon-cyan neon-text-cyan" : "text-red-500"}`}>
+                                    {result.winnerId === p1.id ? t('win') : t('lose')}
+                                </h2>
 
-                            {result.winnerId === p1.id && (
-                                <div className="text-yellow-400 font-bold text-xl flex flex-col items-center gap-2 bg-black/40 p-4 rounded border border-yellow-500/30">
-                                    <div className="flex items-center gap-2">
-                                        <Zap className="w-5 h-5 text-yellow-400" />
-                                        <span>
-                                            Gets: <CountUp value={result.rewards.credits ?? 0} prefix="+" suffix=" cr" /> / <CountUp value={result.rewards.exp ?? 0} prefix="+" suffix=" XP" />
-                                        </span>
+                                {result.winnerId === p1.id && (
+                                    <div className="text-yellow-400 font-bold text-xl flex flex-col items-center gap-2 bg-black/40 p-4 rounded border border-yellow-500/30">
+                                        <div className="flex items-center gap-2">
+                                            <Zap className="w-5 h-5 text-yellow-400" />
+                                            <span>
+                                                Gets: <CountUp value={result.rewards.credits ?? 0} prefix="+" suffix=" cr" /> / <CountUp value={result.rewards.exp ?? 0} prefix="+" suffix=" XP" />
+                                            </span>
+                                        </div>
+                                        {/* Robot Level Up Notification */}
+                                        {result.rewards.robotLevelUp && (
+                                            <div className="mt-2 text-neon-cyan font-black text-lg animate-bounce drop-shadow-[0_0_5px_rgba(0,243,255,0.8)]">
+                                                ROBOT LEVEL UP! Lv.{result.rewards.robotLevel}
+                                            </div>
+                                        )}
+                                        {!result.rewards.robotLevelUp && result.rewards.robotXpEarned && (
+                                            <div className="mt-1 text-sm text-gray-400">
+                                                Robot XP +{result.rewards.robotXpEarned}
+                                            </div>
+                                        )}
                                     </div>
-                                    {/* Robot Level Up Notification */}
-                                    {result.rewards.robotLevelUp && (
-                                        <div className="mt-2 text-neon-cyan font-black text-lg animate-bounce drop-shadow-[0_0_5px_rgba(0,243,255,0.8)]">
-                                            ROBOT LEVEL UP! Lv.{result.rewards.robotLevel}
-                                        </div>
-                                    )}
-                                    {!result.rewards.robotLevelUp && result.rewards.robotXpEarned && (
-                                        <div className="mt-1 text-sm text-gray-400">
-                                            Robot XP +{result.rewards.robotXpEarned}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
+                                )}
 
-                            <Button size="lg" onClick={onComplete} className="w-full bg-neon-cyan text-black hover:bg-white font-bold h-12 text-lg">
-                                {t('continue_button').toUpperCase()}
-                            </Button>
+                                <Button size="lg" onClick={onComplete} className="w-full bg-neon-cyan text-black hover:bg-white font-bold h-12 text-lg">
+                                    {t('continue_button').toUpperCase()}
+                                </Button>
+                            </motion.div>
                         </motion.div>
-                    </motion.div>
+                    </>
                 )}
             </AnimatePresence>
 
