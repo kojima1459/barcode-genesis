@@ -286,23 +286,40 @@ export default function BossBattle({ modeOverride }: { modeOverride?: "weekly" |
                     </Card>
 
                     {/* Battle Replay */}
-                    <Card className="border-white/10">
-                        <CardHeader>
-                            <CardTitle>バトルリプレイ</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <BattleReplay
-                                logs={battleResult.logs}
-                                myRobot={selectedRobot}
-                                enemyRobot={bossData as any}
-                                result={{
-                                    winnerId: battleResult.winnerId,
-                                    logs: battleResult.logs,
-                                    rewards: battleResult.rewards,
-                                } as any}
-                            />
-                        </CardContent>
-                    </Card>
+                    {selectedRobot && bossData && (
+                        <Card className="border-white/10">
+                            <CardHeader>
+                                <CardTitle>バトルリプレイ</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <BattleReplay
+                                    p1={selectedRobot as RobotData}
+                                    p2={{
+                                        id: bossData.bossId || 'boss',
+                                        name: bossData.name,
+                                        epithet: bossData.epithet || 'BOSS',
+                                        baseHp: bossData.stats?.hp || 1000,
+                                        baseAttack: bossData.stats?.attack || 100,
+                                        baseDefense: bossData.stats?.defense || 50,
+                                        baseSpeed: bossData.stats?.speed || 50,
+                                        rarity: 5,
+                                        rarityName: 'BOSS',
+                                        parts: bossData.parts || {},
+                                        colors: bossData.colors || { primary: '#ff0055', secondary: '#330011', accent: '#ff5588', glow: '#ff0055' },
+                                    } as RobotData}
+                                    result={{
+                                        winnerId: battleResult.winnerId,
+                                        loserId: battleResult.winnerId === selectedRobot.id ? (bossData.bossId || 'boss') : selectedRobot.id!,
+                                        logs: battleResult.logs || [],
+                                        rewards: battleResult.rewards || { exp: 0, coins: 0 },
+                                    }}
+                                    onComplete={() => {
+                                        // Battle replay finished
+                                    }}
+                                />
+                            </CardContent>
+                        </Card>
+                    )}
                 </main>
             </div>
         );

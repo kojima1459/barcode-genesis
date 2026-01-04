@@ -84,14 +84,28 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
     const { fx } = useRobotFx();
     const { shake, shakeStyle } = useScreenShake();
 
+    // Defensive check: ensure p1 and p2 are valid
+    if (!p1 || !p2 || !p1.id || !p2.id) {
+        console.error('[BattleReplay] Invalid props:', { p1, p2 });
+        return (
+            <div className="p-4 text-center text-red-400">
+                <p>バトルデータの読み込みに失敗しました</p>
+                <p className="text-xs text-gray-500 mt-2">Invalid battle data</p>
+            </div>
+        );
+    }
+
     // Sound - sync with both old and new systems
     const [isMuted, setIsMuted] = useState(() => getMuted() || getSfxMuted());
 
     const [events, setEvents] = useState<BattleEvent[]>([]);
     const [currentEventIndex, setCurrentEventIndex] = useState(0);
 
-    // Game State
-    const [hp, setHp] = useState<Record<string, number>>({ [p1.id]: p1.baseHp, [p2.id]: p2.baseHp });
+    // Game State - use safe defaults
+    const [hp, setHp] = useState<Record<string, number>>({
+        [p1.id]: p1.baseHp ?? 1000,
+        [p2.id]: p2.baseHp ?? 1000
+    });
     const [activeMessage, setActiveMessage] = useState<string>("");
     const [isFinished, setIsFinished] = useState(false);
 
@@ -479,24 +493,24 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
                             setShakeId(event.defenderId);
                             scheduleTimeout(() => setShakeId(null), 300 / speed);
 
-                        // Enhanced shake for special/overdrive
-                        if (event.specialTriggered || event.overdriveTriggered) {
-                            shake({ intensity: 'heavy', duration: 400 });
-                        } else if (event.isCritical) {
-                            shake({ intensity: 'heavy', duration: 300 });
-                        } else if (!event.isMiss) {
-                            shake({ intensity: 'light', duration: 200 });
-                        }
+                            // Enhanced shake for special/overdrive
+                            if (event.specialTriggered || event.overdriveTriggered) {
+                                shake({ intensity: 'heavy', duration: 400 });
+                            } else if (event.isCritical) {
+                                shake({ intensity: 'heavy', duration: 300 });
+                            } else if (!event.isMiss) {
+                                shake({ intensity: 'light', duration: 200 });
+                            }
 
-                        if (event.isMiss) {
-                            playGenerated('miss');
-                        } else if (event.specialTriggered || event.overdriveTriggered) {
-                            playMiniSfx('special');
-                        } else if (event.isCritical) {
-                            playMiniSfx('crit');
-                        } else {
-                            playMiniSfx('hit');
-                        }
+                            if (event.isMiss) {
+                                playGenerated('miss');
+                            } else if (event.specialTriggered || event.overdriveTriggered) {
+                                playMiniSfx('special');
+                            } else if (event.isCritical) {
+                                playMiniSfx('crit');
+                            } else {
+                                playMiniSfx('hit');
+                            }
 
                             if (event.cheerApplied) {
                                 scheduleTimeout(() => playSfx('cheer', { volume: 0.6 }), 100);
