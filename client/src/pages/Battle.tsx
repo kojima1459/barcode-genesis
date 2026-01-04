@@ -192,22 +192,32 @@ export default function Battle() {
         return;
       }
       try {
-        const [robotsSnap, variantsSnap, userDoc] = await Promise.all([
+        const [robotsSnap, variantsSnap, userDoc, inventorySnap] = await Promise.all([
           getDocs(query(collection(getDb(), "users", user.uid, "robots"), orderBy("createdAt", "desc"))),
           getDocs(query(collection(getDb(), "users", user.uid, "variants"), orderBy("createdAt", "desc"))),
-          getDoc(doc(getDb(), "users", user.uid))
+          getDoc(doc(getDb(), "users", user.uid)),
+          getDocs(collection(getDb(), "users", user.uid, "inventory"))
         ]);
 
         const robotList = robotsSnap.docs.map(snap => ({ id: snap.id, ...snap.data() } as RobotData));
         const variantList = variantsSnap.docs.map(snap => ({ id: snap.id, ...snap.data() } as VariantData));
         const userData = userDoc.data();
 
+        // Process inventory subcollection
+        const loadedInventory: Record<string, number> = {};
+        inventorySnap.forEach(doc => {
+          const data = doc.data();
+          if (typeof data.qty === 'number') {
+            loadedInventory[doc.id] = data.qty;
+          }
+        });
+
         setRobots(robotList);
         setVariants(variantList);
         if (userData) {
           setUserLevel(userData.level || 1);
-          setInventory(userData.inventory ?? {});
         }
+        setInventory(loadedInventory);
       } catch (error) {
         console.error("Failed to fetch battle data:", error);
         toast.error("データの読み込みに失敗しました");
