@@ -12,8 +12,7 @@ export function VictoryEffect({ onComplete }: VictoryEffectProps) {
     const [particles, setParticles] = useState<Array<{ id: number; x: number; y: number; delay: number }>>([]);
 
     useEffect(() => {
-        // Play victory sound
-        playGenerated('win');
+        // NOTE: SE is played in handleBattleEnd, not here (to prevent duplication)
 
         if (prefersReducedMotion) {
             onComplete?.();
@@ -185,8 +184,7 @@ export function DefeatEffect({ onComplete }: DefeatEffectProps) {
     const prefersReducedMotion = useReducedMotion();
 
     useEffect(() => {
-        // Play defeat sound
-        playGenerated('lose');
+        // NOTE: SE is played in handleBattleEnd, not here (to prevent duplication)
 
         if (prefersReducedMotion) {
             onComplete?.();
