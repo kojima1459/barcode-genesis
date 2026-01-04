@@ -609,14 +609,14 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
             {Recharts ? (
               <Recharts.ResponsiveContainer width="100%" height="100%">
                 <Recharts.RadarChart cx="50%" cy="50%" outerRadius="70%" data={[
-                  { subject: 'HP', A: baseRobot.baseHp, fullMark: 500 },
-                  { subject: 'ATK', A: baseRobot.baseAttack, fullMark: 200 },
-                  { subject: 'DEF', A: baseRobot.baseDefense, fullMark: 200 },
-                  { subject: 'SPD', A: baseRobot.baseSpeed, fullMark: 200 },
+                  { subject: 'HP', A: (baseRobot.baseHp / 4000) * 100, fullMark: 100, value: baseRobot.baseHp },
+                  { subject: 'ATK', A: (baseRobot.baseAttack / 400) * 100, fullMark: 100, value: baseRobot.baseAttack },
+                  { subject: 'DEF', A: (baseRobot.baseDefense / 400) * 100, fullMark: 100, value: baseRobot.baseDefense },
+                  { subject: 'SPD', A: (baseRobot.baseSpeed / 400) * 100, fullMark: 100, value: baseRobot.baseSpeed },
                 ]}>
                   <Recharts.PolarGrid stroke="#ffffff33" />
                   <Recharts.PolarAngleAxis dataKey="subject" tick={{ fill: '#0ff', fontSize: 12, fontFamily: 'Orbitron' }} />
-                  <Recharts.PolarRadiusAxis angle={30} domain={[0, 200]} tick={false} axisLine={false} />
+                  <Recharts.PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
                   <Recharts.Radar
                     name="Stats"
                     dataKey="A"

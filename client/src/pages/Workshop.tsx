@@ -366,9 +366,31 @@ export default function Workshop() {
 
                         {/* Error Alert if blocked */}
                         {isFull && (
-                            <Alert variant="destructive">
+                            <Alert variant="destructive" className="border-red-500/50 bg-red-900/20">
                                 <AlertCircle className="h-4 w-4" />
-                                <AlertDescription>{t('workshop_error_full')}</AlertDescription>
+                                <div className="flex flex-col gap-3 w-full">
+                                    <AlertDescription className="text-sm leading-relaxed whitespace-pre-line">
+                                        {t('workshop_full_desc')}
+                                    </AlertDescription>
+                                    <div className="flex gap-3 mt-1">
+                                        <Link href="/battle">
+                                            <Button size="sm" variant="outline" className="text-xs bg-red-950/40 border-red-500/40 hover:bg-red-900/60 hover:text-white">
+                                                {t('workshop_action_battle')}
+                                            </Button>
+                                        </Link>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="text-xs bg-red-950/40 border-red-500/40 hover:bg-red-900/60 hover:text-white"
+                                            onClick={() => {
+                                                document.getElementById('variant-list')?.scrollIntoView({ behavior: 'smooth' });
+                                                toast.info(t('workshop_action_scrap') + ": 👇");
+                                            }}
+                                        >
+                                            {t('workshop_action_scrap')}
+                                        </Button>
+                                    </div>
+                                </div>
                             </Alert>
                         )}
                         {!isFull && !canAfford && (
@@ -460,7 +482,7 @@ export default function Workshop() {
                 </Card>
 
                 {/* List Section */}
-                <div className="space-y-4">
+                <div className="space-y-4" id="variant-list">
                     <h2 className="text-xl font-bold">{t('workshop_owned_variants').replace('{count}', String(variants.length))}</h2>
                     {variants.length === 0 ? (
                         <div className="text-center p-8 text-muted-foreground border border-dashed rounded bg-black/20">
