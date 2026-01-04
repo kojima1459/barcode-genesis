@@ -46,10 +46,14 @@ const POOL_SIZE = 3;
 const pools: Record<string, AudioPool> = {};
 let isMuted = false;
 let isUnlocked = false;
+let isSkipping = false;  // Skip mode suppression
 
 // Cooldown tracking to prevent sound spam
 const lastPlayTime: Record<string, number> = {};
 const DEFAULT_COOLDOWN_MS = 100;
+
+// Track played SFX by unique key to prevent duplicate plays
+const playedKeys = new Set<string>();
 
 /**
  * Preload all SFX files into memory pools
@@ -93,9 +97,17 @@ export function playSfx(
         volume?: number;
         playbackRate?: number;
         cooldownMs?: number;  // Custom cooldown (default 100ms)
+        uniqueKey?: string;   // Optional key to prevent duplicate plays
     } = {}
 ): void {
     if (isMuted) return;
+    if (isSkipping && name !== 'win' && name !== 'lose') return;  // Allow victory/defeat during skip
+
+    // Unique key deduplication
+    if (options.uniqueKey) {
+        if (playedKeys.has(options.uniqueKey)) return;
+        playedKeys.add(options.uniqueKey);
+    }
 
     // Cooldown check to prevent spam
     const now = Date.now();
@@ -136,6 +148,27 @@ export function setMuted(muted: boolean): void {
     try {
         localStorage.setItem('sfx_muted', muted ? '1' : '0');
     } catch { /* ignore storage errors */ }
+}
+
+/**
+ * Set skip mode (suppress most SFX during fast-forward/skip)
+ */
+export function setSkipMode(skip: boolean): void {
+    isSkipping = skip;
+}
+
+/**
+ * Get skip mode state
+ */
+export function getSkipMode(): boolean {
+    return isSkipping;
+}
+
+/**
+ * Clear played keys (call when starting new battle)
+ */
+export function clearPlayedKeys(): void {
+    playedKeys.clear();
 }
 
 /**
