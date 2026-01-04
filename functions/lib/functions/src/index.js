@@ -81,7 +81,16 @@ admin.initializeApp();
 const ITEM_CATALOG = {
     power_core: { price: 100 },
     shield_plate: { price: 80 },
-    speed_chip: { price: 60 }
+    speed_chip: { price: 60 },
+    hp_module: { price: 120 },
+    repair_kit: { price: 50 },
+    attack_boost: { price: 40 },
+    defense_boost: { price: 40 },
+    critical_lens: { price: 70 },
+    gold_coating: { price: 200 },
+    neon_glow: { price: 150 },
+    flame_aura: { price: 180 },
+    ice_armor: { price: 180 }
 };
 const isItemId = (itemId) => {
     return Object.prototype.hasOwnProperty.call(ITEM_CATALOG, itemId);
