@@ -86,7 +86,7 @@ export const translations = {
 
     credits: "クレジット",
     missions: "指令",
-    // streak_count removed (duplicate)
+    streak_count: "{count}日連続",
     // Home Ticker
     ticker_online: "システム稼働中...",
     ticker_stable: "接続安定",
