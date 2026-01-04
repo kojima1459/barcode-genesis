@@ -149,7 +149,7 @@ export default function BossBattle({ modeOverride }: { modeOverride?: "weekly" |
         if (!selectedRobotId || !bossData || !canChallenge) return;
 
         setIsBattling(true);
-        playSE('se_battle_start');
+        // playSE('se_battle_start'); // Duplicate - removed to prevent loop/overlay
 
         try {
             const executeBossBattle = httpsCallable(getFunctions(), "executeBossBattle");
@@ -166,13 +166,14 @@ export default function BossBattle({ modeOverride }: { modeOverride?: "weekly" |
             setBattleResult(battleData);
 
             // Play result sound
-            if (battleData.result === 'win') {
-                playSE('se_win');
-                toast.success(t('boss_victory'));
-            } else {
-                playSE('se_lose');
-                toast.error(t('boss_defeat'));
-            }
+            // NOTE: BattleReplay will handle win/lose SE at the end of the replay.
+            // if (battleData.result === 'win') {
+            //     playSE('se_win');
+            //     toast.success(t('boss_victory'));
+            // } else {
+            //     playSE('se_lose');
+            //     toast.error(t('boss_defeat'));
+            // }
         } catch (error: any) {
             console.error("Boss battle error:", error);
             if (error.code === 'functions/failed-precondition' && error.message === 'already-challenged-today') {
@@ -314,9 +315,17 @@ export default function BossBattle({ modeOverride }: { modeOverride?: "weekly" |
                                         rewards: battleResult.rewards || { exp: 0, coins: 0 },
                                     }}
                                     onComplete={() => {
-                                        // Battle replay finished
+                                        // Battle replay finished - allow user to see result
                                     }}
                                 />
+                                {selectedRobotId && (
+                                    <div className="mt-4 text-center">
+                                        <Button variant="outline" onClick={() => setLocation('/')}>
+                                            <ArrowLeft className="w-4 h-4 mr-2" />
+                                            {t('go_home')}
+                                        </Button>
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
                     )}
