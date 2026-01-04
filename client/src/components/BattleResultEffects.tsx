@@ -1,7 +1,8 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { Trophy, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
-import { playGenerated } from "@/lib/sound";
+// Removed unused playGenerated import
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface VictoryEffectProps {
     onComplete?: () => void;
@@ -9,6 +10,7 @@ interface VictoryEffectProps {
 
 export function VictoryEffect({ onComplete }: VictoryEffectProps) {
     const prefersReducedMotion = useReducedMotion();
+    const { t } = useLanguage();
     const [particles, setParticles] = useState<Array<{ id: number; x: number; y: number; delay: number }>>([]);
 
     useEffect(() => {
@@ -85,7 +87,7 @@ export function VictoryEffect({ onComplete }: VictoryEffectProps) {
                             className="absolute -inset-x-12 top-1/2 h-px bg-linear-to-r from-transparent via-yellow-400 to-transparent"
                         />
                         <motion.div
-                            className="text-7xl font-black italic tracking-tighter text-white font-orbitron"
+                            className="text-7xl font-black italic tracking-tighter text-white font-orbitron whitespace-nowrap"
                             animate={{
                                 scale: [1, 1.02, 1],
                                 textShadow: [
@@ -96,7 +98,7 @@ export function VictoryEffect({ onComplete }: VictoryEffectProps) {
                             }}
                             transition={{ duration: 0.5, repeat: Infinity }}
                         >
-                            VICTORY
+                            {t('win')}
                         </motion.div>
                     </div>
 
@@ -182,6 +184,7 @@ interface DefeatEffectProps {
 
 export function DefeatEffect({ onComplete }: DefeatEffectProps) {
     const prefersReducedMotion = useReducedMotion();
+    const { t } = useLanguage();
 
     useEffect(() => {
         // NOTE: SE is played in handleBattleEnd, not here (to prevent duplication)
@@ -235,7 +238,7 @@ export function DefeatEffect({ onComplete }: DefeatEffectProps) {
                 <div className="flex flex-col items-center gap-4">
                     <div className="relative">
                         <motion.div
-                            className="text-7xl font-black italic tracking-tighter text-red-500 font-orbitron"
+                            className="text-7xl font-black italic tracking-tighter text-red-500 font-orbitron whitespace-nowrap"
                             animate={{
                                 x: [0, -4, 4, -2, 2, 0],
                                 textShadow: [
@@ -246,14 +249,14 @@ export function DefeatEffect({ onComplete }: DefeatEffectProps) {
                             }}
                             transition={{ duration: 0.2, repeat: Infinity }}
                         >
-                            DEFEAT
+                            {t('lose')}
                         </motion.div>
                         <motion.div
-                            className="absolute inset-0 text-7xl font-black italic tracking-tighter text-red-500 font-orbitron opacity-50 blur-sm"
+                            className="absolute inset-0 text-7xl font-black italic tracking-tighter text-red-500 font-orbitron opacity-50 blur-sm whitespace-nowrap"
                             animate={{ scale: [1, 1.1, 1], opacity: [0.5, 0.2, 0.5] }}
                             transition={{ duration: 0.1, repeat: Infinity }}
                         >
-                            DEFEAT
+                            {t('lose')}
                         </motion.div>
                     </div>
 
