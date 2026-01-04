@@ -559,12 +559,12 @@ export default function Dex() {
                   <SelectValue placeholder="ROLE" />
                 </SelectTrigger>
                 <SelectContent className="bg-black/90 border-white/20">
-                  <SelectItem value="ALL">ALL ROLES</SelectItem>
-                  <SelectItem value="ATTACKER">STRIKER / ASSAULT</SelectItem>
-                  <SelectItem value="TANK">TANK</SelectItem>
-                  <SelectItem value="SPEED">SPEED</SelectItem>
-                  <SelectItem value="SUPPORT">SUPPORT</SelectItem>
-                  <SelectItem value="BALANCE">BALANCE</SelectItem>
+                  <SelectItem value="ALL">{t('filter_all_roles')}</SelectItem>
+                  <SelectItem value="ATTACKER">{t('filter_striker')}</SelectItem>
+                  <SelectItem value="TANK">{t('filter_tank')}</SelectItem>
+                  <SelectItem value="SPEED">{t('filter_speed')}</SelectItem>
+                  <SelectItem value="SUPPORT">{t('filter_support')}</SelectItem>
+                  <SelectItem value="BALANCE">{t('filter_balance')}</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -573,15 +573,15 @@ export default function Dex() {
                   <SelectValue placeholder="RARITY" />
                 </SelectTrigger>
                 <SelectContent className="bg-black/90 border-white/20">
-                  <SelectItem value="ALL">ALL RARITIES</SelectItem>
-                  <SelectItem value="legendary">LEGENDARY</SelectItem>
-                  <SelectItem value="rare">RARE</SelectItem>
-                  <SelectItem value="common">COMMON</SelectItem>
+                  <SelectItem value="ALL">{t('filter_all_rarities')}</SelectItem>
+                  <SelectItem value="legendary">{t('filter_legendary')}</SelectItem>
+                  <SelectItem value="rare">{t('filter_rare')}</SelectItem>
+                  <SelectItem value="common">{t('filter_common')}</SelectItem>
                 </SelectContent>
               </Select>
 
               <div className="ml-auto text-xs text-white/50 font-orbitron mr-2">
-                {filteredRobots.length} UNITS
+                {t('units_count').replace('{count}', filteredRobots.length.toString())}
               </div>
             </div>
 
@@ -620,7 +620,7 @@ export default function Dex() {
                               role={typeof r.role === 'string' ? r.role : undefined}
                               rarityEffect={r.rarityTier === 'legendary' ? 'legendary' : (r.rarityTier === 'rare' ? 'rare' : undefined)}
                             />
-                          ) : <div className="text-xs text-muted-foreground">No preview</div>}
+                          ) : <div className="text-xs text-muted-foreground">{t('no_preview')}</div>}
                         </div>
                         <div className="flex-1 min-w-0 space-y-2">
                           <div className="flex items-center justify-between gap-2">
@@ -709,7 +709,7 @@ export default function Dex() {
             ) : variantsEmpty ? (
               <EmptyState
                 title={t('no_variants_msg')}
-                description="Combine robots in the Workshop to create variants."
+                description={t('variants_empty_desc')}
                 icon={Swords}
               />
             ) : (
@@ -719,7 +719,7 @@ export default function Dex() {
                     <Interactive className="bg-black/30 border-white/10 rounded-xl">
                       <CardContent className="p-4 flex gap-4 h-full">
                         <div className="shrink-0 w-[96px] h-[96px] flex items-center justify-center rounded border border-white/10 bg-black/20" data-testid="owned-robot-card">
-                          {v.parts && v.colors ? <RobotSVG parts={v.parts} colors={v.colors} size={90} simplified={true} /> : <div className="text-xs text-muted-foreground">No preview</div>}
+                          {v.parts && v.colors ? <RobotSVG parts={v.parts} colors={v.colors} size={90} simplified={true} /> : <div className="text-xs text-muted-foreground">{t('no_preview')}</div>}
                         </div>
                         <div className="flex-1 min-w-0 space-y-2">
                           <div className="min-w-0">

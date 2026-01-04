@@ -119,6 +119,13 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Sync document.documentElement.lang with language state (for browser "Translate?" prompt prevention)
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.documentElement.lang = language;
+    }
+  }, [language]);
+
   // 言語設定を保存（localStorage + state）
   const setLanguage = (lang: Language) => {
     const normalized = normalizeLanguage(lang);

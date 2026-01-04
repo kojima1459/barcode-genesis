@@ -201,6 +201,21 @@ export const translations = {
     sort_rarity: "レアリティ順",
     sort_level: "レベル順",
 
+    // Dex Filters
+    filter_all_roles: "全ロール",
+    filter_striker: "ストライカー / アサルト",
+    filter_tank: "タンク",
+    filter_speed: "スピード",
+    filter_support: "サポート",
+    filter_balance: "バランス",
+    filter_all_rarities: "全レアリティ",
+    filter_legendary: "レジェンダリー",
+    filter_rare: "レア",
+    filter_common: "コモン",
+    units_count: "{count}ユニット",
+    no_preview: "プレビューなし",
+    variants_empty_desc: "ワークショップでロボットを合成してバリアントを作成しよう。",
+
     // Leaderboard
     top_players: "トッププレイヤー",
     rank: "順位",
