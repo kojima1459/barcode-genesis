@@ -222,7 +222,7 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
         setCurrentEventIndex(0);
         setHp({ [p1.id]: p1.baseHp, [p2.id]: p2.baseHp });
 
-        playBGM('bgm_battle');
+        playBGM('bgm_battle', false);
         if (!isMuted) playGenerated('ui_click');
     }, [result, p1.id, p2.id]);
 
@@ -802,7 +802,7 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
                 </div>
             )}
 
-            <div className={`flex flex-col md:flex-row justify-between items-center gap-8 relative z-10 w-full transition-all duration-300 ${isFinished ? 'blur-[2px] scale-95 opacity-80' : ''}`}>
+            <div className={`flex flex-col-reverse md:flex-row justify-between items-center gap-4 md:gap-8 relative z-10 w-full transition-all duration-300 ${isFinished ? 'blur-[2px] scale-95 opacity-80' : ''}`}>
                 {/* P1 Cards */}
                 <div className={shakeId === p1.id ? 'shake-strong' : ''}>
                     <RobotCard
@@ -946,7 +946,7 @@ const RobotCard = memo(({ robot, hpPercent, currentHp, isShaking, isLunging, isP
                 <RobotSVG
                     parts={robot.parts}
                     colors={robot.colors}
-                    size={160}
+                    size={220}
                     fx={fx}
                     role={typeof robot.role === 'string' ? robot.role : undefined}
                     rarityEffect={robot.rarityTier === 'legendary' ? 'legendary' : (robot.rarityTier === 'rare' ? 'rare' : undefined)}
