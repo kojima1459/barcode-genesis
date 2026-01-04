@@ -364,7 +364,7 @@ export const translations = {
     cheer_protocol: "応援プロトコル",
     p1_support: "P1支援",
     p2_support: "P2支援",
-    overdrive_ready: "オーバードライブ準備完了",
+    overdrive_ready: "必殺技準備完了",
     overdrive_desc: "プライマリスキルモジュールを起動",
     start_battle: "作戦開始",
     defeat: "敗北",

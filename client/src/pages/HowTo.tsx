@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { ArrowLeft, ScanLine, Swords, Factory, HelpCircle, Layers, TrendingUp, Trophy, ScanBarcode } from "lucide-react";
+import { ArrowLeft, ScanLine, Swords, Factory, HelpCircle, Layers, TrendingUp, Trophy, ScanBarcode, Zap, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import SEO from "@/components/SEO";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -114,6 +114,22 @@ export default function HowTo() {
                   {t('howto_step2_note2')}
                 </li>
               </ul>
+              <div className="p-3 rounded-lg bg-pink-500/10 border border-pink-500/20 text-xs text-pink-200/90 space-y-2">
+                <div className="font-bold flex items-center gap-1.5 text-pink-300">
+                  <Zap className="w-3.5 h-3.5" />
+                  必殺技（Overdrive）
+                </div>
+                <p>
+                  作戦開始前の「必殺技準備完了」スイッチをONにすると、バトル中にゲージが溜まったタイミングで強力な必殺技が発動します。
+                </p>
+                <div className="font-bold flex items-center gap-1.5 text-pink-300 pt-1">
+                  <Users className="w-3.5 h-3.5" />
+                  支援プロトコル（Support）
+                </div>
+                <p>
+                  バトル開始前に「応援プロトコル」を要請すると、味方ロボットのステータスが強化されます。強敵との戦いで活用しましょう。
+                </p>
+              </div>
               <Link href="/battle">
                 <Button className="w-full bg-linear-to-r from-pink-600 to-pink-500 hover:from-pink-500 hover:to-pink-400 text-white font-bold tracking-wider shadow-[0_0_15px_rgba(236,72,153,0.4)] border-none mt-2 h-10">
                   {t('battle')}
