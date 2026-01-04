@@ -863,12 +863,13 @@ export const simulateBattle = (
             skillName = skill.name;
 
             switch (skill.type) {
-                case 'attack':
+                case 'attack': {
                     const baseDamage = coreDamage;
                     damage = toDamage(baseDamage * skill.power * elementMultiplier * stanceMultiplier * overdriveSkillMult);
                     message = `${attacker.name} uses ${skill.name}! Dealt ${damage} damage!`;
                     break;
-                case 'heal':
+                }
+                case 'heal': {
                     const healAmount = Math.floor(attacker.baseHp * skill.power * overdriveSkillMult);
                     if (attacker.id === robot1.id) {
                         hp1 = Math.min(robot1.baseHp, hp1 + healAmount);
@@ -880,11 +881,13 @@ export const simulateBattle = (
                     message = `${attacker.name} uses ${skill.name}! Recovered ${healAmount} HP!`;
                     damage = 0;
                     break;
-                default:
+                }
+                default: {
                     const bonusDamage = Math.floor(coreDamage * 0.5);
                     damage = toDamage(bonusDamage * elementMultiplier * stanceMultiplier * overdriveSkillMult);
                     message = `${attacker.name} uses ${skill.name}! Dealt ${damage} damage!`;
                     break;
+                }
             }
         } else {
             // Normal attack

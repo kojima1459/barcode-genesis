@@ -37,8 +37,6 @@ export default function TutorialOverlay() {
         const config = TUTORIAL_Config[activeStep];
         if (!config?.targetId) return;
 
-        let intervalId: NodeJS.Timeout;
-
         const updateRect = () => {
             const element = document.getElementById(config.targetId);
             if (element) {
@@ -54,7 +52,7 @@ export default function TutorialOverlay() {
         updateRect();
 
         // Poll for element existence/position changes
-        intervalId = setInterval(updateRect, 500);
+        const intervalId = setInterval(updateRect, 500);
 
         window.addEventListener('resize', updateRect);
         window.addEventListener('scroll', updateRect);

@@ -329,7 +329,7 @@ export default function Dex() {
     setLocation(`/battle?selected=${encodeURIComponent(robotId)}`);
   };
 
-  const useInWorkshop = (id?: string, idB?: string) => {
+  const goToWorkshop = (id?: string, idB?: string) => {
     if (!id) return;
     if (idB) {
       sessionStorage.setItem("workshopParentA", id);
@@ -682,7 +682,7 @@ export default function Dex() {
                               size="sm"
                               variant="ghost"
                               className="h-8 text-[11px]"
-                              onClick={() => useInWorkshop(r.id)}
+                              onClick={() => goToWorkshop(r.id)}
                             >
                               {t('use_in_workshop')}
                             </Button>
@@ -765,7 +765,7 @@ export default function Dex() {
                               size="sm"
                               variant="ghost"
                               className="h-8 text-[11px]"
-                              onClick={() => useInWorkshop(v.parentRobotIds?.[0], v.parentRobotIds?.[1])}
+                              onClick={() => goToWorkshop(v.parentRobotIds?.[0], v.parentRobotIds?.[1])}
                               disabled={!v.parentRobotIds?.[0] || !v.parentRobotIds?.[1]}
                               title={!v.parentRobotIds?.[0] || !v.parentRobotIds?.[1] ? t('parents_missing') : undefined}
                             >

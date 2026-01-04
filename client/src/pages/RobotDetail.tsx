@@ -349,8 +349,8 @@ export default function RobotDetail({ robotId }: { robotId: string }) {
     setUpgradeError(null);
     setIsUpgrading(true);
     try {
-      const useUpgrade = await getCallable("useUpgradeItem");
-      const result = await useUpgrade({ robotId: baseRobot.id, itemId: upgradeItemId });
+      const upgradeCallable = await getCallable("useUpgradeItem");
+      const result = await upgradeCallable({ robotId: baseRobot.id, itemId: upgradeItemId });
       const data = result.data as {
         robotId: string;
         stat: string;

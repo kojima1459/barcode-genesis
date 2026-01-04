@@ -792,14 +792,12 @@ function RobotSVGComponent({
       )}
 
       {/* Chest Vents (if not covered by body) - mostly handled by Body variants now, but we add extra detail if standard */}
-      {true && ( // Always add subtle intake detail
-        <g id="ms-ducts">
-          <rect x="75" y="74" width="20" height="1" fill="black" opacity="0.3" />
-          <rect x="75" y="78" width="20" height="1" fill="black" opacity="0.3" />
-          <rect x="105" y="74" width="20" height="1" fill="black" opacity="0.3" />
-          <rect x="105" y="78" width="20" height="1" fill="black" opacity="0.3" />
-        </g>
-      )}
+      <g id="ms-ducts">
+        <rect x="75" y="74" width="20" height="1" fill="black" opacity="0.3" />
+        <rect x="75" y="78" width="20" height="1" fill="black" opacity="0.3" />
+        <rect x="105" y="74" width="20" height="1" fill="black" opacity="0.3" />
+        <rect x="105" y="78" width="20" height="1" fill="black" opacity="0.3" />
+      </g>
 
       {/* Waist Armor / Skirts */}
       <g id="ms-waist">
