@@ -39,7 +39,6 @@ import {
   WeeklyBossData,
   WeeklyBossResponse
 } from "@/types/boss";
-import { GlobalHeader } from "@/components/GlobalHeader";
 import { PremiumCard } from "@/components/PremiumCard";
 
 
@@ -356,8 +355,6 @@ export default function Home() {
   if (loading) {
     return (
       <div className="min-h-dvh bg-background text-foreground pb-8 flex flex-col" style={{ paddingBottom: "calc(var(--bottom-nav-height) + env(safe-area-inset-bottom) + 16px)" }}>
-        {/* Global Header */}
-        <GlobalHeader missions={missions} />
 
         <main className="flex-1 w-full max-w-md md:max-w-5xl mx-auto space-y-6 px-4 pt-4 relative z-10">
           <header className="flex justify-between items-center py-4">
@@ -390,9 +387,6 @@ export default function Home() {
       style={{ paddingBottom: "calc(var(--bottom-nav-height) + 1rem)" }}>
       {/* Background Effect */}
       <div className="fixed inset-0 bg-[url('/grid.svg')] opacity-10 pointer-events-none z-0" />
-
-      {/* Global Header now acts as the primary status bar on mobile */}
-      <GlobalHeader missions={missions} />
 
       {/* Mobile: Constrained width, Desktop: Expanded width */}
       <div className="flex-1 w-full max-w-md md:max-w-5xl mx-auto flex flex-col relative z-10">

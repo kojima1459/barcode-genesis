@@ -14,7 +14,6 @@ import { SHOP_ITEMS, ShopItemCategory, getCategoryLabel, getItemLabel, getItemDe
 import { PRODUCTS } from "../../../shared/products";
 import { toast } from "sonner";
 import { Interactive } from "@/components/ui/interactive";
-import { GlobalHeader } from "@/components/GlobalHeader";
 import { useUserData } from "@/hooks/useUserData";
 import { ShopItemCard, CategoryIcon } from "@/components/ShopItemCard";
 
@@ -190,8 +189,6 @@ export default function Shop() {
 
   return (
     <div className="flex-1 flex flex-col relative pb-32 md:pb-8 bg-background text-foreground overflow-hidden">
-      {/* Global Header */}
-      <GlobalHeader />
 
       <main className="flex-1 max-w-4xl mx-auto w-full px-4 pt-4 relative z-10 space-y-8">
         {/* Coin Shop Section */}

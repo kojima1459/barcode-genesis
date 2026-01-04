@@ -11,11 +11,15 @@ import { toast } from "sonner";
 import { getBadgeLabel } from "@/lib/badges";
 import { preloadSfx, unlockSfx } from "@/lib/sfx";
 import BottomNav from "@/components/BottomNav";
+import { GlobalHeader } from "@/components/GlobalHeader";
 import { APP_VERSION } from "@/version";
 
 function getJstDateKey(): string {
   return new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" });
 }
+
+// Pages that should NOT show GlobalHeader (they have their own headers or are public)
+const PAGES_WITHOUT_GLOBAL_HEADER = ["/lp", "/auth", "/privacy", "/terms", "/law", "/404", "/how-to", "/guide", "/premium", "/boss", "/workshop", "/robot/", "/scan"];
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -27,6 +31,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const userDataDenied = (error as { code?: string } | null)?.code === "permission-denied";
 
   const [dailyFreeStatus, setDailyFreeStatus] = useState<string>("unknown");
+
+  // Determine if GlobalHeader should be shown
+  const showGlobalHeader = useMemo(() => {
+    if (!user) return false;
+    return !PAGES_WITHOUT_GLOBAL_HEADER.some(path => location.startsWith(path) || location === path);
+  }, [user, location]);
 
   // Preload SFX on mount
   useEffect(() => {
@@ -124,6 +134,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
       <div className="relative z-10 flex flex-col flex-1 min-h-0">
 
+        {/* GlobalHeader - rendered once, fixed position */}
+        {showGlobalHeader && <GlobalHeader />}
+
         {/* Desktop Header - Hiding on mobile to save space (replaced by GlobalHeader + BottomNav) */}
         <header className="hidden md:flex sticky top-0 z-40 border-b border-border/60 bg-surface/80 backdrop-blur w-full shrink-0">
           <div className="container px-4 py-3 flex items-center justify-between gap-2">
@@ -162,8 +175,13 @@ export default function AppShell({ children }: { children: ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain -webkit-overflow-scrolling-touch"
-          style={{ paddingBottom: "calc(var(--bottom-nav-height) + env(safe-area-inset-bottom) + 16px)" }}>
+        <main
+          className="flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain -webkit-overflow-scrolling-touch"
+          style={{
+            paddingTop: showGlobalHeader ? "calc(var(--header-height) + env(safe-area-inset-top))" : undefined,
+            paddingBottom: "calc(var(--bottom-nav-height) + env(safe-area-inset-bottom) + 16px)"
+          }}
+        >
           {userDataDenied && (
             <div className="mx-4 mt-3 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs font-mono text-destructive">
               読み込み不可

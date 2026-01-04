@@ -7,7 +7,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserData } from "@/hooks/useUserData";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { GlobalHeader } from "@/components/GlobalHeader";
 import { getDb } from "@/lib/firebase";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
@@ -412,8 +411,6 @@ export default function Dex() {
 
   return (
     <div className="flex-1 flex flex-col relative pb-32 md:pb-8 bg-background text-foreground overflow-hidden">
-      {/* Global Header */}
-      <GlobalHeader />
 
       <main className="mx-auto w-full max-w-6xl px-4 py-6 space-y-4 relative z-10">
         <SEO title="Dex | Barcode Genesis" description="Your robots and variants." />

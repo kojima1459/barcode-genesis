@@ -17,7 +17,6 @@ import { RobotData } from "@/types/shared";
 import { Interactive } from "@/components/ui/interactive";
 import { SystemSkeleton } from "@/components/ui/SystemSkeleton";
 // [REFACTOR 1.3] Removed unused imports: ThemeSwitcher, SoundSettings, LanguageSwitcher, Crown, Settings
-import { GlobalHeader } from "@/components/GlobalHeader";
 import { useUserData } from "@/hooks/useUserData";
 // [REFACTOR 1.1] Import compressImage and validation from imageUtils
 import { compressImage, validateImageFile } from "@/lib/imageUtils";
@@ -202,8 +201,6 @@ export default function Profile() {
 
   return (
     <div className="flex-1 flex flex-col relative pb-32 md:pb-8 bg-background text-foreground overflow-hidden">
-      {/* Global Header */}
-      <GlobalHeader />
 
       <main className="flex-1 max-w-4xl mx-auto w-full p-4 relative z-10 space-y-8">
         <div className="flex items-center justify-between mb-8">
