@@ -70,29 +70,31 @@ const useVersionCheck = () => {
   }, []);
 };
 
-// Lazy load pages for better performance
-const Home = lazy(() => import("@/pages/Home"));
-const Auth = lazy(() => import("@/pages/Auth"));
-const Battle = lazy(() => import("@/pages/Battle"));
-const Collection = lazy(() => import("@/pages/Collection"));
-const Dex = lazy(() => import("@/pages/Dex"));
-const Leaderboard = lazy(() => import("@/pages/Leaderboard"));
-const Profile = lazy(() => import("@/pages/Profile"));
-const RobotDetail = lazy(() => import("@/pages/RobotDetail"));
-const Shop = lazy(() => import("@/pages/Shop"));
-const Achievements = lazy(() => import("@/pages/Achievements"));
-const Premium = lazy(() => import("@/pages/Premium"));
-const Guide = lazy(() => import("@/pages/Guide"));
-const HowTo = lazy(() => import("@/pages/HowTo"));
-const LandingPage = lazy(() => import("@/pages/LandingPage"));
-const Privacy = lazy(() => import("@/pages/legal/Privacy"));
-const Terms = lazy(() => import("@/pages/legal/Terms"));
-const SpecifiedCommercial = lazy(() => import("@/pages/legal/SpecifiedCommercial"));
-const NotFound = lazy(() => import("@/pages/NotFound"));
-const Scan = lazy(() => import("@/pages/Scan"));
-const Workshop = lazy(() => import("@/pages/Workshop"));
-const BossBattle = lazy(() => import("@/pages/BossBattle"));
-const Debug = lazy(() => import("@/pages/Debug"));
+// Lazy load pages for better performance (with auto-retry on chunk error)
+import { lazyRetry } from "@/lib/lazyRetry";
+
+const Home = lazyRetry(() => import("@/pages/Home"), "Home");
+const Auth = lazyRetry(() => import("@/pages/Auth"), "Auth");
+const Battle = lazyRetry(() => import("@/pages/Battle"), "Battle");
+const Collection = lazyRetry(() => import("@/pages/Collection"), "Collection");
+const Dex = lazyRetry(() => import("@/pages/Dex"), "Dex");
+const Leaderboard = lazyRetry(() => import("@/pages/Leaderboard"), "Leaderboard");
+const Profile = lazyRetry(() => import("@/pages/Profile"), "Profile");
+const RobotDetail = lazyRetry(() => import("@/pages/RobotDetail"), "RobotDetail");
+const Shop = lazyRetry(() => import("@/pages/Shop"), "Shop");
+const Achievements = lazyRetry(() => import("@/pages/Achievements"), "Achievements");
+const Premium = lazyRetry(() => import("@/pages/Premium"), "Premium");
+const Guide = lazyRetry(() => import("@/pages/Guide"), "Guide");
+const HowTo = lazyRetry(() => import("@/pages/HowTo"), "HowTo");
+const LandingPage = lazyRetry(() => import("@/pages/LandingPage"), "LandingPage");
+const Privacy = lazyRetry(() => import("@/pages/legal/Privacy"), "Privacy");
+const Terms = lazyRetry(() => import("@/pages/legal/Terms"), "Terms");
+const SpecifiedCommercial = lazyRetry(() => import("@/pages/legal/SpecifiedCommercial"), "SpecifiedCommercial");
+const NotFound = lazyRetry(() => import("@/pages/NotFound"), "NotFound");
+const Scan = lazyRetry(() => import("@/pages/Scan"), "Scan");
+const Workshop = lazyRetry(() => import("@/pages/Workshop"), "Workshop");
+const BossBattle = lazyRetry(() => import("@/pages/BossBattle"), "BossBattle");
+const Debug = lazyRetry(() => import("@/pages/Debug"), "Debug");
 
 // Loading fallback component
 function PageLoader() {
