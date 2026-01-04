@@ -16,8 +16,9 @@ export type PhaseBSpecialType = 'burst' | 'guard' | 'heal' | 'accel' | 'focus';
  */
 export function getRoleFromSeed(seed: number): RobotRole {
     const roles: RobotRole[] = ['striker', 'tank', 'speed', 'support', 'balanced'];
-    const index = Math.floor((seed / 10000) % 5);
-    return roles[index];
+    const safeSeed = Math.abs(seed);
+    const index = Math.floor((safeSeed / 10000) % 5);
+    return roles[index] ?? 'balanced'; // Fallback to balanced if somehow undefined
 }
 
 /**
@@ -25,7 +26,7 @@ export function getRoleFromSeed(seed: number): RobotRole {
  * 1% legendary, 9% rare, 90% common
  */
 export function getRarityFromSeed(seed: number): RobotRarity {
-    const roll = seed % 100;
+    const roll = Math.abs(seed) % 100;
     if (roll === 0) return 'legendary'; // 1%
     if (roll < 10) return 'rare';       // 9%
     return 'common';                     // 90%
