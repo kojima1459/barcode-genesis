@@ -3,7 +3,7 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 type SoundType = 'bgm_menu' | 'bgm_battle' | 'se_click' | 'se_scan' | 'se_attack' | 'se_win' | 'se_lose' | 'se_levelup' | 'se_equip' | 'se_reveal' | 'se_rare' | 'se_hit_heavy' | 'se_hit_light' | 'se_miss' | 'se_battle_start';
 
 interface SoundContextType {
-  playBGM: (type: 'bgm_menu' | 'bgm_battle') => void;
+  playBGM: (type: 'bgm_menu' | 'bgm_battle', loop?: boolean) => void;
   stopBGM: () => void;
   playSE: (type: 'se_click' | 'se_scan' | 'se_attack' | 'se_win' | 'se_lose' | 'se_levelup' | 'se_equip' | 'se_reveal' | 'se_rare' | 'se_hit_heavy' | 'se_hit_light' | 'se_miss' | 'se_battle_start') => void;
   volume: number;

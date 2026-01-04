@@ -187,7 +187,7 @@ export const translations = {
 
     play_again: "もう一度戦う",
     win: "勝利！",
-    lose: "敗北...",
+    lose: "敗北",
     exp_gained: "獲得経験値",
     level_up: "レベルアップ！ステータス上昇！",
     new_skill: "新スキル習得",

@@ -84,7 +84,7 @@ interface BattleReplayProps {
 }
 
 export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed = 1, showResultOverlay = true, p1OverdriveGauge: initialP1Overdrive = 0, p2OverdriveGauge: initialP2Overdrive = 0 }: BattleReplayProps) {
-    const { playSE, playBGM } = useSound();
+    const { playSE, playBGM, stopBGM } = useSound();
     const { t } = useLanguage();
     const { fx } = useRobotFx();
     const { shake, shakeStyle } = useScreenShake();
@@ -563,6 +563,9 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
         if (!mountedRef.current) return;
         hasEndedRef.current = true;
 
+        // Stop battle music
+        stopBGM();
+
         const isWin = result.winnerId === p1.id;
         // Play victory/defeat SFX
         if (isWin) {
@@ -770,7 +773,7 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
             {/* NEW: Improved Pacing Controls */}
             {/* NEW: Improved Pacing Controls */}
             {!isFinished && (
-                <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1.5 px-4 py-2 rounded-2xl glass-panel border border-white/10 shadow-2xl">
+                <div className="fixed bottom-32 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-1.5 px-4 py-2 rounded-2xl glass-panel border border-white/10 shadow-2xl pb-[env(safe-area-inset-bottom)]">
                     <div className="flex gap-1 bg-black/40 p-1 rounded-xl border border-white/5">
                         {([1, 2, 3] as const).map(s => (
                             <Interactive
@@ -886,7 +889,7 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
                             className="text-center space-y-8 p-10 glass-panel border-neon-cyan shadow-[0_0_50px_rgba(0,243,255,0.2)] max-w-md w-full relative overflow-hidden"
                         >
                             <h2 className={`text-5xl md:text-7xl font-black italic tracking-tighter ${result.winnerId === p1.id ? "text-neon-cyan neon-text-cyan" : "text-red-500"}`}>
-                                {result.winnerId === p1.id ? t('victory').toUpperCase() : t('defeat').toUpperCase()}
+                                {result.winnerId === p1.id ? t('win') : t('lose')}
                             </h2>
 
                             {result.winnerId === p1.id && (
