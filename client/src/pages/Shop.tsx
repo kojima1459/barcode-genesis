@@ -9,7 +9,7 @@ import { CountUp } from "@/components/ui/CountUp";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { getDb, functions } from "@/lib/firebase";
+import { getDb, getFunctions } from "@/lib/firebase";
 import { SHOP_ITEMS, ShopItemCategory, getCategoryLabel, getItemLabel, getItemDescription } from "@/lib/items";
 import { PRODUCTS } from "../../../shared/products";
 import { toast } from "sonner";
@@ -95,7 +95,7 @@ export default function Shop() {
     if (!user) return;
     setBuyingProduct(productId);
     try {
-      const createCheckoutSession = httpsCallable(functions, "createCheckoutSession");
+      const createCheckoutSession = httpsCallable(getFunctions(), "createCheckoutSession");
       // Map product IDs to pack IDs expected by the Cloud Function
       const packIdMap: Record<string, string> = {
         'coin_pack_small': 'credits_100',
@@ -129,7 +129,7 @@ export default function Shop() {
       // qty is now passed from ShopItemCard
       const item = SHOP_ITEMS.find((entry) => entry.id === itemId);
       const isCraftItem = typeof item?.tokenCost === "number";
-      const action = httpsCallable(functions, isCraftItem ? "craftItem" : "purchaseItem");
+      const action = httpsCallable(getFunctions(), isCraftItem ? "craftItem" : "purchaseItem");
       const payload = isCraftItem ? { recipeId: itemId, qty } : { itemId, qty };
       const result = await action(payload);
       const data = result.data as {

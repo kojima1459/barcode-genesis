@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { functions } from "@/lib/firebase";
+import { getFunctions } from "@/lib/firebase";
 import { toast } from "sonner";
 import { Interactive } from "@/components/ui/interactive";
 import { useUserData } from "@/hooks/useUserData";
@@ -91,7 +91,7 @@ export default function Premium() {
         setLoadingPackId(packId);
 
         try {
-            const createCheckoutSession = httpsCallable(functions, "createCheckoutSession");
+            const createCheckoutSession = httpsCallable(getFunctions(), "createCheckoutSession");
             const result = await createCheckoutSession({
                 packId,
                 successUrl: `${window.location.origin}/shop?success=true`,
@@ -121,7 +121,7 @@ export default function Premium() {
         setLoadingSubscription(true);
 
         try {
-            const createSubscriptionSession = httpsCallable(functions, "createSubscriptionSession");
+            const createSubscriptionSession = httpsCallable(getFunctions(), "createSubscriptionSession");
             const result = await createSubscriptionSession({
                 successUrl: `${window.location.origin}/?premium=activated`,
                 cancelUrl: `${window.location.origin}/premium?canceled=true`,
@@ -145,7 +145,7 @@ export default function Premium() {
         if (!user) return;
         setLoadingPortal(true);
         try {
-            const createPortalSession = httpsCallable(functions, "createPortalSession");
+            const createPortalSession = httpsCallable(getFunctions(), "createPortalSession");
             const result = await createPortalSession({
                 returnUrl: window.location.href,
             });

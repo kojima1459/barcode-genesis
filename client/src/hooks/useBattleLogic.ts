@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { httpsCallable } from "firebase/functions";
 import { doc, getDoc } from "firebase/firestore";
 import { toast } from "sonner";
-import { getDb, functions } from "@/lib/firebase";
+import { getDb, getFunctions } from "@/lib/firebase";
 import { RobotData, BattleResult, BattleLog, MatchBattleResponse, BattleItemType } from "@/types/shared";
 import { toBattleRobotData, normalizeTrainingInput, simulateBattle as simulateTrainingBattle, getTrainingBattleId } from "@/lib/battleEngine";
 import { useSound } from "@/contexts/SoundContext";
@@ -54,7 +54,7 @@ export function useBattleLogic({
         setMatchmakingStatus('対戦相手を探しています...');
 
         try {
-            const joinMatchmaking = httpsCallable(functions, 'joinMatchmaking');
+            const joinMatchmaking = httpsCallable(getFunctions(), 'joinMatchmaking');
             const result = await joinMatchmaking({ robotId: selectedRobotId });
             const data = result.data as { status: string; queueId?: string; battleId?: string; opponent?: any };
 
@@ -76,7 +76,7 @@ export function useBattleLogic({
     };
 
     const pollMatchStatus = async (qId: string) => {
-        const checkMatchStatus = httpsCallable(functions, 'checkMatchStatus');
+        const checkMatchStatus = httpsCallable(getFunctions(), 'checkMatchStatus');
         const poll = async () => {
             // In a hook, we need to be careful about closure staleness if we used state inside poll, e.g. !isMatchmaking
             // Ideally use a ref to track if polling should stop
@@ -87,7 +87,7 @@ export function useBattleLogic({
     const cancelMatchmaking = async () => {
         if (queueId) {
             try {
-                const leaveMatchmaking = httpsCallable(functions, 'leaveMatchmaking');
+                const leaveMatchmaking = httpsCallable(getFunctions(), 'leaveMatchmaking');
                 await leaveMatchmaking({ queueId });
             } catch (e) {
                 console.error(e);
@@ -147,7 +147,7 @@ export function useBattleLogic({
 
         // Online / Match Battle
         try {
-            const matchBattleFn = httpsCallable(functions, 'matchBattle');
+            const matchBattleFn = httpsCallable(getFunctions(), 'matchBattle');
             const isVariant = variants.find(v => v.id === selectedRobotId);
             const fighterRef = isVariant ? { kind: 'variant', id: selectedRobotId } : { kind: 'robot', id: selectedRobotId };
 

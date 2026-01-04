@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
-import { getDb, functions } from "@/lib/firebase";
+import { getDb, getFunctions } from "@/lib/firebase";
 import { callGenerateRobot } from "@/lib/functions";
 import { httpsCallable } from "firebase/functions";
 import { collection, getDocs } from "firebase/firestore";
@@ -109,7 +109,7 @@ export default function Home() {
     setBossLoading(true);
     setBossError(null);
     try {
-      const getDailyBoss = httpsCallable(functions, "getDailyBoss");
+      const getDailyBoss = httpsCallable(getFunctions(), "getDailyBoss");
       const result = await getDailyBoss();
       const data = result.data as DailyBossResponse;
       setBossData(data.boss);
@@ -135,7 +135,7 @@ export default function Home() {
     setMilestoneLoading(true);
     setMilestoneError(null);
     try {
-      const getMilestoneBoss = httpsCallable(functions, "getMilestoneBoss");
+      const getMilestoneBoss = httpsCallable(getFunctions(), "getMilestoneBoss");
       const result = await getMilestoneBoss();
       setMilestoneData(result.data as MilestoneBossResponse);
     } catch (error: any) {
@@ -151,7 +151,7 @@ export default function Home() {
     setWeeklyLoading(true);
     setWeeklyError(null);
     try {
-      const getWeeklyBoss = httpsCallable(functions, "getWeeklyBoss");
+      const getWeeklyBoss = httpsCallable(getFunctions(), "getWeeklyBoss");
       const result = await getWeeklyBoss();
       const data = result.data as WeeklyBossResponse;
       setWeeklyBossData(data.boss);
@@ -186,7 +186,7 @@ export default function Home() {
       setMissionsLoading(true);
       setMissionsError(null);
       try {
-        const getMissions = httpsCallable(functions, "getDailyMissions");
+        const getMissions = httpsCallable(getFunctions(), "getDailyMissions");
         const result = await getMissions();
         const data = result.data as { dateKey: string; missions: Mission[] };
         setMissionDateKey(data.dateKey);
@@ -282,7 +282,7 @@ export default function Home() {
     setLoginError(null);
     setIsClaimingLogin(true);
     try {
-      const claim = httpsCallable(functions, "claimDailyLogin");
+      const claim = httpsCallable(getFunctions(), "claimDailyLogin");
       const result = await claim();
       const data = result.data as { claimed?: boolean; streak?: number; creditsGained?: number; newBadges?: string[] };
       if (data?.claimed) {
@@ -312,7 +312,7 @@ export default function Home() {
     setMissionsError(null);
     setClaimingMissionId(missionId);
     try {
-      const claim = httpsCallable(functions, "claimMissionReward");
+      const claim = httpsCallable(getFunctions(), "claimMissionReward");
       const result = await claim({ dateKey: missionDateKey, missionId });
       const data = result.data as { credits: number; missionId: string };
       // credits is read from useUserData() which auto-refreshes
@@ -336,7 +336,7 @@ export default function Home() {
     setFollowError(null);
     setIsFollowing(true);
     try {
-      const follow = httpsCallable(functions, "followUser");
+      const follow = httpsCallable(getFunctions(), "followUser");
       await follow({ targetUid: followTarget.trim() });
       setFollowTarget("");
       const followSnap = await getDocs(collection(getDb(), "publicUsers", user.uid, "following"));

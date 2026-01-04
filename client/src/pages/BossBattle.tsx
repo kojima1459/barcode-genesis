@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
-import { getDb, functions } from "@/lib/firebase";
+import { getDb, getFunctions } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
 import { collection, getDocs } from "firebase/firestore";
 import { ArrowLeft, Skull, Loader2, Shield, Zap, Trophy, XCircle, RotateCw, ScanBarcode } from "lucide-react";
@@ -78,7 +78,7 @@ export default function BossBattle({ modeOverride }: { modeOverride?: "weekly" |
         setLoadError(null);
         try {
             if (mode === "weekly") {
-                const getWeeklyBoss = httpsCallable(functions, "getWeeklyBoss");
+                const getWeeklyBoss = httpsCallable(getFunctions(), "getWeeklyBoss");
                 const weeklyResult = await getWeeklyBoss();
                 const weeklyResponse = weeklyResult.data as WeeklyBossResponse;
                 const weeklyBoss = weeklyResponse?.boss as WeeklyBossData | undefined;
@@ -102,7 +102,7 @@ export default function BossBattle({ modeOverride }: { modeOverride?: "weekly" |
                 setHasScannedToday(true);
             } else {
                 // Load boss data
-                const getDailyBoss = httpsCallable(functions, "getDailyBoss");
+                const getDailyBoss = httpsCallable(getFunctions(), "getDailyBoss");
                 const bossResult = await getDailyBoss();
                 const bossResponse = bossResult.data as { boss: DailyBossData; canChallenge: boolean; hasScannedToday: boolean };
                 setBossData(bossResponse.boss);
@@ -152,7 +152,7 @@ export default function BossBattle({ modeOverride }: { modeOverride?: "weekly" |
         playSE('se_battle_start');
 
         try {
-            const executeBossBattle = httpsCallable(functions, "executeBossBattle");
+            const executeBossBattle = httpsCallable(getFunctions(), "executeBossBattle");
             const isVariant = variants.some(v => v.id === selectedRobotId);
 
             const result = await executeBossBattle({

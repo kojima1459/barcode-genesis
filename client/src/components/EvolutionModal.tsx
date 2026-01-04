@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Loader2, Check, Zap } from "lucide-react";
-import { functions } from "@/lib/firebase";
+import { getFunctions } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
 import { toast } from "sonner";
 import { RobotData } from "@/types/shared";
@@ -67,7 +67,7 @@ export default function EvolutionModal({ isOpen, onClose, target, allRobots, onS
 
         setIsEvolving(true);
         try {
-            const evolveRobot = httpsCallable(functions, "evolveRobot");
+            const evolveRobot = httpsCallable(getFunctions(), "evolveRobot");
             const result = await evolveRobot({
                 targetBarcode,
                 materialBarcodes: selectedMaterials,

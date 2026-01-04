@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
-import { getDb, functions } from "@/lib/firebase";
+import { getDb, getFunctions } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
 import { collection, orderBy, query, getDocs } from "firebase/firestore";
 import { ArrowLeft, Loader2, Plus, RefreshCw, AlertCircle, Trash2 } from "lucide-react";
@@ -108,7 +108,7 @@ export default function Workshop() {
         const b = params.get("b") ?? sessionStorage.getItem("workshopParentB");
         if (a) setRobotAId(a);
         if (b) setRobotBId(b);
-         
+
     }, [user]);
 
     // Keep Dex navigation state in sync
@@ -158,7 +158,7 @@ export default function Workshop() {
 
         setCreating(true);
         try {
-            const createFn = httpsCallable(functions, 'createVariant');
+            const createFn = httpsCallable(getFunctions(), 'createVariant');
             const res = await createFn({ robotIdA: robotAId, robotIdB: robotBId, name: variantName });
             const data = res.data as { variant: VariantData }; // CreateVariant returns { variantId, variant, ... }
 
@@ -285,7 +285,7 @@ export default function Workshop() {
 
         setDeletingId(variantId);
         try {
-            const deleteVariantFn = httpsCallable(functions, 'deleteVariant');
+            const deleteVariantFn = httpsCallable(getFunctions(), 'deleteVariant');
             await deleteVariantFn({ variantId });
             toast.success(t('workshop_variant_deleted'));
             // Refresh data since we no longer have real-time subscription
