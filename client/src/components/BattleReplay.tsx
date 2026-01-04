@@ -84,27 +84,16 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
     const { fx } = useRobotFx();
     const { shake, shakeStyle } = useScreenShake();
 
-    // Defensive check: ensure p1 and p2 are valid
-    if (!p1 || !p2 || !p1.id || !p2.id) {
-        console.error('[BattleReplay] Invalid props:', { p1, p2 });
-        return (
-            <div className="p-4 text-center text-red-400">
-                <p>バトルデータの読み込みに失敗しました</p>
-                <p className="text-xs text-gray-500 mt-2">Invalid battle data</p>
-            </div>
-        );
-    }
-
     // Sound - sync with both old and new systems
     const [isMuted, setIsMuted] = useState(() => getMuted() || getSfxMuted());
 
     const [events, setEvents] = useState<BattleEvent[]>([]);
     const [currentEventIndex, setCurrentEventIndex] = useState(0);
 
-    // Game State - use safe defaults
+    // Game State - use safe defaults (use optional chaining for safety)
     const [hp, setHp] = useState<Record<string, number>>({
-        [p1.id]: p1.baseHp ?? 1000,
-        [p2.id]: p2.baseHp ?? 1000
+        [p1?.id ?? 'p1']: p1?.baseHp ?? 1000,
+        [p2?.id ?? 'p2']: p2?.baseHp ?? 1000
     });
     const [activeMessage, setActiveMessage] = useState<string>("");
     const [isFinished, setIsFinished] = useState(false);
@@ -131,7 +120,7 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
     const [flashP1, setFlashP1] = useState(false);
     const [flashP2, setFlashP2] = useState(false);
     const [showResultsOnly, setShowResultsOnly] = useState(false);
-    const [lastHp, setLastHp] = useState<Record<string, number>>({ [p1.id]: p1.baseHp, [p2.id]: p2.baseHp });
+    const [lastHp, setLastHp] = useState<Record<string, number>>({ [p1?.id ?? 'p1']: p1?.baseHp ?? 1000, [p2?.id ?? 'p2']: p2?.baseHp ?? 1000 });
 
     // Extended HUD State
     const [currentEvent, setCurrentEvent] = useState<BattleEvent | null>(null);
@@ -166,6 +155,20 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
     // HUD helper state
     const [lastDamage, setLastDamage] = useState(0);
     const [lastDamageTargetId, setLastDamageTargetId] = useState<string | null>(null);
+
+    // Memoized filtered popups (must be before any conditional returns)
+    const p1Popups = useMemo(() => p1?.id ? popups.filter(p => p.targetId === p1.id) : [], [popups, p1?.id]);
+    const p2Popups = useMemo(() => p2?.id ? popups.filter(p => p.targetId === p2.id) : [], [popups, p2?.id]);
+
+    // Defensive check: ensure p1 and p2 are valid (computed flag, NOT early return)
+    const isInvalidProps = !p1 || !p2 || !p1.id || !p2.id;
+
+    // Log once if invalid
+    useEffect(() => {
+        if (isInvalidProps) {
+            console.error('[BattleReplay] Invalid props:', { p1, p2 });
+        }
+    }, [isInvalidProps, p1, p2]);
 
     // Initial Setup
     useEffect(() => {
@@ -389,7 +392,7 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
 
                 // Process Event Side Effects
                 switch (event.type) {
-                    case 'SPECIAL_CUT_IN':
+                    case 'SPECIAL_CUT_IN': {
                         // Show cut-in overlay
                         const attackerRobot = event.attackerId === p1.id ? p1 : p2;
                         setCutInData({
@@ -409,6 +412,7 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
                         // Auto-hide after delay
                         scheduleTimeout(() => setShowCutIn(false), (event.delay || 650) / speed);
                         break;
+                    }
 
                     case 'LOG_MESSAGE':
                         if (event.message) {
@@ -613,8 +617,18 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
         return Math.max(0, Math.min(100, (current / max) * 100));
     };
 
-    const nextHitKills = lastDamageTargetId === p2.id && lastDamage > 0
-        && lastDamage >= (hp[p2.id] ?? p2.baseHp);
+    const nextHitKills = lastDamageTargetId === p2?.id && lastDamage > 0
+        && lastDamage >= (hp[p2?.id ?? 'p2'] ?? p2?.baseHp ?? 1000);
+
+    // Render invalid props error (after all hooks)
+    if (isInvalidProps) {
+        return (
+            <div className="p-4 text-center text-red-400">
+                <p>バトルデータの読み込みに失敗しました</p>
+                <p className="text-xs text-gray-500 mt-2">Invalid battle data</p>
+            </div>
+        );
+    }
 
     if (replayError) {
         return (
@@ -794,7 +808,7 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
                         isLunging={lungeId === p1.id}
                         isPlayer={true}
                         fx={fx}
-                        popups={useMemo(() => popups.filter(p => p.targetId === p1.id), [popups, p1.id])}
+                        popups={p1Popups}
                     />
                 </div>
 
@@ -813,7 +827,7 @@ export default function BattleReplay({ p1, p2, result, onComplete }: BattleRepla
                         isLunging={lungeId === p2.id}
                         isPlayer={false}
                         fx={fx}
-                        popups={useMemo(() => popups.filter(p => p.targetId === p2.id), [popups, p2.id])}
+                        popups={p2Popups}
                     />
                 </div>
             </div>
