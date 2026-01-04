@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useSound } from "@/contexts/SoundContext";
-import { Coins, ShoppingCart, User, Target, Shield, Flame } from "lucide-react";
+import { Coins, ShoppingCart, User, Target, Shield, Flame, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useUserData } from "@/hooks/useUserData";
@@ -83,6 +83,15 @@ export function GlobalHeader({ className, missions }: GlobalHeaderProps) {
                         <div className="text-xs sm:text-sm font-bold font-mono text-neon-cyan leading-none flex items-center gap-1 tabular-nums">
                             <Coins className="w-3 h-3" />
                             {userData?.credits.toLocaleString() || 0}
+                        </div>
+                    </div>
+
+                    {/* Chips */}
+                    <div className="flex flex-col items-end px-2 sm:px-3 py-1 rounded-lg bg-white/5 border border-white/5">
+                        <span className="hidden sm:block text-[9px] text-muted-foreground/60 font-orbitron tracking-widest leading-none mb-1 uppercase">{t('shop_scan_token')}</span>
+                        <div className="text-xs sm:text-sm font-bold font-mono text-amber-400 leading-none flex items-center gap-1 tabular-nums">
+                            <Zap className="w-3 h-3" />
+                            {userData?.scanTokens || 0}
                         </div>
                     </div>
 

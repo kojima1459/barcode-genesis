@@ -49,7 +49,7 @@ export function ShopItemCard({ item, ownedCount, credits, scanTokens, onPurchase
                 <div className="flex justify-between items-center text-sm">
                     <span className={`font-bold ${canAfford ? 'text-primary' : 'text-red-500'}`}>
                         {isCraftItem
-                            ? `${t('shop_material')}: Token ${item.tokenCost} + ${item.price} ${t('shop_credits')}`
+                            ? `${t('shop_material')}: ${t('shop_scan_token')} ${item.tokenCost} + ${item.price} ${t('shop_credits')}`
                             : `${item.price} ${t('shop_credits')}`}
                     </span>
                     <span className="text-muted-foreground">{t('shop_owned')}: {ownedCount}</span>

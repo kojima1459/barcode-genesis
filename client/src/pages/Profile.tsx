@@ -9,7 +9,7 @@ import { getDb } from "@/lib/firebase";
 // [REFACTOR 1.3] Removed unused import: getDoc
 import { doc, updateDoc, collection, getDocs, query, orderBy } from "firebase/firestore";
 // [REFACTOR 1.3] Removed unused imports: ArrowLeft
-import { Copy, Edit2, Save, User, Trophy, Sword, Shield, LogOut, Camera, Loader2 } from "lucide-react";
+import { Copy, Edit2, Save, User, Trophy, Sword, Shield, LogOut, Camera, Loader2, Zap } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
 import RobotSVG from "@/components/RobotSVG";
@@ -312,6 +312,18 @@ export default function Profile() {
                   <Interactive className="text-center p-4 bg-secondary/10 rounded-lg h-auto">
                     <div className="text-2xl font-bold text-orange-500">{userData?.workshopLines || 1}</div>
                     <div className="text-xs text-muted-foreground">{t('factory_lines')}</div>
+                  </Interactive>
+                </div>
+
+                {/* Chips / Balance */}
+                <div className="grid grid-cols-2 gap-4 pt-2">
+                  <Interactive className="text-center p-4 bg-secondary/10 rounded-lg h-auto">
+                    <div className="text-2xl font-bold text-neon-cyan">{userData?.credits?.toLocaleString() || 0}</div>
+                    <div className="text-xs text-muted-foreground">{t('credits')}</div>
+                  </Interactive>
+                  <Interactive className="text-center p-4 bg-secondary/10 rounded-lg h-auto">
+                    <div className="text-2xl font-bold text-amber-400">{userData?.scanTokens || 0}</div>
+                    <div className="text-xs text-muted-foreground">{t('shop_scan_token')}</div>
                   </Interactive>
                 </div>
               </div>

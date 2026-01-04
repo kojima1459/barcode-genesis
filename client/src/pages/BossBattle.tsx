@@ -281,7 +281,7 @@ export default function BossBattle({ modeOverride }: { modeOverride?: "weekly" |
                             </div>
                             <div>
                                 <div className="text-2xl font-bold text-neon-pink">{battleResult.rewards.scanTokens}</div>
-                                <div className="text-xs text-muted-foreground">Tokens</div>
+                                <div className="text-xs text-muted-foreground">{t('shop_scan_token')}</div>
                             </div>
                         </CardContent>
                     </Card>

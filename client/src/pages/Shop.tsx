@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import { httpsCallable } from "firebase/functions";
 import { collection, doc, getDoc, getDocs } from "firebase/firestore";
-import { ArrowLeft, Loader2, Zap, Sword, Sparkles } from "lucide-react";
+import { ArrowLeft, Loader2, Zap, Sword, Sparkles, Coins } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SystemSkeleton } from "@/components/ui/SystemSkeleton";
 import { CountUp } from "@/components/ui/CountUp";
@@ -191,9 +191,37 @@ export default function Shop() {
     <div className="flex-1 flex flex-col relative pb-32 md:pb-8 bg-background text-foreground overflow-hidden">
 
       <main className="flex-1 max-w-4xl mx-auto w-full px-4 pt-4 relative z-10 space-y-8">
+        {/* User Balance Summary */}
+        <section className="bg-secondary/10 p-4 rounded-2xl border border-secondary/20 flex flex-wrap gap-6 items-center justify-center">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-neon-cyan/10 flex items-center justify-center">
+              <Coins className="w-6 h-6 text-neon-cyan" />
+            </div>
+            <div>
+              <p className="text-[10px] text-muted-foreground font-orbitron uppercase tracking-wider">{t('credits')}</p>
+              <p className="text-xl font-bold font-mono text-neon-cyan tabular-nums">{credits.toLocaleString()}</p>
+            </div>
+          </div>
+          <div className="w-px h-8 bg-border hidden sm:block" />
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-amber-400/10 flex items-center justify-center">
+              <Zap className="w-6 h-6 text-amber-400" />
+            </div>
+            <div>
+              <p className="text-[10px] text-muted-foreground font-orbitron uppercase tracking-wider">{t('shop_scan_token')}</p>
+              <p className="text-xl font-bold font-mono text-amber-400 tabular-nums">{scanTokens}</p>
+            </div>
+          </div>
+        </section>
+
         {/* Coin Shop Section */}
         <section>
-          <h2 className="text-xl font-bold mb-4 text-primary">{t('shop_coins_title')}</h2>
+          <div className="flex justify-between items-end mb-4">
+            <h2 className="text-xl font-bold text-primary">{t('shop_coins_title')}</h2>
+            <p className="text-xs text-muted-foreground bg-secondary/20 px-2 py-1 rounded">
+              {t('shop_chip_hint') || "💡 チップはスキャンやボス戦でゲットできるよ！"}
+            </p>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {PRODUCTS.filter(p => p.type === 'coin').map((product) => (
               <Interactive key={product.id} className="border-primary/20 h-auto overflow-hidden rounded-xl">

@@ -77,8 +77,8 @@ export default function Scan() {
                     import("firebase/functions"),
                     import("@/lib/firebase"),
                 ]);
-                const awardScanToken = httpsCallable(getFunctions(), "awardScanToken");
                 await awardScanToken({ barcode, source: "camera" });
+                toast.success(t('scan_chip_gained'));
             } catch (error: any) {
                 const code = getCallableErrorCode(error);
                 if (code === "already-exists") {

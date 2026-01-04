@@ -136,7 +136,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     name: "Support Drone",
     nameJa: "サポートドローン",
     description: "Token-only craft item",
-    descriptionJa: "トークンのみでクラフト可能",
+    descriptionJa: "チップだけで作れるバトル用ドローン",
     price: 0,
     tokenCost: 3,
     category: 'battle'
