@@ -1,6 +1,6 @@
 import { Component, type ReactNode, useEffect, useRef, useState, memo } from 'react';
 import { useUserData } from '@/hooks/useUserData';
-import { safeRemove } from '@/lib/utils';
+// import { safeRemove } from '@/lib/utils'; // Removed as we manage innerHTML directly
 
 /**
  * AdBanner Component - Performance Optimized
@@ -45,9 +45,8 @@ function AdBannerComponent() {
       if (!container || !container.isConnected) return;
 
       try {
-        while (container.firstChild) {
-          safeRemove(container.firstChild);
-        }
+        // Clear previous content safely
+        container.innerHTML = '';
 
         const iframe = document.createElement('iframe');
         Object.assign(iframe.style, {
@@ -115,12 +114,12 @@ function AdBannerComponent() {
     return () => {
       unmountedRef.current = true;
       const container = bannerRef.current;
-      if (container && container.isConnected) {
+      if (container) {
         try {
-          // Clear children safely
+          // Clear children safely to prevent memory leaks/DOM issues
           container.innerHTML = '';
         } catch {
-          // Ignore cleanup errors during unmount
+          // Ignore cleanup errors
         }
       }
     };
@@ -131,7 +130,7 @@ function AdBannerComponent() {
   }
 
   return (
-    <div className="flex justify-center my-4 w-full overflow-hidden">
+    <div className="flex justify-center my-4 w-full overflow-hidden min-h-[50px]">
       <div
         ref={bannerRef}
         className="w-[320px] h-[50px] bg-black/50 rounded flex items-center justify-center"

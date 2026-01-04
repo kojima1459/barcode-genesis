@@ -251,9 +251,9 @@ export default function Battle() {
   };
 
   const battleItemStock = {
-    BOOST: inventory.BOOST ?? 0,
-    SHIELD: inventory.SHIELD ?? 0,
-    JAMMER: inventory.JAMMER ?? inventory.DISRUPT ?? inventory.CANCEL_CRIT ?? 0,
+    BOOST: inventory.attack_boost ?? 0,
+    SHIELD: inventory.defense_boost ?? 0,
+    JAMMER: inventory.speed_chip ?? 0,
   };
 
   const itemSlotsUnlocked = userLevel >= 5;

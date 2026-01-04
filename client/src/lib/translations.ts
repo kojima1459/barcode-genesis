@@ -43,6 +43,7 @@ export const translations = {
     system_upgrade: "システムアップグレード",
     unlock_full_capability: "全機能のロックを解除し、最大のパフォーマンスを発揮せよ。",
     premium: "プレミアム",
+    battleWait: "対戦相手を待っています...",
 
     // Header & Nav
     system_online: "システム稼働中",
@@ -738,6 +739,7 @@ export const translations = {
     unlock_full_capability: "Unlock full capability",
     premium: "Premium",
     rookie: "Rookie",
+    battleWait: "Waiting for opponent...",
     cancel_anytime: "Cancel Anytime",
     current_plan: "Current Plan",
     restore_purchase: "Restore Purchase",
