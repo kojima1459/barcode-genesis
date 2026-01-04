@@ -641,6 +641,19 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
             delay = 50;
         }
 
+        // Task F: Auto-pause on important events (critical, special, stun)
+        const isAutoPauseEvent = !isSkipped && (
+            event.isCritical ||
+            event.specialTriggered ||
+            event.overdriveTriggered ||
+            event.stunApplied ||
+            event.bossShieldBroken
+        );
+
+        if (isAutoPauseEvent && isAutoMode) {
+            delay += 800; // Extra pause to notice
+        }
+
         // Critical Hit Slow-mo Logic (visual enhancement, not part of pure function)
         if (event.type === 'ATTACK_IMPACT' && (event.isCritical || event.specialTriggered) && !isSkipped) {
             delay *= 2.5; // Slow-mo for impact
