@@ -63,26 +63,34 @@ const NAME_SYLLABLES_SECOND = [
  * Generate epithet from role, rarity, and seed
  */
 export function generateEpithet(role: RobotRole, rarity: RobotRarity, seed: number): string {
+    // Ensure seed is a valid number
+    const safeSeed = Number.isFinite(seed) ? Math.abs(seed) : 12345;
+
     // Legendary always gets legendary epithets
     if (rarity === 'legendary') {
-        const index = Math.floor((seed / 100) % LEGENDARY_EPITHETS.length);
-        return LEGENDARY_EPITHETS[index];
+        const index = Math.floor((safeSeed / 100) % LEGENDARY_EPITHETS.length);
+        return LEGENDARY_EPITHETS[index] ?? '伝説の';
     }
 
     // Otherwise use role-based epithets (fallback to 'balanced' if role is invalid)
     const epithets = EPITHETS_BY_ROLE[role] ?? EPITHETS_BY_ROLE['balanced'];
-    const index = Math.floor((seed / 1000) % epithets.length);
-    return epithets[index];
+    const index = Math.floor((safeSeed / 1000) % epithets.length);
+    return epithets[index] ?? '勇敢な';
 }
 
 /**
  * Generate base robot name from seed
  */
 export function generateBaseName(seed: number): string {
-    const firstIndex = Math.floor((seed / 100) % NAME_SYLLABLES_FIRST.length);
-    const secondIndex = Math.floor((seed / 10) % NAME_SYLLABLES_SECOND.length);
+    // Ensure seed is a valid number
+    const safeSeed = Number.isFinite(seed) ? Math.abs(seed) : 12345;
 
-    return NAME_SYLLABLES_FIRST[firstIndex] + NAME_SYLLABLES_SECOND[secondIndex];
+    const firstIndex = Math.floor((safeSeed / 100) % NAME_SYLLABLES_FIRST.length);
+    const secondIndex = Math.floor((safeSeed / 10) % NAME_SYLLABLES_SECOND.length);
+
+    const first = NAME_SYLLABLES_FIRST[firstIndex] ?? 'ゼフィ';
+    const second = NAME_SYLLABLES_SECOND[secondIndex] ?? 'オス';
+    return first + second;
 }
 
 /**

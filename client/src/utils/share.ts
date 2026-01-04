@@ -33,6 +33,28 @@ export async function generateImageFromElement(
 ): Promise<Blob | null> {
     const { width = 600, height = 800, retries = 2 } = options;
 
+    // Common options to avoid CSS SecurityError with external stylesheets
+    const imageOptions = {
+        width,
+        height,
+        style: { transform: 'none' },
+        pixelRatio: 2, // Higher quality
+        cacheBust: true, // Prevent caching issues
+        skipFonts: true, // Skip external fonts to avoid SecurityError
+        includeQueryParams: true,
+        // Skip external stylesheets that cause SecurityError
+        filter: (node: Node) => {
+            if (node instanceof HTMLLinkElement && node.rel === 'stylesheet') {
+                // Skip external stylesheets (Google Fonts, etc.)
+                const href = node.href || '';
+                if (href.includes('fonts.googleapis.com') || href.includes('fonts.gstatic.com')) {
+                    return false;
+                }
+            }
+            return true;
+        },
+    };
+
     for (let attempt = 0; attempt <= retries; attempt++) {
         try {
             console.log(`[Share] Generating image (attempt ${attempt + 1}/${retries + 1})`);
@@ -42,13 +64,7 @@ export async function generateImageFromElement(
                 await new Promise(resolve => setTimeout(resolve, 500 * attempt));
             }
 
-            const blob = await toBlob(element, {
-                width,
-                height,
-                style: { transform: 'none' },
-                pixelRatio: 2, // Higher quality
-                cacheBust: true, // Prevent caching issues
-            });
+            const blob = await toBlob(element, imageOptions);
 
             if (blob) {
                 console.log('[Share] Image generated successfully:', blob.size, 'bytes');
@@ -61,11 +77,7 @@ export async function generateImageFromElement(
                 // Last attempt failed, try PNG as fallback
                 try {
                     console.log('[Share] Trying PNG fallback method');
-                    const dataUrl = await toPng(element, {
-                        width,
-                        height,
-                        pixelRatio: 2,
-                    });
+                    const dataUrl = await toPng(element, imageOptions);
 
                     const response = await fetch(dataUrl);
                     const blob = await response.blob();
