@@ -195,7 +195,7 @@ export default function BossBattle({ modeOverride }: { modeOverride?: "weekly" |
 
     if (loading) {
         return (
-            <div className="flex justify-center p-8 min-h-screen items-center bg-background">
+            <div className="flex justify-center p-8 items-center h-full">
                 <SystemSkeleton
                     className="w-full max-w-lg aspect-video rounded-3xl"
                     text="CONNECTING TO BOSS SERVER..."
@@ -207,7 +207,7 @@ export default function BossBattle({ modeOverride }: { modeOverride?: "weekly" |
 
     if (loadError || !bossData) {
         return (
-            <div className="min-h-screen bg-background text-foreground p-4 flex flex-col items-center justify-center gap-4">
+            <div className="h-full text-foreground p-4 flex flex-col items-center justify-center gap-4">
                 <XCircle className="w-16 h-16 text-red-500" />
                 <p className="text-lg font-medium text-center">ボスデータの読み込みに失敗しました</p>
                 {loadError && (
@@ -231,7 +231,7 @@ export default function BossBattle({ modeOverride }: { modeOverride?: "weekly" |
         const isWin = battleResult.result === 'win';
 
         return (
-            <div className="min-h-screen bg-background text-foreground p-4 flex flex-col pb-24">
+            <div className="text-foreground p-4 flex flex-col">
                 <SEO title={isWin ? t('boss_victory') : t('boss_defeat')} />
 
                 <header className="flex items-center mb-6 max-w-4xl mx-auto w-full">
@@ -327,9 +327,9 @@ export default function BossBattle({ modeOverride }: { modeOverride?: "weekly" |
 
     // Pre-battle Selection Screen
     return (
-        <div className="min-h-screen bg-background text-foreground p-4 flex flex-col pb-24">
+        <div className="text-foreground p-4 flex flex-col">
             <SEO title={`BOSS: ${bossData.name}`} />
-            <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-20 pointer-events-none" />
+            <div className="fixed inset-0 bg-[url('/grid.svg')] opacity-20 pointer-events-none z-0" />
 
             <header className="flex items-center mb-6 max-w-4xl mx-auto w-full relative z-10">
                 <Link href="/">
