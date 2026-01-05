@@ -55,20 +55,22 @@ const RobotCard = React.forwardRef<HTMLDivElement, RobotCardProps>(({ robot, use
         const roleStr = String(robot.role || '').toUpperCase();
 
         switch (roleStr) {
+            case 'ASSAULT':  // New system
             case 'ATTACKER': // Legacy
-            case 'STRIKER':  // Phase B
+            case 'STRIKER':  // Phase B legacy
                 return <RoleIconAttacker className={iconClasses} color={mainColor} />;
             case 'TANK':
                 return <RoleIconTank className={iconClasses} color={mainColor} />;
-            case 'SPEED':
+            case 'SNIPER':   // New system
+            case 'SPEED':    // Legacy
                 return <RoleIconSpeed className={iconClasses} color={mainColor} />;
-            case 'TRICKY':   // Legacy
+            case 'TRICKSTER': // New system
+            case 'TRICKY':    // Legacy
                 return <RoleIconTricky className={iconClasses} color={mainColor} />;
-            case 'SUPPORT':  // Phase B (Map to Tricky visually for now, or Balance)
-                return <RoleIconTricky className={iconClasses} color={mainColor} />;
-            case 'BALANCE':  // Legacy
-            case 'BALANCED': // Phase B
+            case 'SUPPORT':
                 return <RoleIconBalance className={iconClasses} color={mainColor} />;
+            case 'BALANCE':  // Legacy
+            case 'BALANCED': // Phase B legacy
             default:
                 return <RoleIconBalance className={iconClasses} color={mainColor} />;
         }
@@ -138,7 +140,7 @@ const RobotCard = React.forwardRef<HTMLDivElement, RobotCardProps>(({ robot, use
                                         {robot.rarityTier}
                                     </span>
                                 )}
-                                {robot.role && ['striker', 'tank', 'speed', 'support', 'balanced'].includes(String(robot.role).toLowerCase()) && (
+                                {robot.role && ['assault', 'tank', 'sniper', 'support', 'trickster', 'striker', 'speed', 'balanced', 'balance', 'tricky', 'attacker'].includes(String(robot.role).toLowerCase()) && (
                                     <span className="px-1.5 py-0.5 border rounded text-[10px] uppercase font-orbitron tracking-wider bg-black/60 backdrop-blur-sm border-white/30 text-white/80 shadow-sm">
                                         {String(robot.role).toUpperCase()}
                                     </span>

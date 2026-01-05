@@ -176,18 +176,25 @@ const getUserCredits = (user: any): number => {
   return typeof credits === "number" ? credits : 0;
 };
 
-// ロボット生成API
-const FREE_DAILY_LIMIT = 5;      // Free users: 5 scans/day
-const PREMIUM_DAILY_LIMIT = 9999; // Premium users: effectively unlimited
-
-export const generateRobot = functions.https.onCall(async (data: GenerateRobotRequest, context): Promise<GenerateRobotResponse> => {
-  // 認証チェック
+// [Refactor A01] Centralized Auth Helper
+// Ensures consistent error handling and type narrowing for auth
+const assertAuth = (context: functions.https.CallableContext) => {
   if (!context.auth) {
     throw new functions.https.HttpsError(
       'unauthenticated',
       'The function must be called while authenticated.'
     );
   }
+  return context.auth;
+};
+
+// ロボット生成API
+const FREE_DAILY_LIMIT = 5;      // Free users: 5 scans/day
+const PREMIUM_DAILY_LIMIT = 9999; // Premium users: effectively unlimited
+
+export const generateRobot = functions.https.onCall(async (data: GenerateRobotRequest, context): Promise<GenerateRobotResponse> => {
+  // 認証チェック
+  const auth = assertAuth(context);
 
   const { barcode } = data ?? {};
 
@@ -200,7 +207,7 @@ export const generateRobot = functions.https.onCall(async (data: GenerateRobotRe
   }
 
   try {
-    const userId = context.auth.uid;
+    const userId = auth.uid;
     const db = admin.firestore();
     const userRef = db.collection('users').doc(userId);
     const robotRef = userRef.collection('robots').doc(barcode);
@@ -316,9 +323,7 @@ export const generateRobot = functions.https.onCall(async (data: GenerateRobotRe
 
 // ScanToken issuance (daily per barcode)
 export const awardScanToken = functions.https.onCall(async (data: any, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Auth required');
-  }
+  const auth = assertAuth(context);
 
   const barcode = data?.barcode;
   if (typeof barcode !== 'string') {
@@ -331,7 +336,7 @@ export const awardScanToken = functions.https.onCall(async (data: any, context) 
     throw new functions.https.HttpsError('invalid-argument', 'Invalid barcode');
   }
 
-  const userId = context.auth.uid;
+  const userId = auth.uid;
   const db = admin.firestore();
   const userRef = db.collection('users').doc(userId);
   const dateKey = getJstDateKey();
@@ -410,20 +415,20 @@ const RARITY_CREDIT_VALUE: Record<string, number> = {
 
 // 一括分解API
 export const batchDisassemble = functions.https.onCall(async (data: { robotIds: string[] }, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Auth required');
-  }
+  const auth = assertAuth(context);
 
   const { robotIds } = data;
   if (!Array.isArray(robotIds) || robotIds.length === 0) {
     throw new functions.https.HttpsError('invalid-argument', 'robotIds must be a non-empty array');
   }
 
-  if (robotIds.length > 50) {
+  // [Refactor S01] Deduplicate IDs to prevent credit farming exploit
+  const uniqueIds = [...new Set(robotIds)];
+  if (uniqueIds.length > 50) {
     throw new functions.https.HttpsError('invalid-argument', 'Cannot disassemble more than 50 robots at once');
   }
 
-  const userId = context.auth.uid;
+  const userId = auth.uid;
   const db = admin.firestore();
 
   try {
@@ -431,7 +436,7 @@ export const batchDisassemble = functions.https.onCall(async (data: { robotIds: 
     let deletedCount = 0;
 
     await db.runTransaction(async (transaction) => {
-      const robotRefs = robotIds.map(id =>
+      const robotRefs = uniqueIds.map(id =>
         db.collection('users').doc(userId).collection('robots').doc(id)
       );
 
@@ -482,9 +487,7 @@ const getFamilyFromBarcode = (barcode: string): number => {
 
 export const evolveRobot = functions.https.onCall(async (data: { targetBarcode: string, materialBarcodes: string[] }, context) => {
   // 1. Auth check
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'ログインしてください');
-  }
+  const auth = assertAuth(context);
 
   const { targetBarcode, materialBarcodes } = data ?? {};
 
@@ -518,7 +521,7 @@ export const evolveRobot = functions.https.onCall(async (data: { targetBarcode: 
     throw new functions.https.HttpsError('invalid-argument', 'ターゲットを素材にはできません');
   }
 
-  const userId = context.auth.uid;
+  const userId = auth.uid;
   const db = admin.firestore();
   const robotsRef = db.collection('users').doc(userId).collection('robots');
 
@@ -756,13 +759,11 @@ const stripItemFields = (log: Record<string, any>) => {
 };
 
 export const matchBattle = functions.https.onCall(async (data: any, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Auth required');
-  }
+  const auth = assertAuth(context);
 
   const { playerRobotId, useItemId, cheer, battleItems, fighterRef, specialInput } = data;
   const pFighterRef = fighterRef || { kind: 'robot', id: playerRobotId };
-  const userId = context.auth.uid;
+  const userId = auth.uid;
   const db = admin.firestore();
 
   // アイテムID検証

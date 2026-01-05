@@ -1,8 +1,15 @@
 /**
  * Phase B: Special Moves System
  * 
- * Implements role-based special moves that trigger once per battle at HP <= 40%
+ * Implements role-based special moves that trigger once per battle at HP <= 50%
  * All special moves are deterministic (triggered by HP threshold, not random)
+ * 
+ * Role Mapping:
+ * - ASSAULT → burst (メガブレイク): 1.35x damage
+ * - TANK → guard (アイアンバリア): 0.7x damage taken
+ * - SNIPER → accel (ヘッドショット): 1.15x + guaranteed crit
+ * - SUPPORT → heal (リペアパルス): 8% HP recovery
+ * - TRICKSTER → focus (シグナルジャム): enemy next attack 0.85x
  */
 
 import { RobotRole, PhaseBSpecialType, getSpecialMoveForRole } from './robotRoles';
@@ -14,49 +21,68 @@ export interface SpecialMoveEffect {
     trigger: (currentHp: number, maxHp: number) => boolean;
 }
 
+// HP threshold for special move activation (50%)
+const SPECIAL_HP_THRESHOLD = 0.5;
+
 /**
  * Special Move Definitions (Phase B)
+ * 
+ * Effects are conservative to avoid breaking balance:
+ * - burst: 1.35x (single hit, clear impact)
+ * - guard: 0.7x damage taken (one-time shield)
+ * - accel: 1.15x + guaranteed crit (sniper precision)
+ * - heal: 8% HP recovery (emergency sustain)
+ * - focus: enemy debuff 0.85x (disruption)
  */
 export const PHASE_B_SPECIAL_MOVES: Record<PhaseBSpecialType, SpecialMoveEffect> = {
     burst: {
         type: 'burst',
-        name: 'バースト',
+        name: 'メガブレイク',
         description: '次の攻撃が1.35倍',
-        trigger: (hp, maxHp) => hp <= maxHp * 0.4
+        trigger: (hp, maxHp) => hp <= maxHp * SPECIAL_HP_THRESHOLD
     },
     guard: {
         type: 'guard',
-        name: 'アイアンウォール',
-        description: '次の被ダメージ50%軽減',
-        trigger: (hp, maxHp) => hp <= maxHp * 0.4
+        name: 'アイアンバリア',
+        description: '次の被ダメージ30%軽減',
+        trigger: (hp, maxHp) => hp <= maxHp * SPECIAL_HP_THRESHOLD
     },
     heal: {
         type: 'heal',
-        name: 'ヒール',
-        description: '最大HPの15%回復',
-        trigger: (hp, maxHp) => hp <= maxHp * 0.4
+        name: 'リペアパルス',
+        description: '最大HPの8%回復',
+        trigger: (hp, maxHp) => hp <= maxHp * SPECIAL_HP_THRESHOLD
     },
     accel: {
         type: 'accel',
-        name: 'アクセル',
-        description: 'このターン2回攻撃',
-        trigger: (hp, maxHp) => hp <= maxHp * 0.4
+        name: 'ヘッドショット',
+        description: '1.15倍+クリティカル確定',
+        trigger: (hp, maxHp) => hp <= maxHp * SPECIAL_HP_THRESHOLD
     },
     focus: {
         type: 'focus',
-        name: 'フォーカス',
-        description: '3ターンATK+30%',
-        trigger: (hp, maxHp) => hp <= maxHp * 0.4
+        name: 'シグナルジャム',
+        description: '相手の次攻撃0.85倍',
+        trigger: (hp, maxHp) => hp <= maxHp * SPECIAL_HP_THRESHOLD
     }
 };
 
 /**
  * Get special move for a robot's role
+ * Supports both old (striker, tank, speed, support, balanced) and 
+ * new (ASSAULT, TANK, SNIPER, SUPPORT, TRICKSTER) role names
  */
 export function getSpecialMove(role?: RobotRole | any): SpecialMoveEffect | null {
     if (!role || typeof role !== 'string') return null;
 
-    // Check if it's a Phase B role
+    // Map new role names to special types
+    const roleUppercase = role.toUpperCase();
+    if (['ASSAULT', 'TANK', 'SNIPER', 'SUPPORT', 'TRICKSTER'].includes(roleUppercase)) {
+        const specialType = getSpecialMoveForRole(roleUppercase as RobotRole);
+        return PHASE_B_SPECIAL_MOVES[specialType];
+    }
+
+    // Legacy role names support
     if (['striker', 'tank', 'speed', 'support', 'balanced'].includes(role)) {
         const specialType = getSpecialMoveForRole(role as RobotRole);
         return PHASE_B_SPECIAL_MOVES[specialType];
@@ -85,57 +111,78 @@ export function shouldTriggerSpecial(
 /**
  * Apply special move effects
  * Returns modified stats/state
+ * 
+ * Updated effects:
+ * - burst (ASSAULT): 1.35x damage multiplier
+ * - guard (TANK): 0.7x damage taken (30% reduction)
+ * - accel (SNIPER): 1.15x + guaranteed critical
+ * - heal (SUPPORT): 8% HP recovery
+ * - focus (TRICKSTER): enemy's next attack 0.85x
  */
 export interface SpecialEffectResult {
-    damageMultiplier?: number;      // For burst (1.35x)
-    defenseMultiplier?: number;     // For guard (0.5x damage taken)
-    healAmount?: number;            // For heal (maxHp * 0.15)
-    extraAttack?: boolean;          // For accel (attack again)
-    temporaryAtkBoost?: number;     // For focus (+30% ATK for 3 turns)
-    message: string;                // Log message
+    damageMultiplier?: number;       // For burst (1.35x) and accel (1.15x)
+    defenseMultiplier?: number;      // For guard (0.7x damage taken)
+    healAmount?: number;             // For heal (maxHp * 0.08)
+    guaranteedCrit?: boolean;        // For accel (sniper precision)
+    enemyDebuff?: number;            // For focus (enemy attack 0.85x)
+    message: string;                 // Log message
+    impactText: string;              // Short impact description for UI
 }
 
 export function applySpecialEffect(
     specialType: PhaseBSpecialType,
     maxHp: number,
-    currentAtk: number
+    _currentAtk: number
 ): SpecialEffectResult {
     const special = PHASE_B_SPECIAL_MOVES[specialType];
 
     switch (specialType) {
         case 'burst':
+            // ASSAULT: メガブレイク - 1.35x damage
             return {
                 damageMultiplier: 1.35,
-                message: `必殺技！${special.name}発動！次の攻撃が強化される！`
+                message: `【必殺】${special.name}発動！`,
+                impactText: '大ダメージ'
             };
 
         case 'guard':
+            // TANK: アイアンバリア - 30% damage reduction (0.7x)
             return {
-                defenseMultiplier: 0.5,
-                message: `必殺技！${special.name}発動！防御態勢を固めた！`
+                defenseMultiplier: 0.7,
+                message: `【必殺】${special.name}発動！`,
+                impactText: '軽減'
             };
 
         case 'heal':
+            // SUPPORT: リペアパルス - 8% HP recovery
             return {
-                healAmount: Math.floor(maxHp * 0.15),
-                message: `必殺技！${special.name}発動！HPが回復した！`
+                healAmount: Math.floor(maxHp * 0.08),
+                message: `【必殺】${special.name}発動！`,
+                impactText: '回復'
             };
 
         case 'accel':
+            // SNIPER: ヘッドショット - 1.15x + guaranteed crit
             return {
-                extraAttack: true,
-                message: `必殺技！${special.name}発動！連続攻撃の構え！`
+                damageMultiplier: 1.15,
+                guaranteedCrit: true,
+                message: `【必殺】${special.name}発動！`,
+                impactText: '必中クリティカル'
             };
 
         case 'focus':
+            // TRICKSTER: シグナルジャム - enemy attack 0.85x
             return {
-                temporaryAtkBoost: Math.floor(currentAtk * 0.3),
-                message: `必殺技！${special.name}発動！攻撃力が上昇した！`
+                enemyDebuff: 0.85,
+                message: `【必殺】${special.name}発動！`,
+                impactText: '妨害'
             };
 
         default:
             return {
-                message: `必殺技発動！`
+                message: `【必殺】発動！`,
+                impactText: '特殊効果'
             };
     }
 }
+

@@ -164,9 +164,9 @@ export default function Battle() {
   };
 
   const selectedVariant = variants.find(v => v.id === selectedRobotId);
-  const myRobot = robots.find(r => r.id === selectedRobotId)
-    || (selectedVariant ? { ...selectedVariant, name: selectedVariant.name || `Variant ${selectedRobotId?.slice(0, 4)}`, rarityName: 'Fusion', baseHp: 100, baseAttack: 50, baseDefense: 50, baseSpeed: 50 } as unknown as RobotData : null)
-    || battleResult?.resolvedPlayerRobot;
+  const myRobot = battleResult?.resolvedPlayerRobot
+    || robots.find(r => r.id === selectedRobotId)
+    || (selectedVariant ? { ...selectedVariant, name: selectedVariant.name || `Variant ${selectedRobotId?.slice(0, 4)}`, rarityName: 'Fusion', baseHp: 100, baseAttack: 50, baseDefense: 50, baseSpeed: 50 } as unknown as RobotData : null);
 
   // Use hook's resolved enemy if battling, otherwise use selection from training list or default logic
   const enemyRobot = isBattling ? resolvedEnemyRobot : (enemyRobots.find(r => r.id === enemyRobotId) || robots.find(r => r.id === enemyRobotId));
@@ -380,6 +380,7 @@ export default function Battle() {
                                 animate={false}
                                 role={typeof robot.role === 'string' ? robot.role : undefined}
                                 rarityEffect={robot.rarityTier === 'legendary' ? 'legendary' : (robot.rarityTier === 'rare' ? 'rare' : undefined)}
+                                renderQuality="list"
                               />
                             </div>
                             <div className="flex-1 min-w-0">

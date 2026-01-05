@@ -313,11 +313,16 @@ export const translations = {
 
     // Robot Roles
     role_label: "ロール",
-    role_attacker: "アタッカー",
+    role_assault: "アサルト",
     role_tank: "タンク",
-    role_speed: "スピード",
-    role_balance: "バランス",
-    role_tricky: "トリッキー",
+    role_sniper: "スナイパー",
+    role_support: "サポート",
+    role_trickster: "トリックスター",
+    role_desc_assault: "攻撃型",
+    role_desc_tank: "防御型",
+    role_desc_sniper: "速攻型",
+    role_desc_support: "支援型",
+    role_desc_trickster: "妨害型",
 
     // Common UI (Unique)
     rookie: "ルーキー",
@@ -694,6 +699,25 @@ export const translations = {
     dex_hint_workshop: "このレアなロボットはワークショップで\n合体してゲットできるかも！？",
     dex_btn_scan: "スキャンへ移動",
     dex_btn_workshop: "ワークショップへ移動",
+
+    // HowTo: Detailed Battle Guide
+    howto_battle_mode_title: "バトルの 種類",
+    howto_battle_auto: "オートバトル (Auto)",
+    howto_battle_auto_desc: "基本はオート！ロボットが自分で考えて戦います。\n(Robots fight automatically based on their stats/AI)",
+    howto_battle_manual: "マニュアル介入 (Manual)",
+    howto_battle_manual_desc: "「アイテム」や「応援」でプレイヤーが戦闘をサポートできます。",
+    howto_support_item: "アイテム使用",
+    howto_support_item_desc: "HP回復や攻撃力アップなど、戦況を変えるアイテムを使えます。",
+    howto_support_cheer: "応援 (Cheer)",
+    howto_support_cheer_desc: "強敵とのバトルでは「応援」タップでステータスが一時的に上昇！\n(Tap Cheer button to boost stats temporarily!)",
+    howto_overdrive_title: "必殺技 (Overdrive)",
+    howto_overdrive_detail: "ターン経過でゲージが溜まると、強力な必殺技が自動発動します。",
+
+    // HowTo: Features System
+    howto_workshop_fusion: "融合 (Fusion)",
+    howto_workshop_fusion_detail: "所持しているロボット2体を組み合わせて、新しい見た目のバリアントを作成します。ステータスは両親の平均を引き継ぎます。",
+    howto_shop_title: "ショップ (Shop)",
+    howto_shop_detail: "バトルで獲得したチップやクレジットで、強化アイテムやスキャン回数回復を購入できます。",
   },
   en: {
     // Common
@@ -793,6 +817,25 @@ export const translations = {
     exp_gained: "EXP Gained",
     level_up: "LEVEL UP! Stats Increased!",
     new_skill: "New Skill Learned",
+
+    // HowTo: Detailed Battle Guide
+    howto_battle_mode_title: "Battle Modes",
+    howto_battle_auto: "Auto Battle",
+    howto_battle_auto_desc: "Robots fight automatically based on their stats and AI.",
+    howto_battle_manual: "Manual Support",
+    howto_battle_manual_desc: "Support your robot using Items and Cheer commands.",
+    howto_support_item: "Use Items",
+    howto_support_item_desc: "Use recovery or boost items to change the tide of battle.",
+    howto_support_cheer: "Cheer Command",
+    howto_support_cheer_desc: "Tap 'Cheer' to temporarily boost your robot's stats!",
+    howto_overdrive_title: "Overdrive",
+    howto_overdrive_detail: "Powerful special moves activate automatically when the gauge fills.",
+
+    // HowTo: Features System
+    howto_workshop_fusion: "Fusion",
+    howto_workshop_fusion_detail: "Combine two robots to create a visual variant. Stats are averaged from parents.",
+    howto_shop_title: "Shop",
+    howto_shop_detail: "Purchase upgrade items and refill scans using Chips and Credits.",
     skill_upgraded: "Skill Upgraded",
     turn: "Turn",
     critical: "CRITICAL!",

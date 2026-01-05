@@ -1,6 +1,7 @@
 import { Link } from "wouter";
-import { ArrowLeft, ScanLine, Swords, Factory, HelpCircle, Layers, TrendingUp, Trophy, ScanBarcode, Zap, Users } from "lucide-react";
+import { ArrowLeft, ScanLine, Swords, Factory, HelpCircle, Layers, TrendingUp, Trophy, ScanBarcode, Zap, Users, RefreshCw, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Interactive } from "@/components/ui/interactive";
 import SEO from "@/components/SEO";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { TechCard } from "@/components/ui/TechCard";
@@ -114,21 +115,48 @@ export default function HowTo() {
                   {t('howto_step2_note2')}
                 </li>
               </ul>
-              <div className="p-3 rounded-lg bg-pink-500/10 border border-pink-500/20 text-xs text-pink-200/90 space-y-2">
-                <div className="font-bold flex items-center gap-1.5 text-pink-300">
-                  <Zap className="w-3.5 h-3.5" />
-                  ひっさつわざ (Overdrive)
+              <div className="space-y-3 pt-2">
+                <h3 className="font-orbitron text-pink-400 border-l-2 border-pink-500 pl-2">
+                  {t('howto_battle_mode_title')}
+                </h3>
+
+                {/* Auto Mode */}
+                <div className="p-3 rounded-lg bg-pink-500/10 border border-pink-500/20 text-xs text-pink-200/90">
+                  <div className="font-bold flex items-center gap-1.5 text-pink-300 mb-1">
+                    <Swords className="w-3.5 h-3.5" />
+                    {t('howto_battle_auto')}
+                  </div>
+                  <p>{t('howto_battle_auto_desc')}</p>
                 </div>
-                <p>
-                  バトルがはじまるまえに「ひっさつわざ」をONにしよう。ゲージがたまったときに、すごいわざが はつどうするよ！
-                </p>
-                <div className="font-bold flex items-center gap-1.5 text-pink-300 pt-1">
-                  <Users className="w-3.5 h-3.5" />
-                  サポート (Support)
+
+                {/* Manual Mode */}
+                <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/20 text-xs text-purple-200/90 space-y-2">
+                  <div className="font-bold flex items-center gap-1.5 text-purple-300 mb-1">
+                    <Users className="w-3.5 h-3.5" />
+                    {t('howto_battle_manual')}
+                  </div>
+                  <p>{t('howto_battle_manual_desc')}</p>
+
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    <div className="bg-black/20 p-2 rounded border border-purple-500/10">
+                      <div className="text-purple-300 font-bold mb-0.5 text-[10px]">{t('howto_support_item')}</div>
+                      <div className="text-[10px] opacity-80 leading-tight">{t('howto_support_item_desc')}</div>
+                    </div>
+                    <div className="bg-black/20 p-2 rounded border border-purple-500/10">
+                      <div className="text-purple-300 font-bold mb-0.5 text-[10px]">{t('howto_support_cheer')}</div>
+                      <div className="text-[10px] opacity-80 leading-tight">{t('howto_support_cheer_desc')}</div>
+                    </div>
+                  </div>
                 </div>
-                <p>
-                  「おうえんプロトコル」をつかうと、ロボットの ステータスが パワーアップするよ！ つよいあいてと たたかうときに つかってみよう。
-                </p>
+
+                {/* Overdrive */}
+                <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-xs text-yellow-200/90">
+                  <div className="font-bold flex items-center gap-1.5 text-yellow-400 mb-1">
+                    <Zap className="w-3.5 h-3.5" />
+                    {t('howto_overdrive_title')}
+                  </div>
+                  <p>{t('howto_overdrive_detail')}</p>
+                </div>
               </div>
               <Link href="/battle">
                 <Button className="w-full bg-linear-to-r from-pink-600 to-pink-500 hover:from-pink-500 hover:to-pink-400 text-white font-bold tracking-wider shadow-[0_0_15px_rgba(236,72,153,0.4)] border-none mt-2 h-10">
@@ -227,6 +255,29 @@ export default function HowTo() {
               </p>
             </div>
           </div>
+        </div>
+
+        {/* Detailed Features Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Interactive className="relative overflow-hidden rounded-xl border border-purple-500/30 bg-black/40 backdrop-blur-sm p-4 hover:border-purple-500/60 transition-colors">
+            <div className="flex items-center gap-2 mb-2 font-orbitron text-purple-400 font-bold">
+              <RefreshCw className="w-4 h-4" />
+              {t('howto_workshop_fusion')}
+            </div>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              {t('howto_workshop_fusion_detail')}
+            </p>
+          </Interactive>
+
+          <Interactive className="relative overflow-hidden rounded-xl border border-yellow-500/30 bg-black/40 backdrop-blur-sm p-4 hover:border-yellow-500/60 transition-colors">
+            <div className="flex items-center gap-2 mb-2 font-orbitron text-yellow-500 font-bold">
+              <ShoppingBag className="w-4 h-4" />
+              {t('howto_shop_title')}
+            </div>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              {t('howto_shop_detail')}
+            </p>
+          </Interactive>
         </div>
 
         {/* Level Up Methods */}

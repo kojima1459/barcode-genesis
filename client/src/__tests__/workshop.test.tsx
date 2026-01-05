@@ -4,7 +4,7 @@ import { createVariantDoc, getFirestoreMock, renderWithRouter, setAuthState } fr
 
 // TODO: Tests fail due to Workshop async loading state timing in JSDOM.
 // Production functionality verified manually.
-describe.skip("Workshop UI", () => {
+describe("Workshop UI", () => {
   const uid = "user-456";
 
   it("renders variants read-only and updates via realtime snapshots", async () => {

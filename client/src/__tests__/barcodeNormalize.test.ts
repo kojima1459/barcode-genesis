@@ -13,25 +13,25 @@ import {
 
 // TODO: Tests fail due to module mock conflicts when run with full test suite.
 // Individual runs pass. Production functionality verified.
-describe.skip('barcodeNormalize', () => {
+describe('barcodeNormalize', () => {
     describe('ean13CheckDigit', () => {
         it('should calculate correct check digit for valid payload', () => {
-            // 4901234567890 → check digit = 0
-            expect(ean13CheckDigit('490123456789')).toBe('0');
-            // 4902430401131 → check digit = 1
-            expect(ean13CheckDigit('490243040113')).toBe('1');
+            // 490123456789 -> check digit = 4 (Sum 126)
+            expect(ean13CheckDigit('490123456789')).toBe('4');
+            // 490243040113 -> check digit = 5 (Sum 75)
+            expect(ean13CheckDigit('490243040113')).toBe('5');
         });
     });
 
     describe('isValidEan13', () => {
         it('should return true for valid EAN-13', () => {
-            expect(isValidEan13('4901234567890')).toBe(true);
-            expect(isValidEan13('4902430401131')).toBe(true);
+            expect(isValidEan13('4901234567894')).toBe(true);
+            expect(isValidEan13('4902430401135')).toBe(true);
         });
 
         it('should return false for invalid EAN-13 (wrong check digit)', () => {
-            expect(isValidEan13('4901234567891')).toBe(false);
-            expect(isValidEan13('4902430401132')).toBe(false);
+            expect(isValidEan13('4901234567890')).toBe(false);
+            expect(isValidEan13('4902430401131')).toBe(false);
         });
 
         it('should return false for wrong length', () => {
@@ -56,6 +56,9 @@ describe.skip('barcodeNormalize', () => {
             const ean8 = '49123456';
             const ean13 = ean8ToEan13(ean8);
             // "00000" + "4912345" = "000004912345" + checkDigit
+            // Payload: 000004912345
+            // Calc: 0+0+0+0+0+4 + 9*3 + 1*1 + 2*3 + 3*1 + 4*3 + 5*1
+            // 4 + 27 + 1 + 6 + 3 + 12 + 5 = 58. Check = 2.
             expect(ean13.length).toBe(13);
             expect(ean13.startsWith('00000')).toBe(true);
             // Same input should always produce same output (deterministic)
@@ -65,10 +68,10 @@ describe.skip('barcodeNormalize', () => {
 
     describe('normalizeToEan13', () => {
         it('should pass through valid EAN-13', () => {
-            const result = normalizeToEan13('4901234567890');
+            const result = normalizeToEan13('4901234567894');
             expect(result.ok).toBe(true);
             if (result.ok) {
-                expect(result.ean13).toBe('4901234567890');
+                expect(result.ean13).toBe('4901234567894');
                 expect(result.kind).toBe('EAN13');
             }
         });
@@ -93,7 +96,7 @@ describe.skip('barcodeNormalize', () => {
         });
 
         it('should reject invalid EAN-13 check digit', () => {
-            const result = normalizeToEan13('4901234567891');
+            const result = normalizeToEan13('4901234567897');
             expect(result.ok).toBe(false);
             if (!result.ok) {
                 expect(result.reason).toContain('チェックデジット');
@@ -109,10 +112,10 @@ describe.skip('barcodeNormalize', () => {
         });
 
         it('should clean non-digit characters', () => {
-            const result = normalizeToEan13('4901-2345-6789-0');
+            const result = normalizeToEan13('4901-2345-6789-4');
             expect(result.ok).toBe(true);
             if (result.ok) {
-                expect(result.ean13).toBe('4901234567890');
+                expect(result.ean13).toBe('4901234567894');
             }
         });
 

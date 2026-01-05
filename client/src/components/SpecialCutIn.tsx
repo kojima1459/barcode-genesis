@@ -43,13 +43,18 @@ const SpecialCutIn = memo(({
     const isOverdrive = overdriveTriggered;
     const isSpecial = specialTriggered && !overdriveTriggered;
 
+    // Role badge (《アサルト》 style)
+    const roleBadge = isSpecial && specialRoleName ? `《${specialRoleName}》` : "";
+
+    // Main move name
     const mainText = isOverdrive
         ? (overdriveMessage || t('label_overdrive'))
         : isSpecial
-            ? `${specialRoleName || ''} ${specialName || t('label_special')}`.trim()
+            ? (specialName || t('label_special'))
             : "";
 
-    const subText = isSpecial && specialImpact ? specialImpact : "";
+    // Impact description (【大ダメージ】 style)
+    const subText = isSpecial && specialImpact ? `【${specialImpact}】` : "";
     const hitsText = isSpecial && specialHits && specialHits > 1 ? `×${specialHits}` : "";
 
     const colorClass = isOverdrive
@@ -100,6 +105,18 @@ const SpecialCutIn = memo(({
                         transition={{ type: "spring", stiffness: 300, damping: 25 }}
                         className="relative z-10 text-center px-4"
                     >
+                        {/* Role Badge (《アサルト》) */}
+                        {roleBadge && (
+                            <motion.div
+                                initial={{ opacity: 0, y: -10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.05 }}
+                                className="text-lg sm:text-xl text-cyan-300/90 mb-1 tracking-[0.3em]"
+                            >
+                                {roleBadge}
+                            </motion.div>
+                        )}
+
                         {/* Robot Name */}
                         {robotName && (
                             <motion.div
@@ -128,13 +145,13 @@ const SpecialCutIn = memo(({
                             )}
                         </motion.div>
 
-                        {/* Sub Text (Impact) */}
+                        {/* Sub Text (Impact) - 【大ダメージ】 */}
                         {subText && (
                             <motion.div
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: 0.2 }}
-                                className="text-lg sm:text-xl text-white/80 mt-3 font-mono"
+                                className="text-lg sm:text-2xl text-yellow-400 mt-3 font-bold tracking-wide"
                             >
                                 {subText}
                             </motion.div>

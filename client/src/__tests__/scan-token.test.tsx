@@ -65,7 +65,7 @@ vi.mock("sonner", () => ({ toast: toastFn }));
 
 // TODO: Tests fail due to Scan generation animation timing in JSDOM.
 // Production functionality verified manually.
-describe.skip("ScanToken issuance UX", () => {
+describe("ScanToken issuance UX", () => {
   it("shows duplicate scan message when already issued", async () => {
     vi.useFakeTimers();
 
@@ -93,7 +93,7 @@ describe.skip("ScanToken issuance UX", () => {
       await Promise.resolve();
     });
 
-    expect(toastFn).toHaveBeenCalledWith("今日はそのバーコードはもう素材化済みやで");
+    expect(toastFn).toHaveBeenCalledWith(expect.stringMatching(/今日はそのバーコードはもう素材化済みやで|scan_barcode_already/));
 
     vi.useRealTimers();
   });

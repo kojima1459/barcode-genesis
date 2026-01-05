@@ -12,7 +12,7 @@ vi.mock("sonner", () => ({ toast: toastFn }));
 
 // TODO: Tests fail due to AppShell async login state timing in JSDOM.
 // Production functionality verified manually.
-describe.skip("daily login display + toast", () => {
+describe.skip('Daily Login Bonus', () => {
   it("shows title and streak and fires toast on claim", async () => {
     const uid = "user-streak-1";
     setAuthState({ user: { uid }, loading: false });

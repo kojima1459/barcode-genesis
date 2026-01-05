@@ -17,10 +17,13 @@ import { AnimatedHPBar } from "@/components/AnimatedHPBar";
 import { VictoryEffect, DefeatEffect } from "@/components/BattleResultEffects";
 import { useScreenShake } from "@/hooks/useScreenShake";
 import { EnhancedDamageNumber } from "@/components/EnhancedDamageNumber";
-import { playSfx, setMuted as setSfxMuted, getMuted as getSfxMuted, setSkipMode, clearPlayedKeys, SfxName } from "@/lib/sfx";
+import { playSfx, setMuted as setSfxMuted, getMuted as getSfxMuted, setSkipMode, clearSfxHistory, SfxName } from "@/lib/sfx";
 import { PLAY_STEP_MS, IMPORTANT_EVENT_BONUS_MS, getImpactIntensity, isImportantLog } from "@/lib/battleFx";
 import SpecialCutIn from "@/components/SpecialCutIn";
 import BattleHUDExtended from "@/components/BattleHUDExtended";
+import BattleIntro from "@/components/BattleIntro";
+import SkillBanner from "@/components/SkillBanner";
+import TurnIndicator from "@/components/TurnIndicator";
 
 // ============================================================
 // PURE FUNCTIONS - Single source of truth for HP/Summary/Status/Delay/SE
@@ -242,6 +245,23 @@ const pickSfxForLog = (event: BattleEvent): SfxName | null => {
     return null;
 };
 
+// --- (G) Skill Detection for Skill Banners ---
+const detectSkillName = (message: string): string | null => {
+    if (!message) return null;
+
+    // Japanese skill names (Kanji/Hiragana)
+    if (message.includes('修理') || message.includes('回復')) return '修理';
+    if (message.includes('パワースマッシュ')) return 'パワースマッシュ';
+    if (message.includes('レーザービーム') || message.includes('ビーム')) return 'レーザービーム';
+    if (message.includes('鉄壁') || message.includes('防御')) return '鉄壁';
+    if (message.includes('チャージ')) return 'チャージ';
+    if (message.includes('ジャミング')) return 'ジャミング';
+    if (message.includes('ダブルストライク')) return 'ダブルストライク';
+    if (message.includes('回避')) return '回避';
+
+    return null;
+};
+
 // --- Speed persistence (localStorage) ---
 const SPEED_STORAGE_KEY = 'battle_speed';
 
@@ -401,6 +421,7 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
     }>({});
     const prefersReducedMotion = useReducedMotion();
     const [showSpecialOverlay, setShowSpecialOverlay] = useState(false);
+    const [showDarkenOverlay, setShowDarkenOverlay] = useState(false);  // Brief darkening before special
     const [replayError, setReplayError] = useState<string | null>(null);
     const [pauseTick, setPauseTick] = useState(0);
     const [devCrashNotice, setDevCrashNotice] = useState<string | null>(null);
@@ -421,6 +442,14 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
     const [hpDeltas, setHpDeltas] = useState<Record<string, { value: number, isCritical: boolean, type: 'damage' | 'heal', id: number } | null>>({});
     const [summaryText, setSummaryText] = useState("");
 
+    // Battle Intro & Skill Banner State
+    const [showIntro, setShowIntro] = useState(true);
+    const [activeSkillBanners, setActiveSkillBanners] = useState<{ id: string, skillName: string, isPlayer: boolean }[]>([]);
+
+    // Turn Indicator State
+    const [showTurnIndicator, setShowTurnIndicator] = useState(false);
+    const [displayTurn, setDisplayTurn] = useState(1);
+
     // Memoized filtered popups (must be before any conditional returns)
     const p1Popups = useMemo(() => p1?.id ? popups.filter(p => p.targetId === p1.id) : [], [popups, p1?.id]);
     const p2Popups = useMemo(() => p2?.id ? popups.filter(p => p.targetId === p2.id) : [], [popups, p2?.id]);
@@ -439,8 +468,8 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
     useEffect(() => {
         if (!mountedRef.current) return;
 
-        // Reset SFX state for new battle
-        clearPlayedKeys();
+        // Reset SFX state for new battle (with ID check to prevent loops)
+        clearSfxHistory(result.battleId);
         setSkipMode(false);
 
         // Filter out START log for visual timeline
@@ -674,6 +703,12 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
                 // Process Event Side Effects
                 switch (event.type) {
                     case 'SPECIAL_CUT_IN': {
+                        // Brief darkening effect (80ms)
+                        if (!prefersReducedMotion) {
+                            setShowDarkenOverlay(true);
+                            scheduleTimeout(() => setShowDarkenOverlay(false), 80);
+                        }
+
                         // Show cut-in overlay
                         const attackerRobot = event.attackerId === p1.id ? p1 : p2;
                         setCutInData({
@@ -687,8 +722,13 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
                             specialHits: event.specialHits
                         });
                         setShowCutIn(true);
-                        // Play special SFX
-                        playSfx('ult');
+
+                        // Play special SFX (suppress during skip mode)
+                        if (!isSkipped) {
+                            playSfx('ult', {
+                                uniqueKey: `ult-${result.battleId}-${currentEventIndex}`
+                            });
+                        }
                         shake({ intensity: 'medium', duration: 400 });
                         // Auto-hide after delay
                         scheduleTimeout(() => setShowCutIn(false), (event.delay || 650) / speed);
@@ -715,6 +755,19 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
                             if (isHighlight) {
                                 setActiveMessage(event.message);
                                 setHighlightMessages(prev => [...prev, event.message!].slice(-5));
+                            }
+
+                            // Detect and trigger skill banner
+                            const skillName = detectSkillName(event.message);
+                            if (skillName && event.attackerId) {
+                                const isPlayer = event.attackerId === p1?.id;
+                                const bannerId = `skill-${currentEventIndex}-${Date.now()}`;
+                                setActiveSkillBanners(prev => [...prev, { id: bannerId, skillName, isPlayer }]);
+
+                                // Auto-remove after 1.1s
+                                scheduleTimeout(() => {
+                                    setActiveSkillBanners(prev => prev.filter(b => b.id !== bannerId));
+                                }, 1100);
                             }
                         }
                         if (event.attackerId) {
@@ -763,7 +816,10 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
                             }
 
                             if (event.cheerApplied) {
-                                scheduleTimeout(() => playSfx('cheer', { volume: 0.6 }), 100);
+                                scheduleTimeout(() => playSfx('cheer', {
+                                    volume: 0.6,
+                                    uniqueKey: `cheer-${result.battleId}-${currentEventIndex}`
+                                }), 100);
                             }
                         }
                         break;
@@ -841,7 +897,15 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
                     }
 
                     case 'PHASE_START':
-                        if (event.turn) setCurrentTurn(event.turn);
+                        if (event.turn) {
+                            setCurrentTurn(event.turn);
+                            // Trigger turn indicator overlay (every 5 turns for less cluttering)
+                            if (event.turn % 5 === 0 || event.turn === 1) {
+                                setDisplayTurn(event.turn);
+                                setShowTurnIndicator(true);
+                                scheduleTimeout(() => setShowTurnIndicator(false), 1300);
+                            }
+                        }
                         break;
                 }
 
@@ -870,11 +934,19 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
         setSkipMode(false);
 
         const isWin = result.winnerId === p1.id;
+
+        // Force visual HP to 0 for the loser (to prevent "HP remaining but dead" confusion)
+        setHp(prev => ({
+            ...prev,
+            [isWin ? p2.id : p1.id]: 0
+        }));
+
         // Play victory/defeat SFX (with uniqueKey to prevent duplicate plays)
         if (isWin) {
             playSfx('win', { volume: 0.8, uniqueKey: `battle-${result.battleId}-win` });
         } else {
             playSfx('lose', { volume: 0.7, uniqueKey: `battle-${result.battleId}-lose` });
+            // Also play "Yattane" (cheer) if Win? No, user complained about loop.
         }
         setIsFinished(true);
     };
@@ -974,6 +1046,19 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
                 </div>
             )}
 
+            {/* Brief darkening flash for special move impact */}
+            <AnimatePresence>
+                {showDarkenOverlay && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 0.8 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.08 }}
+                        className="fixed inset-0 bg-black z-[90] pointer-events-none"
+                    />
+                )}
+            </AnimatePresence>
+
             {/* Special/Overdrive Cut-In Overlay */}
             <SpecialCutIn
                 show={showCutIn}
@@ -987,6 +1072,30 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
                 specialHits={cutInData.specialHits}
                 onComplete={() => setShowCutIn(false)}
             />
+
+            {/* Battle Intro (READY... FIGHT!) */}
+            {showIntro && !isSkipped && (
+                <BattleIntro onComplete={() => setShowIntro(false)} />
+            )}
+
+            {/* Skill Activation Banners */}
+            <AnimatePresence>
+                {activeSkillBanners.map(banner => (
+                    <SkillBanner
+                        key={banner.id}
+                        skillName={banner.skillName}
+                        isPlayer={banner.isPlayer}
+                        onComplete={() => {
+                            setActiveSkillBanners(prev => prev.filter(b => b.id !== banner.id));
+                        }}
+                    />
+                ))}
+            </AnimatePresence>
+
+            {/* Turn Indicator Overlay */}
+            {showTurnIndicator && !isSkipped && (
+                <TurnIndicator turn={displayTurn} onComplete={() => setShowTurnIndicator(false)} />
+            )}
 
             {/* NEW: Fixed Battle HUD */}
             {!isFinished && (
@@ -1317,6 +1426,19 @@ const RobotCard = memo(({ robot, hpPercent, currentHp, isShaking, isLunging, isP
     const status = battleStatus || {};
     const deltas = hpDeltas || {};
 
+    // Status Effect Visual Classes
+    const isStunned = status.stunned && status.defenderId === robot.id;
+    const isGuarded = status.guarded && status.defenderId === robot.id;
+    const isDebuffed = status.bossShieldRemaining !== undefined && status.bossShieldRemaining > 0 && !isPlayer;
+
+    const statusEffectClass = isStunned
+        ? 'animate-pulse brightness-110 saturate-150 hue-rotate-[30deg] drop-shadow-[0_0_20px_rgba(255,255,0,0.8)]'
+        : isGuarded
+            ? 'drop-shadow-[0_0_25px_rgba(0,150,255,0.9)] brightness-110'
+            : isDebuffed
+                ? 'saturate-50 brightness-75 drop-shadow-[0_0_15px_rgba(148,0,211,0.6)]'
+                : '';
+
     return (
         <motion.div
             className={`relative p-6 rounded-xl glass-panel w-full md:w-[45%] ${borderColor} ${shadowColor} transition-colors duration-200`}
@@ -1327,7 +1449,20 @@ const RobotCard = memo(({ robot, hpPercent, currentHp, isShaking, isLunging, isP
                 {isPlayer ? t('player_label').toUpperCase() : t('opponent_label').toUpperCase()}
             </div>
 
-            <div className="flex justify-center my-4">
+            {/* Robot SVG with Status Effect Visuals */}
+            <div className={`flex justify-center my-4 transition-all duration-300 ${statusEffectClass}`}>
+                {/* Stun Effect: Electric spark overlay */}
+                {isStunned && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                        <div className="text-4xl animate-bounce">⚡</div>
+                    </div>
+                )}
+                {/* Guard Effect: Shield overlay */}
+                {isGuarded && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                        <div className="w-40 h-40 rounded-full border-4 border-blue-400/50 animate-pulse" />
+                    </div>
+                )}
                 <RobotSVG
                     parts={robot.parts}
                     colors={robot.colors}

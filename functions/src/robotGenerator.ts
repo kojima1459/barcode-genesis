@@ -7,21 +7,21 @@ const RARITY_NAMES = ["ノーマル", "レア", "スーパーレア", "ウルト
 const ELEMENT_NAMES = ["ファイア", "アクア", "ウィンド", "アース", "ライト", "ダーク", "メカ"];
 const FAMILY_NAMES = ["DRINK", "SNACK", "DAILY", "BEAUTY", "OTHER"];
 
-// ロール定義（アーキタイプ）- Legacy system
+// ロール定義（アーキタイプ）- Legacy system (mapped to new roles)
 const ROLE_NAMES: Record<LegacyRole, string> = {
-  'ATTACKER': 'アサルト', // Was アタッカー
+  'ATTACKER': 'アサルト',
   'TANK': 'タンク',
-  'SPEED': 'ランナー',   // Was スピード
-  'BALANCE': 'サポート', // Was バランス
-  'TRICKY': 'ジャガーノート' // Was トリッキー
+  'SPEED': 'スナイパー',
+  'BALANCE': 'サポート',
+  'TRICKY': 'トリックスター'
 };
 
 const ROLE_TITLES: Record<LegacyRole, string> = {
-  'ATTACKER': '突撃',
-  'TANK': '重装',
-  'SPEED': '疾風',
-  'BALANCE': '支援',
-  'TRICKY': '破壊'
+  'ATTACKER': '攻撃型',
+  'TANK': '防御型',
+  'SPEED': '速攻型',
+  'BALANCE': '支援型',
+  'TRICKY': '妨害型'
 };
 
 // 二つ名リスト (Epithet Prefixes) - Legacy system

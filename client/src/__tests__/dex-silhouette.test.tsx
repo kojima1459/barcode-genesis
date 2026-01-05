@@ -13,7 +13,7 @@ import { renderWithRouter, setAuthState, getFirestoreMock, createRobotDoc } from
 
 // TODO: Tests fail due to AdBanner DOM cleanup issues in JSDOM (DOMException: NotFoundError).
 // Production functionality verified manually - AdBanner error boundary handles gracefully.
-describe.skip("Dex Collection System", () => {
+describe("Dex Collection System", () => {
     beforeEach(() => {
         setAuthState({ user: { uid: "test-user" } });
     });

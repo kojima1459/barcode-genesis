@@ -10,6 +10,7 @@
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { LanguageProvider, useLanguage, LANGUAGE_STORAGE_KEY } from '../contexts/LanguageContext';
+vi.unmock('@/contexts/LanguageContext');
 import React from 'react';
 
 // Mock localStorage
@@ -27,7 +28,7 @@ Object.defineProperty(window, 'localStorage', { value: localStorageMock });
 
 // TODO: Tests fail due to LanguageContext being mocked globally by test-utils.
 // Production functionality verified manually. Context works correctly.
-describe.skip('LanguageContext', () => {
+describe('LanguageContext', () => {
     beforeEach(() => {
         localStorageMock.clear();
         vi.clearAllMocks();

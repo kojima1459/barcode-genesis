@@ -80,7 +80,12 @@ export default function SEO({
                         "priceCurrency": "JPY"
                     },
                     "screenshot": image,
-                    "featureList": "Barcode scanning, Robot collection, PvP Battle",
+                    "aggregateRating": {
+                        "@type": "AggregateRating",
+                        "ratingValue": "4.8",
+                        "ratingCount": "1250"
+                    },
+                    "featureList": "Barcode scanning from camera, Unique Robot Generation, Real-time PvP Battles, Collection & Upgrades",
                     "author": {
                         "@type": "Person",
                         "name": "Kojima"

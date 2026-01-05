@@ -13,6 +13,7 @@ import { calculateEffectiveStatsWithRole } from "./levelSystem";
 import { BossTraits } from "./dailyBoss";
 import { shouldTriggerSpecial, applySpecialEffect, getSpecialMove } from "./lib/phaseBSpecialMoves";
 import { getTerrainFromBarcode, applyTerrainModifiers, getTerrainSpeedModifier, getTerrainDefenseModifier } from "./battleTerrain";
+import { ROLE_LABELS, RobotRole } from "./lib/robotRoles";
 
 const resolveSkills = (skills: RobotData["skills"]): Skill[] => {
   if (!Array.isArray(skills)) return [];
@@ -30,7 +31,24 @@ const resolveSkills = (skills: RobotData["skills"]): Skill[] => {
   return resolved;
 };
 
-const MAX_TURNS = 20;
+const MAX_TURNS = 15;  // Reduced from 20 to encourage KO victories
+
+// === ENRAGE SYSTEM ===
+// Damage multiplier increases after turn 3 to prevent stalemates
+const ENRAGE_START_TURN = 3;
+const ENRAGE_INCREMENT = 0.30;  // +30% per turn after turn 3
+const ENRAGE_MAX = 2.5;         // Cap at 2.5x
+
+/**
+ * Calculate enrage damage multiplier based on current turn
+ * Turns 1-3: 1.0x
+ * Turn 4+: 1.0 + (turn - 3) * 0.30, capped at 2.5x
+ */
+export const getEnrageMultiplier = (turn: number): number => {
+  if (turn <= ENRAGE_START_TURN) return 1.0;
+  const bonus = (turn - ENRAGE_START_TURN) * ENRAGE_INCREMENT;
+  return Math.min(1.0 + bonus, ENRAGE_MAX);
+};
 const toDamage = (value: number): number => Math.max(1, Math.floor(value));
 const BASE_DAMAGE_POWER = 100;
 const DEFENSE_OFFSET = 100;
@@ -192,10 +210,13 @@ export const simulateBattle = (
   let p2SpecialUsed = false;
 
   // Phase B: Track special move effects that persist
-  let p1FocusRemaining = 0;  // Focus: +30% ATK for 3 turns
+  let p1FocusRemaining = 0;  // Focus: +30% ATK for 3 turns (legacy)
   let p2FocusRemaining = 0;
-  let p1GuardActive = false; // Guard: 50% damage reduction this turn
+  let p1GuardActive = false; // Guard: damage reduction this turn
   let p2GuardActive = false;
+  // TRICKSTER: シグナルジャム debuff - enemy's next attack 0.85x
+  let p1DebuffActive = false;
+  let p2DebuffActive = false;
 
   // Track total damage for tiebreaker
   let totalDamageP1 = 0;
@@ -385,15 +406,28 @@ export const simulateBattle = (
 
     // ============================================
     // Phase B Special Move System (HP-based, once per battle)
+    // HP <= 50% triggers special move (configurable in phaseBSpecialMoves.ts)
     // ============================================
     let specialTriggered = false;
     let specialMessage: string | undefined;
+    let specialName: string | undefined;
+    let specialRoleName: string | undefined;
+    let specialImpact: string | undefined;
     let specialDamageMultiplier = 1.0;
+    let specialGuaranteedCrit = false;
 
-    // Check if attacker should trigger special (HP <= 40%, not used yet)
+    // Check if attacker should trigger special (HP <= 50%, not used yet)
     const isP1Attacker = attacker.id === robot1.id;
     const attackerMaxHp = isP1Attacker ? maxHp1 : maxHp2;
     const attackerUsedSpecial = isP1Attacker ? p1SpecialUsed : p2SpecialUsed;
+
+    // Check for active debuff from TRICKSTER's シグナルジャム
+    const attackerHasDebuff = isP1Attacker ? p1DebuffActive : p2DebuffActive;
+    if (attackerHasDebuff) {
+      // Clear debuff after applying (one-time use)
+      if (isP1Attacker) p1DebuffActive = false;
+      else p2DebuffActive = false;
+    }
 
     if (shouldTriggerSpecial(attackerHp, attackerMaxHp, attackerUsedSpecial, attacker.role)) {
       // Mark as used
@@ -407,21 +441,29 @@ export const simulateBattle = (
 
         specialTriggered = true;
         specialMessage = effect.message;
+        specialName = special.name;
+        specialRoleName = ROLE_LABELS[attacker.role as RobotRole] || 'ロボット';
+        specialImpact = effect.impactText;
 
-        // Apply immediate effects
+        // Apply immediate effects based on special type
         if (effect.damageMultiplier) {
-          // Burst: Next attack 1.35x
+          // ASSAULT (burst) or SNIPER (accel): damage multiplier
           specialDamageMultiplier = effect.damageMultiplier;
         }
 
+        if (effect.guaranteedCrit) {
+          // SNIPER (accel): guaranteed critical hit
+          specialGuaranteedCrit = true;
+        }
+
         if (effect.defenseMultiplier) {
-          // Guard: 50% damage reduction this turn
+          // TANK (guard): activate damage reduction shield
           if (isP1Attacker) p1GuardActive = true;
           else p2GuardActive = true;
         }
 
         if (effect.healAmount) {
-          // Heal: Recover 15% max HP
+          // SUPPORT (heal): recover HP
           if (isP1Attacker) {
             hp1 = Math.min(maxHp1, hp1 + effect.healAmount);
             attackerHp = hp1;
@@ -431,16 +473,13 @@ export const simulateBattle = (
           }
         }
 
-        // Note: Accel (extra attack) implementation would require more complex loop logic
-        // Placeholder for future enhancement
-
-        if (effect.temporaryAtkBoost) {
-          // Focus: +30% ATK for 3 turns
-          if (isP1Attacker) p1FocusRemaining = 3;
-          else p2FocusRemaining = 3;
+        if (effect.enemyDebuff) {
+          // TRICKSTER (focus): apply debuff to enemy's next attack
+          if (isP1Attacker) p2DebuffActive = true;
+          else p1DebuffActive = true;
         }
 
-        reasonTags.push(`【必殺技】`);
+        reasonTags.push(`【必殺】`);
       }
     }
 
@@ -519,7 +558,12 @@ export const simulateBattle = (
         }
       }
 
-      isCritical = rng.next() < critChance;
+      // SNIPER ヘッドショット: guaranteed critical
+      if (specialGuaranteedCrit) {
+        isCritical = true;
+      } else {
+        isCritical = rng.next() < critChance;
+      }
 
       // ============================================
       // JAMMER Item: Nullify critical (post-RNG, deterministic)
@@ -560,6 +604,12 @@ export const simulateBattle = (
       // Apply special move damage multiplier
       if (specialTriggered && specialDamageMultiplier !== 1.0) {
         damage = toDamage(damage * specialDamageMultiplier);
+      }
+
+      // Apply TRICKSTER debuff (enemy's attack reduced to 0.85x)
+      if (attackerHasDebuff) {
+        damage = toDamage(damage * 0.85);
+        reasonTags.push('ジャム');
       }
 
       message = `${attacker.name} attacks ${defender.name} for ${damage} damage!`;
@@ -714,6 +764,15 @@ export const simulateBattle = (
         itemEvent = "ITEM_APPLIED";
         itemMessage = ` 🛡️シールドアイテム発動！（${itemEffect}）`;
       }
+    }
+
+    // === ENRAGE SYSTEM: Apply late-game damage bonus ===
+    const enrageMultiplier = getEnrageMultiplier(turn);
+    if (damage > 0 && enrageMultiplier > 1.0) {
+      damage = toDamage(damage * enrageMultiplier);
+      const enrageBonus = Math.round((enrageMultiplier - 1) * 100);
+      message += ` 🔥終盤ボーナス（x${enrageMultiplier.toFixed(2)}）`;
+      reasonTags.push(`終盤+${enrageBonus}%`);
     }
 
     // HP減少（回復以外）
@@ -888,6 +947,12 @@ export const simulateBattle = (
         stanceOutcome,
         attackerOverdriveGauge: Math.floor(getOverdrive(attacker.id).gauge),
         defenderOverdriveGauge: Math.floor(getOverdrive(defender.id).gauge),
+        // Special Move fields (必殺技)
+        specialTriggered: true,
+        specialName: specialName,
+        specialRoleName: specialRoleName,
+        specialImpact: specialImpact,
+        specialHits: 1,  // Always single hit for stability
       });
     }
 

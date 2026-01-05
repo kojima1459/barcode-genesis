@@ -6,7 +6,7 @@ import { createRobotDoc, getFirestoreMock, renderWithRouter, setAuthState } from
 
 // TODO: Tests fail due to Battle component async timing in JSDOM.
 // Production functionality verified manually.
-describe.skip("Battle rewards UI", () => {
+describe("Battle rewards UI", () => {
   it("shows reward summary and avoids client credits/xp/level writes", async () => {
     vi.useFakeTimers();
     vi.mocked(setDoc).mockClear();

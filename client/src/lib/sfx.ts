@@ -164,11 +164,22 @@ export function getSkipMode(): boolean {
     return isSkipping;
 }
 
+// Track current battle ID to prevent clearing history on remounts
+let currentBattleId: string | null = null;
+
 /**
- * Clear played keys (call when starting new battle)
+ * Clear played keys for a NEW battle
+ * Only clears if the battleId is different from the last one
  */
-export function clearPlayedKeys(): void {
+export function clearSfxHistory(battleId?: string): void {
+    if (battleId && battleId === currentBattleId) {
+        return; // Same battle, don't clear history (prevents loops on remount)
+    }
+
     playedKeys.clear();
+    if (battleId) {
+        currentBattleId = battleId;
+    }
 }
 
 /**

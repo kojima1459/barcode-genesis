@@ -4,6 +4,58 @@ import type { RobotVisuals } from "@/types/shared";
 
 type RobotParts = RobotPartsSeed;
 
+// ============================================================
+// ROLE VISUAL SYSTEM
+// ============================================================
+
+/** Robot role types (5 categories) */
+type RobotRoleType = 'ASSAULT' | 'TANK' | 'SNIPER' | 'SUPPORT' | 'TRICKSTER';
+
+/** Render quality for performance: "list" is lightweight, "detail" has full effects */
+type RenderQuality = 'list' | 'detail';
+
+/** Role theme colors */
+const ROLE_THEME: Record<RobotRoleType, { eyeColor: string; accent: string; auraStroke: string }> = {
+  ASSAULT: { eyeColor: '#FF3333', accent: '#FF6600', auraStroke: '#FF4400' },
+  TANK: { eyeColor: '#44AAFF', accent: '#3388CC', auraStroke: '#4488BB' },
+  SNIPER: { eyeColor: '#00FF88', accent: '#22CC66', auraStroke: '#00CC55' },
+  SUPPORT: { eyeColor: '#FFDD44', accent: '#FFAA00', auraStroke: '#FFCC22' },
+  TRICKSTER: { eyeColor: '#CC44FF', accent: '#9933CC', auraStroke: '#AA33DD' },
+};
+
+/** Resolve role from robot, with fallback for legacy data */
+function resolveRole(role?: string, seed?: number): RobotRoleType {
+  if (role) {
+    const r = role.toUpperCase();
+    if (r in ROLE_THEME) return r as RobotRoleType;
+    // Legacy mappings
+    if (r === 'ATTACKER' || r === 'STRIKER') return 'ASSAULT';
+    if (r === 'SPEED') return 'SNIPER';
+    if (r === 'BALANCE' || r === 'BALANCED') return 'SUPPORT';
+    if (r === 'TRICKY') return 'TRICKSTER';
+  }
+  // Derive from seed if no role
+  if (seed !== undefined) {
+    const idx = Math.abs(seed) % 100;
+    if (idx < 35) return 'ASSAULT';
+    if (idx < 55) return 'TANK';
+    if (idx < 75) return 'SNIPER';
+    if (idx < 90) return 'SUPPORT';
+    return 'TRICKSTER';
+  }
+  return 'ASSAULT'; // Ultimate fallback
+}
+
+/** Get visual variant indices from seed (for individual variety within same role) */
+function getVisualVariant(seed: number): { eyeV: number; shoulderV: number; auraV: number } {
+  const s = Math.abs(seed);
+  return {
+    eyeV: Math.floor((s / 100) % 3),
+    shoulderV: Math.floor((s / 1000) % 3),
+    auraV: Math.floor((s / 10000) % 2),
+  };
+}
+
 interface RobotColors {
   primary: string;
   secondary: string;
@@ -36,6 +88,8 @@ interface RobotSVGProps {
   rarityEffect?: 'none' | 'rare' | 'legendary';
   simplified?: boolean;
   role?: string; // Phase B: Role for visual diversity
+  /** Render quality: "list" for lightweight (many robots), "detail" for full effects */
+  renderQuality?: RenderQuality;
 }
 
 const pickFromPalette = (palette: string[], seed: number, salt = 0) => {
@@ -59,7 +113,8 @@ function RobotSVGComponent({
   simplified = false,
   visuals,
   rarityEffect,
-  role
+  role,
+  renderQuality = 'detail'
 }: RobotSVGProps) {
   // ===== HOOKS MUST BE CALLED FIRST (before any early returns) =====
   // Use fallback empty object if parts is invalid - actual check happens after hooks
@@ -523,6 +578,250 @@ function RobotSVGComponent({
     );
   };
 
+  // ============================================================
+  // ROLE OVERLAY COMPONENTS (Eyes, Shoulders, Aura)
+  // ============================================================
+
+  const resolvedRole = resolveRole(role, seed);
+  const roleTheme = ROLE_THEME[resolvedRole];
+  const visualVar = getVisualVariant(seed);
+  const isListMode = renderQuality === 'list';
+
+  /** Role Eyes: Distinct eye patterns for each role (drawn over head) */
+  const RoleEyes = () => {
+    if (silhouette) return null;
+
+    const eyeColor = roleTheme.eyeColor;
+    const eyeV = visualVar.eyeV;
+
+    // Eyes positioned on head center (~100, 44)
+    switch (resolvedRole) {
+      case 'ASSAULT':
+        // Angry slanted slits (2 diagonal lines)
+        return (
+          <g id="role-eyes-assault" transform="translate(100, 44)">
+            <path d={`M-12 -2 L-4 ${eyeV > 0 ? 2 : 0} L-4 4 L-12 ${eyeV > 0 ? 0 : 2}`} fill={eyeColor} />
+            <path d={`M4 ${eyeV > 0 ? 2 : 0} L12 -2 L12 ${eyeV > 0 ? 0 : 2} L4 4`} fill={eyeColor} />
+            {/* Small red accent */}
+            <circle cx={eyeV === 2 ? 0 : -8} cy={-1} r="1.5" fill="#FF0000" opacity="0.8" />
+          </g>
+        );
+      case 'TANK':
+        // Wide horizontal visor bar
+        return (
+          <g id="role-eyes-tank" transform="translate(100, 44)">
+            <rect x="-14" y="-4" width="28" height={eyeV > 1 ? 10 : 8} rx="1" fill="#111" stroke={eyeColor} strokeWidth="1.5" />
+            <rect x="-11" y="-1" width="22" height={eyeV > 1 ? 6 : 4} fill={eyeColor} opacity="0.9" />
+          </g>
+        );
+      case 'SNIPER':
+        // Single scope eye OR thin vertical slits
+        return (
+          <g id="role-eyes-sniper" transform="translate(100, 44)">
+            {eyeV === 0 ? (
+              // Mono-scope
+              <>
+                <circle cx="0" cy="0" r="6" fill="#111" stroke={eyeColor} strokeWidth="1" />
+                <circle cx="0" cy="0" r="3" fill={eyeColor} />
+                <path d="M-8 0 L8 0 M0 -8 L0 8" stroke={eyeColor} strokeWidth="0.5" opacity="0.6" />
+              </>
+            ) : (
+              // Dual vertical slits
+              <>
+                <rect x="-10" y="-5" width="3" height="10" fill={eyeColor} />
+                <rect x="7" y="-5" width="3" height="10" fill={eyeColor} />
+                {eyeV === 2 && <circle cx="0" cy="0" r="1.5" fill={eyeColor} />}
+              </>
+            )}
+          </g>
+        );
+      case 'SUPPORT':
+        // Friendly round eyes with highlights
+        return (
+          <g id="role-eyes-support" transform="translate(100, 44)">
+            <circle cx="-7" cy="0" r={eyeV > 1 ? 5 : 4} fill="#111" />
+            <circle cx="-7" cy="0" r={eyeV > 1 ? 4 : 3} fill={eyeColor} />
+            <circle cx="-8" cy="-1" r="1" fill="white" opacity="0.8" />
+            <circle cx="7" cy="0" r={eyeV > 1 ? 5 : 4} fill="#111" />
+            <circle cx="7" cy="0" r={eyeV > 1 ? 4 : 3} fill={eyeColor} />
+            <circle cx="6" cy="-1" r="1" fill="white" opacity="0.8" />
+          </g>
+        );
+      case 'TRICKSTER':
+        // Asymmetric eyes (one normal, one wink/different shape)
+        return (
+          <g id="role-eyes-trickster" transform="translate(100, 44)">
+            {/* Left eye: Normal circle */}
+            <circle cx="-8" cy="0" r="4" fill="#111" />
+            <circle cx="-8" cy="0" r="3" fill={eyeColor} />
+            {/* Right eye: Wink (line) or different shape */}
+            {eyeV === 0 ? (
+              <path d="M4 0 L12 0" stroke={eyeColor} strokeWidth="2" strokeLinecap="round" />
+            ) : eyeV === 1 ? (
+              <path d="M5 -3 L11 3 M11 -3 L5 3" stroke={eyeColor} strokeWidth="1.5" />
+            ) : (
+              <rect x="5" y="-3" width="6" height="6" fill={eyeColor} transform="rotate(45 8 0)" />
+            )}
+            {/* Blinking animation for detail mode */}
+            {!isListMode && (
+              <circle cx="-8" cy="0" r="3" fill="transparent">
+                <animate attributeName="opacity" values="0;1;0" dur="3s" repeatCount="indefinite" begin="1.5s" />
+              </circle>
+            )}
+          </g>
+        );
+      default:
+        return null;
+    }
+  };
+
+  /** Role Shoulders: Distinct shoulder attachments (drawn on arm joints) */
+  const RoleShoulders = () => {
+    if (silhouette) return null;
+
+    const accentCol = roleTheme.accent;
+    const shoulderV = visualVar.shoulderV;
+
+    const ShoulderShape = () => {
+      switch (resolvedRole) {
+        case 'ASSAULT':
+          // Spiky blade shoulder
+          return (
+            <g>
+              <path d={`M0 0 L${shoulderV > 1 ? 25 : 20} ${shoulderV > 0 ? -15 : -12} L8 0 L15 30 L-5 25 Z`} fill={accentCol} stroke="#000" strokeWidth="0.8" />
+              {shoulderV === 2 && <path d="M3 -5 L18 -18" stroke="#FFF" strokeWidth="1" opacity="0.4" />}
+            </g>
+          );
+        case 'TANK':
+          // Large rectangular armor plate
+          return (
+            <g>
+              <rect x="-5" y="-10" width={shoulderV > 1 ? 35 : 30} height={shoulderV > 0 ? 45 : 40} rx="2" fill={accentCol} stroke="#000" strokeWidth="1" />
+              <rect x="0" y="-5" width="20" height="3" fill="#000" opacity="0.3" />
+              <rect x="0" y="5" width="20" height="3" fill="#000" opacity="0.3" />
+              {shoulderV === 2 && <rect x="0" y="15" width="20" height="3" fill="#000" opacity="0.3" />}
+            </g>
+          );
+        case 'SNIPER':
+          // Thin antenna/sensor
+          return (
+            <g>
+              <rect x="0" y="-25" width="3" height={shoulderV > 1 ? 35 : 30} fill={accentCol} stroke="#000" strokeWidth="0.5" />
+              <circle cx="1.5" cy={shoulderV > 1 ? -28 : -23} r="3" fill={roleTheme.eyeColor} opacity="0.9" />
+              {shoulderV > 0 && <rect x="6" y="-15" width="2" height="18" fill={accentCol} opacity="0.7" />}
+            </g>
+          );
+        case 'SUPPORT':
+          // Rounded capsule/pod
+          return (
+            <g>
+              <ellipse cx="10" cy="10" rx={shoulderV > 1 ? 14 : 12} ry={shoulderV > 0 ? 18 : 15} fill={accentCol} stroke="#000" strokeWidth="0.8" />
+              <path d="M6 5 L14 5 M10 2 L10 8" stroke="white" strokeWidth="1" opacity="0.5" />
+              {shoulderV === 2 && <circle cx="10" cy="18" r="3" fill={roleTheme.eyeColor} opacity="0.6" />}
+            </g>
+          );
+        case 'TRICKSTER':
+          // Asymmetric hood/cloak effect (one side only)
+          return (
+            <g>
+              <path d={`M-5 -5 Q15 ${shoulderV > 0 ? -25 : -20} 25 0 L20 35 Q10 40 0 30 Z`} fill={accentCol} stroke="#000" strokeWidth="0.5" opacity="0.85" />
+              {shoulderV > 0 && <path d="M5 10 L15 5" stroke="#FFF" strokeWidth="0.8" opacity="0.3" />}
+            </g>
+          );
+        default:
+          return null;
+      }
+    };
+
+    // Only draw left shoulder for TRICKSTER (asymmetric)
+    if (resolvedRole === 'TRICKSTER') {
+      return (
+        <g id="role-shoulders">
+          <g transform="translate(35, 62)"><ShoulderShape /></g>
+        </g>
+      );
+    }
+
+    return (
+      <g id="role-shoulders">
+        <g transform="translate(35, 62)"><ShoulderShape /></g>
+        <g transform="translate(165, 62) scale(-1, 1)"><ShoulderShape /></g>
+      </g>
+    );
+  };
+
+  /** Role Aura: Background effect (detail mode only, or simple stroke in list) */
+  const RoleAura = () => {
+    if (silhouette) return null;
+
+    const auraStroke = roleTheme.auraStroke;
+    const auraV = visualVar.auraV;
+
+    // List mode: Simple stroke outline only (no filters)
+    if (isListMode) {
+      return (
+        <circle cx="100" cy="100" r="85" fill="none" stroke={auraStroke} strokeWidth="1" opacity="0.25" />
+      );
+    }
+
+    // Detail mode: Role-specific aura effects
+    switch (resolvedRole) {
+      case 'ASSAULT':
+        // Diagonal heat lines
+        return (
+          <g id="role-aura-assault" opacity="0.3">
+            {[0, 1, 2].map(i => (
+              <path key={i} d={`M${50 + i * 30} 20 L${70 + i * 30} 180`} stroke={auraStroke} strokeWidth={auraV > 0 ? 2 : 1.5} strokeLinecap="round" opacity={0.4 + i * 0.1}>
+                <animate attributeName="opacity" values="0.3;0.6;0.3" dur={`${1.5 + i * 0.3}s`} repeatCount="indefinite" />
+              </path>
+            ))}
+          </g>
+        );
+      case 'TANK':
+        // Shield ring (double circle)
+        return (
+          <g id="role-aura-tank" opacity="0.35">
+            <circle cx="100" cy="100" r={auraV > 0 ? 95 : 90} fill="none" stroke={auraStroke} strokeWidth="2" />
+            <circle cx="100" cy="100" r={auraV > 0 ? 85 : 80} fill="none" stroke={auraStroke} strokeWidth="1" strokeDasharray="8 4" />
+          </g>
+        );
+      case 'SNIPER':
+        // Targeting reticle
+        return (
+          <g id="role-aura-sniper" opacity="0.35">
+            <circle cx="100" cy="100" r={auraV > 0 ? 70 : 60} fill="none" stroke={auraStroke} strokeWidth="1" />
+            <circle cx="100" cy="100" r={auraV > 0 ? 50 : 40} fill="none" stroke={auraStroke} strokeWidth="0.5" />
+            <path d="M100 30 L100 50 M100 150 L100 170 M30 100 L50 100 M150 100 L170 100" stroke={auraStroke} strokeWidth="1" />
+          </g>
+        );
+      case 'SUPPORT':
+        // Rising particles (small dots)
+        return (
+          <g id="role-aura-support" opacity="0.4">
+            {[0, 1, 2, 3].map(i => (
+              <circle key={i} cx={70 + i * 20} cy="160" r="2" fill={auraStroke}>
+                <animate attributeName="cy" values="160;60;160" dur={`${2 + i * 0.4}s`} repeatCount="indefinite" />
+                <animate attributeName="opacity" values="0;0.8;0" dur={`${2 + i * 0.4}s`} repeatCount="indefinite" />
+              </circle>
+            ))}
+          </g>
+        );
+      case 'TRICKSTER':
+        // Glitch lines (short segments with opacity flicker)
+        return (
+          <g id="role-aura-trickster" opacity="0.35">
+            {[0, 1, 2].map(i => (
+              <rect key={i} x={40 + i * 50} y={60 + i * 30} width={15 + auraV * 5} height="3" fill={auraStroke}>
+                <animate attributeName="opacity" values="0;1;0" dur={`${0.5 + i * 0.2}s`} repeatCount="indefinite" />
+                <animate attributeName="x" values={`${40 + i * 50};${45 + i * 50};${40 + i * 50}`} dur={`${0.3 + i * 0.1}s`} repeatCount="indefinite" />
+              </rect>
+            ))}
+          </g>
+        );
+      default:
+        return null;
+    }
+  };
 
   const ShoulderArmor = () => {
     // variantKey determines style: 0-2=None (Light), 3-8=Armor
@@ -978,8 +1277,10 @@ function RobotSVGComponent({
 
       {/* Main robot rendering - wrapped in silhouette filter when locked */}
       <g filter={silhouette ? `url(#${instanceId}-silhouette)` : undefined} transform={!silhouette ? roleTransform : undefined}>
-        {/* Render Order: Back -> Thrusters -> Legs -> Arms -> Body -> Head -> Weapon */}
+        {/* Render Order: Aura -> Back -> Thrusters -> Legs -> Arms -> Shoulders -> Body -> Head -> Eyes -> Weapon */}
         <g className={silhouette ? undefined : `mech-anim-${instanceId}`}>
+          {/* Role Aura (background - behind everything) */}
+          <RoleAura />
           {/* Aura and Heavy effects skipped in isLite */}
           {!isLite && (
             <>
@@ -991,10 +1292,14 @@ function RobotSVGComponent({
           )}
           <Legs />
           <Arms />
+          {/* Role Shoulders (on arm joints) */}
+          <RoleShoulders />
           <ShoulderArmor />
           <Body />
           <DecalOverlay />
           <Head />
+          {/* Role Eyes (on top of head - most important visibility) */}
+          <RoleEyes />
           <Weapon />
           {!isLite && <RareEffect />}
         </g>
@@ -1058,7 +1363,8 @@ export default memo(RobotSVGComponent, (prevProps, nextProps) => {
     prevProps.isRareVariant !== nextProps.isRareVariant ||
     prevProps.simplified !== nextProps.simplified ||
     prevProps.role !== nextProps.role ||
-    prevProps.rarityEffect !== nextProps.rarityEffect
+    prevProps.rarityEffect !== nextProps.rarityEffect ||
+    prevProps.renderQuality !== nextProps.renderQuality
   ) {
     return false; // Props changed, re-render
   }

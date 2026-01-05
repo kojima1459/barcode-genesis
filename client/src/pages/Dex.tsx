@@ -164,7 +164,7 @@ function RoleSection({
                         <CardContent className="p-3 flex flex-col gap-2">
                           <div className="flex items-center gap-2">
                             <div className="shrink-0 w-[56px] h-[56px] flex items-center justify-center rounded border border-white/10 bg-black/20">
-                              <RobotSVG parts={robot.parts} colors={robot.colors} size={52} simplified={true} />
+                              <RobotSVG parts={robot.parts} colors={robot.colors} size={52} simplified={true} renderQuality="list" />
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="font-bold text-xs truncate">{robot.name || t('label_unnamed')}</div>
@@ -624,6 +624,7 @@ export default function Dex() {
                               simplified={true}
                               role={typeof r.role === 'string' ? r.role : undefined}
                               rarityEffect={r.rarityTier === 'legendary' ? 'legendary' : (r.rarityTier === 'rare' ? 'rare' : undefined)}
+                              renderQuality="list"
                             />
                           ) : <div className="text-xs text-muted-foreground">{t('no_preview')}</div>}
                         </div>
@@ -724,7 +725,7 @@ export default function Dex() {
                     <Interactive className="bg-black/30 border-white/10 rounded-xl">
                       <CardContent className="p-4 flex gap-4 h-full">
                         <div className="shrink-0 w-[96px] h-[96px] flex items-center justify-center rounded border border-white/10 bg-black/20" data-testid="owned-robot-card">
-                          {v.parts && v.colors ? <RobotSVG parts={v.parts} colors={v.colors} size={90} simplified={true} /> : <div className="text-xs text-muted-foreground">{t('no_preview')}</div>}
+                          {v.parts && v.colors ? <RobotSVG parts={v.parts} colors={v.colors} size={90} simplified={true} renderQuality="list" /> : <div className="text-xs text-muted-foreground">{t('no_preview')}</div>}
                         </div>
                         <div className="flex-1 min-w-0 space-y-2">
                           <div className="min-w-0">

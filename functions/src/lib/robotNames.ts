@@ -13,23 +13,23 @@ import { RobotRole, RobotRarity } from './robotRoles';
  * Epithet lists by role (Japanese)
  */
 const EPITHETS_BY_ROLE: Record<RobotRole, string[]> = {
-    striker: [
+    ASSAULT: [
         '烈火の', '疾風の', '鋭刃の', '雷撃の', '破壊の',
         '猛攻の', '爆炎の', '閃光の', '豪腕の', '無双の'
     ],
-    tank: [
+    TANK: [
         '鉄壁の', '不屈の', '守護の', '堅牢の', '重装の',
         '不動の', '要塞の', '盾の', '防壁の', '鋼の'
     ],
-    speed: [
+    SNIPER: [
         '影走りの', '神速の', '閃光の', '疾走の', '迅雷の',
         '風の', '稲妻の', '瞬間の', '軽業の', '飛翔の'
     ],
-    support: [
+    SUPPORT: [
         '慈愛の', '援護の', '希望の', '祝福の', '癒しの',
         '献身の', '守り手', '導きの', '奇跡の', '光の'
     ],
-    balanced: [
+    TRICKSTER: [
         '勇敢な', '誇り高き', '不屈の', '英雄の', '伝説の',
         '無敵の', '栄光の', '王者の', '覇者の', '至高の'
     ]
@@ -72,8 +72,8 @@ export function generateEpithet(role: RobotRole, rarity: RobotRarity, seed: numb
         return LEGENDARY_EPITHETS[index] ?? '伝説の';
     }
 
-    // Otherwise use role-based epithets (fallback to 'balanced' if role is invalid)
-    const epithets = EPITHETS_BY_ROLE[role] ?? EPITHETS_BY_ROLE['balanced'];
+    // Otherwise use role-based epithets (fallback to 'ASSAULT' if role is invalid)
+    const epithets = EPITHETS_BY_ROLE[role] ?? EPITHETS_BY_ROLE['ASSAULT'];
     const index = Math.floor((safeSeed / 1000) % epithets.length);
     return epithets[index] ?? '勇敢な';
 }

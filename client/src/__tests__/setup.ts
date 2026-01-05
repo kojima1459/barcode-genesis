@@ -182,6 +182,9 @@ vi.mock("@/components/SEO", () => ({
 vi.mock("@/lib/firebase", () => ({
   db: {},
   functions: {},
+  getDb: () => ({}),
+  getAuth: () => ({}),
+  getFunctions: () => ({}),
 }));
 
 vi.mock("firebase/functions", () => ({

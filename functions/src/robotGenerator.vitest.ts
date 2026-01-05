@@ -34,8 +34,8 @@ describe('Role Determinism', () => {
             '8801234567891',
         ];
 
-        // Phase B role system uses lowercase role names
-        const validRoles = ['striker', 'tank', 'speed', 'support', 'balanced'];
+        // Updated role system uses uppercase role names
+        const validRoles = ['ASSAULT', 'TANK', 'SNIPER', 'SUPPORT', 'TRICKSTER'];
 
         for (const barcode of barcodes) {
             const robot = generateRobotData(barcode, 'testUser');

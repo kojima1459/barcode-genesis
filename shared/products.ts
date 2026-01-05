@@ -13,8 +13,8 @@ export interface Product {
 export const PRODUCTS: Product[] = [
   {
     id: 'coin_pack_small',
-    name: 'Credit Pouch',
-    description: 'A small pouch of credits to get you started.',
+    name: 'クレジットポーチ',
+    description: '少しだけクレジットが必要な時に。',
     price: 120,
     currency: 'jpy',
     image: '/images/coin_small.png',
@@ -24,8 +24,8 @@ export const PRODUCTS: Product[] = [
   },
   {
     id: 'coin_pack_medium',
-    name: 'Credit Bag',
-    description: 'A bag full of credits for serious battlers.',
+    name: 'クレジットバッグ',
+    description: 'バトラーに人気の標準セット。',
     price: 500,
     currency: 'jpy',
     image: '/images/coin_medium.png',
@@ -35,8 +35,8 @@ export const PRODUCTS: Product[] = [
   },
   {
     id: 'coin_pack_large',
-    name: 'Credit Chest',
-    description: 'A treasure chest overflowing with credits!',
+    name: 'クレジット金庫',
+    description: '大量のクレジットで一気に強化！',
     price: 980,
     currency: 'jpy',
     image: '/images/coin_large.png',
@@ -46,8 +46,8 @@ export const PRODUCTS: Product[] = [
   },
   {
     id: 'premium_monthly',
-    name: 'Premium Monthly',
-    description: 'Monthly premium subscription with exclusive benefits.',
+    name: 'プレミアムプラン',
+    description: '広告非表示やスキャン制限解除など、特典満載の月額プラン。',
     price: 390,
     currency: 'jpy',
     image: '/images/premium.png',

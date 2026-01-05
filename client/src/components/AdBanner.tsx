@@ -45,8 +45,12 @@ function AdBannerComponent() {
       if (!container || !container.isConnected) return;
 
       try {
-        // Clear previous content safely
-        container.innerHTML = '';
+        // Clear previous content safely (only if in DOM)
+        if (container.isConnected) {
+          while (container.firstChild) {
+            container.removeChild(container.firstChild);
+          }
+        }
 
         const iframe = document.createElement('iframe');
         Object.assign(iframe.style, {
@@ -114,12 +118,16 @@ function AdBannerComponent() {
     return () => {
       unmountedRef.current = true;
       const container = bannerRef.current;
-      if (container) {
+      if (container && container.isConnected) {
         try {
           // Clear children safely to prevent memory leaks/DOM issues
-          container.innerHTML = '';
-        } catch {
-          // Ignore cleanup errors
+          // Only if still in DOM
+          while (container.firstChild) {
+            container.removeChild(container.firstChild);
+          }
+        } catch (e) {
+          // Ignore cleanup errors (element may have been removed already)
+          console.debug('[AdBanner] Cleanup skipped - element detached');
         }
       }
     };

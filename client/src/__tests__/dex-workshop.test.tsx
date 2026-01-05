@@ -5,7 +5,7 @@ import { createRobotDoc, createVariantDoc, getFirestoreMock, renderWithRouter, s
 
 // TODO: These tests timeout due to heavy async component rendering in JSDOM.
 // Production functionality verified manually - tests need optimization.
-describe.skip("Dex -> Workshop wiring", () => {
+describe.skip('Dex Workshop Integration', () => {
   const uid = "user-123";
 
   it("uses robot id when selecting from Robots tab", async () => {

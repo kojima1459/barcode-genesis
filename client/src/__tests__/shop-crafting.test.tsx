@@ -7,7 +7,7 @@ import { SHOP_ITEMS } from "@/lib/items";
 
 // TODO: Tests fail due to Shop async loading state timing in JSDOM.
 // Production functionality verified manually.
-describe.skip("Shop crafting", () => {
+describe("Shop crafting", () => {
   it("renders crafting recipes and calls craftItem", async () => {
     const uid = "user-shop-1";
     setAuthState({ user: { uid }, loading: false });

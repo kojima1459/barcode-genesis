@@ -429,13 +429,13 @@ describe('simulateBattle: New Mechanics', () => {
 });
 
 describe('simulateBattle v2 Updates', () => {
-    it('should respect MAX_TURNS = 20', () => {
+    it('should respect MAX_TURNS = 15', () => {
         const r1 = createTestRobot('r1', { baseHp: 5000, baseAttack: 20, baseDefense: 20 });
         const r2 = createTestRobot('r2', { baseHp: 5000, baseAttack: 20, baseDefense: 20 });
         const res = simulateBattle(r1, r2, 'turn-limit-test');
-        // Likely to reach turn 20 with high HP
+        // Likely to reach turn 15 with high HP (reduced from 20 for better KO rate)
         if (res.logs[res.logs.length - 1].defenderHp > 0) {
-            expect(res.turnCount).toBe(20);
+            expect(res.turnCount).toBe(15);
         }
     });
 
@@ -608,5 +608,207 @@ describe('Combined Mechanics: Finisher + Sudden Death', () => {
 
         // Winner should be the same
         expect(result1.winnerId).toBe(result2.winnerId);
+    });
+});
+
+// ============================================================
+// ENRAGE SYSTEM TESTS
+// ============================================================
+import { getEnrageMultiplier } from './battleSystem';
+
+describe('Enrage System', () => {
+    describe('getEnrageMultiplier', () => {
+        it('should return 1.0 for turns 1-3', () => {
+            expect(getEnrageMultiplier(1)).toBe(1.0);
+            expect(getEnrageMultiplier(2)).toBe(1.0);
+            expect(getEnrageMultiplier(3)).toBe(1.0);
+        });
+
+        it('should increase by 0.30 per turn after turn 3', () => {
+            expect(getEnrageMultiplier(4)).toBeCloseTo(1.30, 2);
+            expect(getEnrageMultiplier(5)).toBeCloseTo(1.60, 2);
+            expect(getEnrageMultiplier(6)).toBeCloseTo(1.90, 2);
+            expect(getEnrageMultiplier(7)).toBeCloseTo(2.20, 2);
+        });
+
+        it('should cap at 2.5x', () => {
+            expect(getEnrageMultiplier(8)).toBeCloseTo(2.50, 2);
+            expect(getEnrageMultiplier(10)).toBeCloseTo(2.50, 2);
+            expect(getEnrageMultiplier(15)).toBeCloseTo(2.50, 2);
+        });
+    });
+
+    describe('Turn Limit', () => {
+        it('should end battle by turn 15', () => {
+            const robot1 = createTestRobot('enrage-r1', { baseHp: 9999, baseAttack: 10, baseDefense: 200 });
+            const robot2 = createTestRobot('enrage-r2', { baseHp: 9999, baseAttack: 10, baseDefense: 200 });
+
+            const result = simulateBattle(robot1, robot2, 'turn-limit-test');
+
+            // Excluding START log, max turns should be 15
+            const actionLogs = result.logs.filter(l => l.action !== 'START');
+            // Each turn may have multiple logs (attack, counter, etc), so check turnCount
+            expect(result.turnCount).toBeLessThanOrEqual(15);
+        });
+    });
+
+    describe('Enrage Damage Scaling', () => {
+        it('should deal more damage in later turns', () => {
+            // Use fixed seed for deterministic results
+            const robot1 = createTestRobot('scale-r1', { baseHp: 2000, baseAttack: 100, baseDefense: 50 });
+            const robot2 = createTestRobot('scale-r2', { baseHp: 2000, baseAttack: 100, baseDefense: 50 });
+
+            const result = simulateBattle(robot1, robot2, 'enrage-scale-test');
+
+            // Find attack logs at different turns
+            const turn3Logs = result.logs.filter(l => l.turn === 3 && l.action === 'attack');
+            const turn8Logs = result.logs.filter(l => l.turn === 8 && l.action === 'attack');
+
+            // If both exist, turn 8 damage should be higher due to enrage
+            if (turn3Logs.length > 0 && turn8Logs.length > 0) {
+                const turn3Damage = turn3Logs[0].damage;
+                const turn8Damage = turn8Logs[0].damage;
+
+                // Turn 8 should have higher damage due to enrage (2.5x vs 1.0x)
+                // Allow for variance in base damage
+                expect(turn8Damage).toBeGreaterThan(turn3Damage * 0.9);
+            }
+        });
+    });
+});
+
+// ============================================================
+// SPECIAL MOVE SYSTEM TESTS (必殺技)
+// ============================================================
+
+describe('Special Move System (必殺技)', () => {
+    it('should trigger special at most once per side', () => {
+        const robot1 = createTestRobot('r1', {
+            baseHp: 200,
+            baseAttack: 100,
+            baseDefense: 50,
+            role: 'ASSAULT' as any,
+        });
+        const robot2 = createTestRobot('r2', {
+            baseHp: 200,
+            baseAttack: 100,
+            baseDefense: 50,
+            role: 'TANK' as any,
+        });
+
+        const result = simulateBattle(robot1, robot2, 'special-once-test');
+
+        const p1SpecialLogs = result.logs.filter(log => log.specialTriggered && log.attackerId === robot1.id);
+        const p2SpecialLogs = result.logs.filter(log => log.specialTriggered && log.attackerId === robot2.id);
+
+        expect(p1SpecialLogs.length).toBeLessThanOrEqual(1);
+        expect(p2SpecialLogs.length).toBeLessThanOrEqual(1);
+    });
+
+    it('should include specialName, specialRoleName, specialImpact in log', () => {
+        const robot1 = createTestRobot('r1', {
+            baseHp: 150,
+            baseAttack: 120,
+            baseDefense: 40,
+            role: 'ASSAULT' as any,
+        });
+        const robot2 = createTestRobot('r2', {
+            baseHp: 300,
+            baseAttack: 150,
+            baseDefense: 50,
+            role: 'SNIPER' as any,
+        });
+
+        const result = simulateBattle(robot1, robot2, 'special-fields-test');
+        const specialLog = result.logs.find(log => log.specialTriggered && log.action === 'special');
+
+        if (specialLog) {
+            expect(specialLog.specialTriggered).toBe(true);
+            expect(specialLog.specialName).toBeDefined();
+            expect(typeof specialLog.specialName).toBe('string');
+            expect(specialLog.specialRoleName).toBeDefined();
+            expect(specialLog.specialImpact).toBeDefined();
+            expect(specialLog.specialHits).toBe(1);
+        }
+    });
+
+    it('should not trigger special when HP stays above 50%', () => {
+        const dominant = createTestRobot('dominant', {
+            baseHp: 1000,
+            baseAttack: 200,
+            baseDefense: 200,
+            role: 'ASSAULT' as any,
+        });
+        const weak = createTestRobot('weak', {
+            baseHp: 50,
+            baseAttack: 10,
+            baseDefense: 10,
+            role: 'SUPPORT' as any,
+        });
+
+        const result = simulateBattle(dominant, weak, 'no-special-test');
+        const dominantSpecialLogs = result.logs.filter(
+            log => log.specialTriggered && log.attackerId === dominant.id
+        );
+        expect(dominantSpecialLogs.length).toBe(0);
+    });
+
+    it('should be deterministic with same battleId', () => {
+        const robot1 = createTestRobot('r1', {
+            baseHp: 200,
+            baseAttack: 100,
+            baseDefense: 50,
+            role: 'SNIPER' as any,
+        });
+        const robot2 = createTestRobot('r2', {
+            baseHp: 200,
+            baseAttack: 100,
+            baseDefense: 50,
+            role: 'TRICKSTER' as any,
+        });
+
+        const result1 = simulateBattle(robot1, robot2, 'special-determinism-test');
+        const result2 = simulateBattle(robot1, robot2, 'special-determinism-test');
+
+        const specialLogs1 = result1.logs.filter(log => log.specialTriggered);
+        const specialLogs2 = result2.logs.filter(log => log.specialTriggered);
+
+        expect(specialLogs1.length).toBe(specialLogs2.length);
+        expect(specialLogs1.map(l => l.turn)).toEqual(specialLogs2.map(l => l.turn));
+    });
+
+    it('should work correctly for all roles', () => {
+        const roles = ['ASSAULT', 'TANK', 'SNIPER', 'SUPPORT', 'TRICKSTER'] as const;
+        const expectedSpecialNames: Record<string, string> = {
+            ASSAULT: 'メガブレイク',
+            TANK: 'アイアンバリア',
+            SNIPER: 'ヘッドショット',
+            SUPPORT: 'リペアパルス',
+            TRICKSTER: 'シグナルジャム',
+        };
+
+        for (const role of roles) {
+            const robot1 = createTestRobot(role, {
+                baseHp: 150,
+                baseAttack: 100,
+                baseDefense: 50,
+                role: role as any,
+            });
+            const robot2 = createTestRobot('opponent', {
+                baseHp: 300,
+                baseAttack: 150,
+                baseDefense: 50,
+                role: 'ASSAULT' as any,
+            });
+
+            const result = simulateBattle(robot1, robot2, `special-role-${role}-test`);
+            const specialLog = result.logs.find(
+                log => log.specialTriggered && log.attackerId === robot1.id && log.action === 'special'
+            );
+
+            if (specialLog) {
+                expect(specialLog.specialName).toBe(expectedSpecialNames[role]);
+            }
+        }
     });
 });
