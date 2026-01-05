@@ -22,6 +22,7 @@ import { Interactive } from "@/components/ui/interactive";
 import { ScrambleText } from "@/components/ui/ScrambleText";
 import { ROLE_COLORS, ROLE_LABELS } from "@/lib/dexRegistry";
 import { normalizeToEan13, type BarcodeKind } from "@/lib/barcodeNormalize"; // REF: EAN8
+import { toUserMessage, isRateLimitError } from "@/lib/errorMessage";
 
 const getCallableErrorCode = (error: unknown) => {
     if (error && typeof error === "object" && "code" in error) {
@@ -121,7 +122,7 @@ export default function Scan() {
                 setMode('scan');
             }
         } catch (error: any) {
-            // Detailed error logging for debugging
+            // Detailed error logging for debugging (console only)
             console.error('[Scan] generateRobot error:', {
                 name: error?.name,
                 message: error?.message,
@@ -131,37 +132,35 @@ export default function Scan() {
                 rawBody: error?.rawBody?.slice?.(0, 500),
                 stack: error?.stack,
             });
-            // Even if error, we waited for animation. 
-            // UX decision: show error after animation or interrupt?
-            // Current code waits. So error appears after "Reveal" phase which might be weird if "Reveal" shows nothing.
-            // But GenerationAnimation onComplete calls are internal.
-            // Actually, we are relying on waiting 6.5s. 
 
-            const code = error?.code;
-            const message = error?.message || 'Unknown error';
-            const httpStatus = error?.httpStatus;
-
-            if (code === 'resource-exhausted') {
-                setLimitMessage(message);
+            // Handle rate limit with modal
+            if (isRateLimitError(error)) {
+                setLimitMessage(error?.message || '');
                 setShowLimitModal(true);
                 setMode('scan');
                 return;
             }
 
-            let userMessage = "Error: " + message;
-            if (code === 'internal') {
-                userMessage = t('scan_server_error');
-            } else if (code === 'invalid-argument') {
-                userMessage = t('scan_invalid_barcode');
-            } else if (code === 'unauthenticated') {
-                userMessage = t('scan_auth_error');
-            } else if (code === 'already-exists') {
-                userMessage = t('scan_robot_exists');
-            }
+            // Convert to user-friendly Japanese message
+            const userMsg = toUserMessage(error, { barcode: scannedBarcode });
 
-            // Add technical details for debugging (visible to user)
-            const techDetails = httpStatus ? ` [${httpStatus}${code ? '/' + code : ''}]` : (code ? ` [${code}]` : '');
-            toast.error(userMessage + techDetails, { duration: 5000 });
+            // Show toast with optional action button
+            if (userMsg.action?.href) {
+                // 「already-exists」など、アクション付きの場合
+                toast(userMsg.message, {
+                    action: {
+                        label: userMsg.action.label,
+                        onClick: () => setLocation(userMsg.action!.href!)
+                    },
+                    duration: 6000
+                });
+            } else if (userMsg.isError === false) {
+                // 情報として表示（既存ロボの場合など）
+                toast(userMsg.message, { duration: 5000 });
+            } else {
+                // エラーとして表示
+                toast.error(userMsg.message, { duration: 5000 });
+            }
             setMode('scan');
         } finally {
             setIsGenerating(false);

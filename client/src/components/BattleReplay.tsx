@@ -695,7 +695,7 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
                         break;
                     }
 
-                    case 'LOG_MESSAGE':
+                    case 'LOG_MESSAGE': {
                         // Update Context for Status Bar
                         setBattleStatus({
                             guarded: event.guarded,
@@ -725,6 +725,7 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
                         if (odUpdates.p1Gauge !== undefined) setP1OverdriveGauge(odUpdates.p1Gauge);
                         if (odUpdates.p2Gauge !== undefined) setP2OverdriveGauge(odUpdates.p2Gauge);
                         break;
+                    }
 
                     case 'ATTACK_PREPARE':
                         if (event.attackerId) {
@@ -792,7 +793,7 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
                         }
                         break;
 
-                    case 'HP_UPDATE':
+                    case 'HP_UPDATE': {
                         if (event.currentHp) {
                             // Calculate Deltas for Flash UI
                             const checkDelta = (id: string, newHp: number, oldHp: number) => {
@@ -837,6 +838,7 @@ export default function BattleReplay({ p1, p2, result, onComplete, initialSpeed 
                         if (odUpdatesHp.p1Gauge !== undefined) setP1OverdriveGauge(odUpdatesHp.p1Gauge);
                         if (odUpdatesHp.p2Gauge !== undefined) setP2OverdriveGauge(odUpdatesHp.p2Gauge);
                         break;
+                    }
 
                     case 'PHASE_START':
                         if (event.turn) setCurrentTurn(event.turn);
@@ -1389,7 +1391,7 @@ const RobotCard = memo(({ robot, hpPercent, currentHp, isShaking, isLunging, isP
                             textShadow: '0 0 5px black'
                         }}
                     >
-                        {deltas[robot.id]?.value! > 0 ? '+' : ''}{deltas[robot.id]?.value}
+                        {(deltas[robot.id]?.value ?? 0) > 0 ? '+' : ''}{deltas[robot.id]?.value}
                         {deltas[robot.id]?.isCritical && <span className="text-yellow-400 text-xs block text-center">CRIT</span>}
                     </motion.div>
                 )}

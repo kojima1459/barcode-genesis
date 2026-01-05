@@ -41,6 +41,7 @@ import {
   WeeklyBossResponse
 } from "@/types/boss";
 import { PremiumCard } from "@/components/PremiumCard";
+import { toUserMessage, isRateLimitError } from "@/lib/errorMessage";
 
 
 interface Mission {
@@ -252,30 +253,37 @@ export default function Home() {
         toast.error(t('scan_failed'));
       }
     } catch (error: any) {
-      console.error('generateRobot error:', error);
+      // Detailed error logging for debugging (console only)
+      console.error('[Home] generateRobot error:', {
+        code: error?.code,
+        message: error?.message,
+        httpStatus: error?.httpStatus,
+      });
 
-      // Improve error handling based on HttpsError code
-      const code = error?.code;
-      const message = error?.message || 'Unknown error';
-
-      if (code === 'resource-exhausted') {
-        setLimitMessage(message);
+      // Handle rate limit with modal
+      if (isRateLimitError(error)) {
+        setLimitMessage(error?.message || '');
         setShowLimitModal(true);
         return;
       }
 
-      let userMessage = "Error: " + message;
-      if (code === 'internal') {
-        userMessage = 'サーバーエラーが発生しました。時間を置いて再度お試しください。(internal)';
-      } else if (code === 'invalid-argument') {
-        userMessage = '無効なバーコードです。(invalid-argument)';
-      } else if (code === 'unauthenticated') {
-        userMessage = '認証エラーです。再度ログインしてください。(unauthenticated)';
-      }
+      // Convert to user-friendly Japanese message
+      const userMsg = toUserMessage(error, { barcode });
 
-      toast.error(userMessage, {
-        duration: 5000,
-      });
+      // Show toast with optional action button
+      if (userMsg.action?.href) {
+        toast(userMsg.message, {
+          action: {
+            label: userMsg.action.label,
+            onClick: () => setLocation(userMsg.action!.href!)
+          },
+          duration: 6000
+        });
+      } else if (userMsg.isError === false) {
+        toast(userMsg.message, { duration: 5000 });
+      } else {
+        toast.error(userMsg.message, { duration: 5000 });
+      }
     } finally {
       setIsGenerating(false);
     }
